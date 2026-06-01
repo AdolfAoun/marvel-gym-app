@@ -22,7 +22,6 @@ export type Member = {
   email: string;
   phone: string;
   dateOfBirth?: string;
-  profileImageUrl?: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   createdAt: string;
