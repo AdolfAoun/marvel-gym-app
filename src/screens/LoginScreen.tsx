@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -58,17 +59,24 @@ export default function LoginScreen() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}>
             <View style={styles.brandBlock}>
-              <Text style={styles.brandTitle}>Marvel Gym</Text>
-              <Text style={styles.tagline}>Stronger Every Day</Text>
+              <View style={styles.logoGlow} />
+              <Image
+                source={require('@/assets/images/marvel-logo-transparent.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
             </View>
 
             <View style={styles.heroBlock}>
-              <Text style={styles.heroSubtitle}>
-                Access your membership, classes, and gym check-in.
-              </Text>
+              <View style={styles.subtitlePill}>
+                <Text style={styles.heroSubtitle}>
+                  Access your membership, classes, and gym check-in.
+                </Text>
+              </View>
             </View>
 
             <View style={styles.loginCard}>
+              <View style={styles.cardGloss} />
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Email</Text>
                 <TextInput
@@ -233,45 +241,71 @@ const styles = StyleSheet.create({
   },
   brandBlock: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 18,
+    position: 'relative',
   },
-  brandTitle: {
-    color: '#f8fafc',
-    fontSize: 30,
-    fontWeight: '900',
-    letterSpacing: 0,
+  logoGlow: {
+    position: 'absolute',
+    top: 3,
+    width: 158,
+    height: 158,
+    borderRadius: 79,
+    backgroundColor: accentColor,
+    opacity: 0.18,
+    shadowColor: accentColor,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.62,
+    shadowRadius: 36,
   },
-  tagline: {
-    color: accentColor,
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 0,
-    marginTop: 8,
+  logoImage: {
+    width: 150,
+    height: 150,
   },
   heroBlock: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 22,
     paddingHorizontal: 10,
+  },
+  subtitlePill: {
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 22,
+    backgroundColor: 'rgba(18, 18, 20, 0.62)',
+    paddingHorizontal: 18,
+    paddingVertical: 13,
+    shadowColor: accentColor,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.13,
+    shadowRadius: 20,
   },
   heroSubtitle: {
     color: '#d5d9df',
-    fontSize: 16,
-    lineHeight: 24,
-    maxWidth: 310,
+    fontSize: 15,
+    lineHeight: 22,
+    maxWidth: 300,
     textAlign: 'center',
   },
   loginCard: {
     gap: 17,
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#2a2024',
+    borderColor: 'rgba(255, 255, 255, 0.11)',
     borderRadius: 30,
-    backgroundColor: '#121214',
+    backgroundColor: 'rgba(18, 18, 20, 0.86)',
     padding: 22,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.35,
     shadowRadius: 28,
     elevation: 6,
+  },
+  cardGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 22,
+    right: 22,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
   },
   inputGroup: {
     gap: 8,
