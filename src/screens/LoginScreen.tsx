@@ -16,7 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { authService } from '@/services';
 
-const accentColor = '#00AEEF';
+const accentColor = '#E11D2E';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -63,7 +63,6 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.heroBlock}>
-              <Text style={styles.heroTitle}>Train Smarter</Text>
               <Text style={styles.heroSubtitle}>
                 Access your membership, classes, and gym check-in.
               </Text>
@@ -137,17 +136,9 @@ export default function LoginScreen() {
               )}
             </View>
 
-            <View style={styles.quickAccessRow}>
+            <View style={styles.quickAccessWrapper}>
               <QuickAccessButton
-                label="Face ID"
-                onPress={() => setStatusMessage('Face ID is coming soon.')}
-              />
-              <QuickAccessButton
-                label="QR Access"
-                onPress={() => setStatusMessage('QR access is coming soon.')}
-              />
-              <QuickAccessButton
-                label="Support"
+                label="Chat with us"
                 onPress={() => setStatusMessage('Support is coming soon.')}
               />
             </View>
@@ -206,7 +197,7 @@ const styles = StyleSheet.create({
     borderRadius: Platform.OS === 'web' ? 34 : 0,
     borderWidth: Platform.OS === 'web' ? 1 : 0,
     marginVertical: Platform.OS === 'web' ? 22 : 0,
-    shadowColor: '#00AEEF',
+    shadowColor: accentColor,
     shadowOffset: { width: 0, height: 24 },
     shadowOpacity: Platform.OS === 'web' ? 0.2 : 0,
     shadowRadius: 42,
@@ -219,7 +210,7 @@ const styles = StyleSheet.create({
     height: 220,
     borderRadius: 110,
     backgroundColor: accentColor,
-    opacity: 0.16,
+    opacity: 0.14,
   },
   glowSmall: {
     position: 'absolute',
@@ -229,7 +220,7 @@ const styles = StyleSheet.create({
     height: 190,
     borderRadius: 95,
     backgroundColor: accentColor,
-    opacity: 0.09,
+    opacity: 0.08,
   },
   keyboardView: {
     flex: 1,
@@ -242,7 +233,7 @@ const styles = StyleSheet.create({
   },
   brandBlock: {
     alignItems: 'center',
-    marginBottom: 34,
+    marginBottom: 30,
   },
   brandTitle: {
     color: '#f8fafc',
@@ -258,28 +249,24 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   heroBlock: {
-    marginBottom: 22,
-  },
-  heroTitle: {
-    color: '#ffffff',
-    fontSize: 42,
-    fontWeight: '900',
-    letterSpacing: 0,
-    lineHeight: 48,
+    alignItems: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 10,
   },
   heroSubtitle: {
-    color: '#a9b4c2',
+    color: '#d5d9df',
     fontSize: 16,
     lineHeight: 24,
-    marginTop: 12,
+    maxWidth: 310,
+    textAlign: 'center',
   },
   loginCard: {
-    gap: 16,
+    gap: 17,
     borderWidth: 1,
-    borderColor: '#202b38',
-    borderRadius: 28,
-    backgroundColor: '#11161c',
-    padding: 20,
+    borderColor: '#2a2024',
+    borderRadius: 30,
+    backgroundColor: '#121214',
+    padding: 22,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.35,
@@ -298,9 +285,9 @@ const styles = StyleSheet.create({
   input: {
     minHeight: 54,
     borderWidth: 1,
-    borderColor: '#293546',
+    borderColor: '#30272b',
     borderRadius: 16,
-    backgroundColor: '#080b0f',
+    backgroundColor: '#080809',
     color: '#f8fafc',
     fontSize: 16,
     paddingHorizontal: 16,
@@ -310,9 +297,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#293546',
+    borderColor: '#30272b',
     borderRadius: 16,
-    backgroundColor: '#080b0f',
+    backgroundColor: '#080809',
   },
   passwordInput: {
     flex: 1,
@@ -357,7 +344,7 @@ const styles = StyleSheet.create({
     opacity: 0.84,
   },
   loginButtonText: {
-    color: '#031018',
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 0,
@@ -368,21 +355,19 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     textAlign: 'center',
   },
-  quickAccessRow: {
-    flexDirection: 'row',
-    gap: 10,
+  quickAccessWrapper: {
     marginTop: 18,
   },
   quickAccessButton: {
-    flex: 1,
-    minHeight: 78,
+    minHeight: 54,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 10,
     borderWidth: 1,
-    borderColor: '#1d2835',
-    borderRadius: 20,
-    backgroundColor: '#0d1218',
+    borderColor: '#332429',
+    borderRadius: 18,
+    backgroundColor: '#0d0d0f',
   },
   quickAccessButtonPressed: {
     borderColor: accentColor,
