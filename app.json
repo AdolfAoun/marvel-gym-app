@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "marvel-gym-app",
-    "slug": "marvel-gym-app",
+    "slug": "marvel",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -39,6 +39,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2d9e1018-8c4f-43db-9896-d9c586818454"
+      }
+    },
+    "owner": "adolfs-team"
   }
 }
