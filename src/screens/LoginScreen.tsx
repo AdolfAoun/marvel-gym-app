@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Image,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Pressable,
   StyleSheet,
@@ -35,28 +36,64 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const feedbackOpacity = useRef(new Animated.Value(0)).current;
+  const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const hideFeedback = () => {
+    Animated.timing(feedbackOpacity, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => setFeedbackMessage(''));
+  };
+
+  const clearFeedback = () => {
+    if (feedbackTimeoutRef.current) {
+      clearTimeout(feedbackTimeoutRef.current);
+    }
+
+    feedbackOpacity.setValue(0);
+    setFeedbackMessage('');
+  };
+
+  const showFeedback = (message: string) => {
+    if (feedbackTimeoutRef.current) {
+      clearTimeout(feedbackTimeoutRef.current);
+    }
+
+    setFeedbackMessage(message);
+    Animated.timing(feedbackOpacity, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+
+    feedbackTimeoutRef.current = setTimeout(hideFeedback, 2500);
+  };
 
   const handleLogin = async () => {
-    setStatusMessage('');
-    setErrorMessage('');
+    clearFeedback();
     const normalizedPhone = phoneNumber.replace(/\D/g, '');
     const normalizedEmail = email.trim().toLowerCase();
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const loginFailureMessage =
+      loginMode === 'phone'
+        ? 'Phone number or password is invalid.'
+        : 'Email or password is invalid.';
 
     if (loginMode === 'phone' && normalizedPhone.length !== 8) {
-      setErrorMessage('Phone number must be 8-digits.');
+      showFeedback('Enter an 8-digit phone number.');
       return;
     }
 
     if (loginMode === 'email' && !emailPattern.test(normalizedEmail)) {
-      setErrorMessage('Enter a valid email address.');
+      showFeedback('Enter a valid email address.');
       return;
     }
 
     if (!password.trim()) {
-      setErrorMessage('Enter your password.');
+      showFeedback('Enter your password.');
       return;
     }
 
@@ -68,6 +105,8 @@ export default function LoginScreen() {
         password,
       });
       router.replace('/(tabs)');
+    } catch {
+      showFeedback(loginFailureMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -84,10 +123,7 @@ export default function LoginScreen() {
         <View style={styles.glowLarge} />
         <View style={styles.glowSmall} />
 
-        <KeyboardAvoidingView
-          style={styles.keyboardView}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.fixedContent}>
+        <Pressable onPress={Keyboard.dismiss} style={styles.fixedContent}>
             <View style={styles.brandBlock}>
               <View style={styles.logoGlow} />
               <Image
@@ -107,15 +143,16 @@ export default function LoginScreen() {
 
             <View style={styles.loginCard}>
               <View style={styles.cardGloss} />
-              <View style={styles.inputGroup}>
+              <View style={[styles.inputGroup, styles.identifierGroup]}>
                 <View style={styles.loginModeHeader}>
                   <Text style={styles.label}>
                     {loginMode === 'phone' ? 'Phone Number' : 'Email'}
                   </Text>
                   <Pressable
-                    onPress={() => {
+                    onPress={(event) => {
+                      event.stopPropagation();
                       setLoginMode((mode) => (mode === 'phone' ? 'email' : 'phone'));
-                      setErrorMessage('');
+                      clearFeedback();
                     }}
                     hitSlop={8}>
                     <Text style={styles.modeToggleText}>
@@ -157,15 +194,6 @@ export default function LoginScreen() {
                     style={styles.input}
                   />
                 )}
-
-                {loginMode === 'email' && (
-                  <Text style={styles.helperText}>
-                    Email login is available only for the email address linked to your account.
-                  </Text>
-                )}
-                {errorMessage.length > 0 && (
-                  <Text style={styles.errorText}>{errorMessage}</Text>
-                )}
               </View>
 
               <View style={styles.inputGroup}>
@@ -195,14 +223,28 @@ export default function LoginScreen() {
               </View>
 
               <Pressable
-                onPress={() => setStatusMessage('Password reset is coming soon.')}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  showFeedback('Password reset email sent');
+                }}
                 style={styles.forgotButton}>
                 <Text style={styles.linkText}>Forgot password?</Text>
               </Pressable>
 
+              {feedbackMessage.length > 0 && (
+                <Animated.View
+                  pointerEvents="none"
+                  style={[styles.formFeedback, { opacity: feedbackOpacity }]}>
+                  <Text style={styles.formFeedbackText}>{feedbackMessage}</Text>
+                </Animated.View>
+              )}
+
               <Pressable
                 disabled={isSubmitting}
-                onPress={handleLogin}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  handleLogin();
+                }}
                 style={({ pressed }) => [
                   styles.loginButton,
                   (pressed || isSubmitting) && styles.loginButtonPressed,
@@ -214,52 +256,32 @@ export default function LoginScreen() {
                 )}
               </Pressable>
 
-              {statusMessage.length > 0 && (
-                <Text style={styles.statusMessage}>{statusMessage}</Text>
-              )}
             </View>
 
-            <View style={styles.quickAccessWrapper}>
-              <QuickAccessButton
-                label="Chat with us"
-                onPress={() => setStatusMessage('Support is coming soon.')}
-              />
-            </View>
-
-            <View style={styles.bottomActions}>
-              <Pressable onPress={() => setStatusMessage('Account creation is coming soon.')}>
+            <Pressable
+              onPress={(event) => event.stopPropagation()}
+              style={styles.bottomActions}>
+              <Pressable
+                onPress={(event) => {
+                  event.stopPropagation();
+                  showFeedback('Registration coming soon');
+                }}>
                 <Text style={styles.bottomActionText}>Create Account</Text>
               </Pressable>
 
               <View style={styles.footerDivider} />
 
-              <Pressable onPress={handleGuestAccess}>
+              <Pressable
+                onPress={(event) => {
+                  event.stopPropagation();
+                  handleGuestAccess();
+                }}>
                 <Text style={styles.bottomActionText}>Continue as Guest</Text>
               </Pressable>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
+            </Pressable>
+          </Pressable>
       </View>
     </SafeAreaView>
-  );
-}
-
-type QuickAccessButtonProps = {
-  label: string;
-  onPress: () => void;
-};
-
-function QuickAccessButton({ label, onPress }: QuickAccessButtonProps) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.quickAccessButton,
-        pressed && styles.quickAccessButtonPressed,
-      ]}>
-      <View style={styles.quickAccessIcon} />
-      <Text style={styles.quickAccessText}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -305,9 +327,6 @@ const styles = StyleSheet.create({
     backgroundColor: accentColor,
     opacity: 0.08,
   },
-  keyboardView: {
-    flex: 1,
-  },
   fixedContent: {
     flex: 1,
     justifyContent: 'center',
@@ -344,7 +363,7 @@ const styles = StyleSheet.create({
   heroBlock: {
     alignItems: 'center',
     marginTop:20,
-    marginBottom: 15,
+    marginBottom: 20,
     paddingHorizontal: 10,
   },
   subtitlePill: {
@@ -367,7 +386,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   loginCard: {
+    position: 'relative',
     gap: 17,
+    height: 356,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.11)',
@@ -388,8 +409,40 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.22)',
   },
+  formFeedback: {
+    position: 'absolute',
+    left: 22,
+    right: 22,
+    bottom: 82,
+    zIndex: 10,
+    alignItems: 'center',
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(225, 29, 46, 0.4)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(12, 12, 14, 0.96)',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    shadowColor: accentColor,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.24,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  formFeedbackText: {
+    color: '#f8fafc',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0,
+    lineHeight: 16,
+    textAlign: 'center',
+  },
   inputGroup: {
     gap: 8,
+  },
+  identifierGroup: {
+    height: 114,
+    justifyContent: 'flex-start',
   },
   loginModeHeader: {
     minHeight: 24,
@@ -409,17 +462,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0,
-  },
-  helperText: {
-    color: '#8f98a6',
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  errorText: {
-    color: '#ff6875',
-    fontSize: 12,
-    fontWeight: '800',
-    lineHeight: 16,
   },
   input: {
     minHeight: 54,
@@ -521,53 +563,13 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0,
   },
-  statusMessage: {
-    color: '#a9b4c2',
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-  quickAccessWrapper: {
-    marginTop: 18,
-  },
-  quickAccessButton: {
-    minHeight: 54,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    borderWidth: 1,
-    borderColor: '#332429',
-    borderRadius: 18,
-    backgroundColor: '#0d0d0f',
-  },
-  quickAccessButtonPressed: {
-    borderColor: accentColor,
-    opacity: 0.82,
-  },
-  quickAccessIcon: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: accentColor,
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
-    shadowRadius: 12,
-  },
-  quickAccessText: {
-    color: '#dbe5ef',
-    fontSize: 12,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
   bottomActions: {
     minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 16,
-    marginTop: 20,
+    marginTop: 22,
   },
   bottomActionText: {
     color: '#f8fafc',
