@@ -1,3 +1,5 @@
+import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,16 +14,23 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 
 import { authService } from '@/services';
 
 const accentColor = '#E11D2E';
 
+function formatLebanesePhone(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  const first = digits.slice(0, 2);
+  const second = digits.slice(2, 5);
+  const third = digits.slice(5, 8);
+
+  return [first, second, third].filter(Boolean).join(' ');
+}
+
 export default function LoginScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,7 +41,10 @@ export default function LoginScreen() {
     setIsSubmitting(true);
 
     try {
-      await authService.loginMember({ email, password });
+      await authService.loginMember({
+        email: phoneNumber.replace(/\D/g, ''),
+        password,
+      });
       router.replace('/(tabs)');
     } finally {
       setIsSubmitting(false);
@@ -70,7 +82,7 @@ export default function LoginScreen() {
             <View style={styles.heroBlock}>
               <View style={styles.subtitlePill}>
                 <Text style={styles.heroSubtitle}>
-                  Access your membership, classes, and gym check-in.
+                  Access your Membership, Classes, and Gym Essentials.
                 </Text>
               </View>
             </View>
@@ -78,19 +90,24 @@ export default function LoginScreen() {
             <View style={styles.loginCard}>
               <View style={styles.cardGloss} />
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Email</Text>
-                <TextInput
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="member@marvelgym.com"
-                  placeholderTextColor="#667282"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="email-address"
-                  textContentType="emailAddress"
-                  selectionColor={accentColor}
-                  style={styles.input}
-                />
+                <Text style={styles.label}>Phone Number</Text>
+                <View style={styles.phoneRow}>
+                  <View style={styles.countryCodeBox}>
+                    <Text style={styles.countryCodeText}>+961</Text>
+                  </View>
+                  <TextInput
+                    value={formatLebanesePhone(phoneNumber)}
+                    onChangeText={(value) => setPhoneNumber(value.replace(/\D/g, '').slice(0, 8))}
+                    placeholder="70 123 456"
+                    placeholderTextColor="#667282"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="number-pad"
+                    textContentType="telephoneNumber"
+                    selectionColor={accentColor}
+                    style={styles.phoneInput}
+                  />
+                </View>
               </View>
 
               <View style={styles.inputGroup}>
@@ -243,11 +260,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 18,
     position: 'relative',
+    transform: [{ translateY: 5 }],
+
   },
   logoGlow: {
     position: 'absolute',
-    top: 3,
-    width: 158,
+    top: 0,
+    width:158,
     height: 158,
     borderRadius: 79,
     backgroundColor: accentColor,
@@ -260,10 +279,13 @@ const styles = StyleSheet.create({
   logoImage: {
     width: 150,
     height: 150,
+    transform: [{ translateY: 6 },{ translateX: 0.3 }],
+   
   },
   heroBlock: {
     alignItems: 'center',
-    marginBottom: 22,
+    marginTop:20,
+    marginBottom: 15,
     paddingHorizontal: 10,
   },
   subtitlePill: {
@@ -280,7 +302,7 @@ const styles = StyleSheet.create({
   },
   heroSubtitle: {
     color: '#d5d9df',
-    fontSize: 15,
+    fontSize: 11,
     lineHeight: 22,
     maxWidth: 300,
     textAlign: 'center',
@@ -318,6 +340,39 @@ const styles = StyleSheet.create({
   },
   input: {
     minHeight: 54,
+    borderWidth: 1,
+    borderColor: '#30272b',
+    borderRadius: 16,
+    backgroundColor: '#080809',
+    color: '#f8fafc',
+    fontSize: 16,
+    paddingHorizontal: 16,
+  },
+  phoneRow: {
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  countryCodeBox: {
+    minHeight: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#30272b',
+    borderRadius: 16,
+    backgroundColor: '#111113',
+    paddingHorizontal: 14,
+  },
+  countryCodeText: {
+    color: '#f8fafc',
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 0,
+  },
+  phoneInput: {
+    minHeight: 54,
+    flex: 1,
     borderWidth: 1,
     borderColor: '#30272b',
     borderRadius: 16,
