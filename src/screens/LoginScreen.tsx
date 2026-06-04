@@ -124,26 +124,28 @@ export default function LoginScreen() {
         <View style={styles.glowSmall} />
 
         <Pressable onPress={Keyboard.dismiss} style={styles.fixedContent}>
-          <View style={styles.brandBlock}>
-            <View style={styles.logoGlow} />
-            <Image
-              source={require('@/assets/images/marvel-logo-transparent.png')}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-          </View>
+          <View style={styles.brandingSection}>
+            <View style={styles.brandBlock}>
+              <View style={styles.logoGlow} />
+              <Image
+                source={require('@/assets/images/marvel-logo-transparent.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            </View>
 
-          <View style={styles.heroBlock}>
-            <View style={styles.subtitlePill}>
-              <Text style={styles.heroSubtitle}>
-                Access your Membership, Classes, and Gym Essentials.
-              </Text>
+            <View style={styles.heroBlock}>
+              <View style={styles.subtitlePill}>
+                <Text style={styles.heroSubtitle}>
+                  Access your Membership, Classes, and Gym Essentials.
+                </Text>
+              </View>
             </View>
           </View>
 
-          <View style={styles.loginCard}>
+          <View style={[styles.loginCard, loginMode === 'email' && styles.loginCardEmail]}>
             <View style={styles.cardGloss} />
-            <View style={[styles.inputGroup, styles.identifierGroup]}>
+            <View style={styles.inputGroup}>
               <View style={styles.loginModeHeader}>
                 <Text style={styles.label}>
                   {loginMode === 'phone' ? 'Phone Number' : 'Email'}
@@ -182,19 +184,24 @@ export default function LoginScreen() {
                   />
                 </View>
               ) : (
-                <TextInput
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="member@marvelgym.com"
-                  placeholderTextColor="#667282"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  autoComplete="email"
-                  keyboardType="email-address"
-                  textContentType="emailAddress"
-                  selectionColor={accentColor}
-                  style={styles.input}
-                />
+                <>
+                  <TextInput
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="member@marvelgym.com"
+                    placeholderTextColor="#667282"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="email"
+                    keyboardType="email-address"
+                    textContentType="emailAddress"
+                    selectionColor={accentColor}
+                    style={styles.input}
+                  />
+                  <Text style={styles.emailNotice}>
+                    Enter the email address associated to your account.
+                  </Text>
+                </>
               )}
             </View>
 
@@ -224,39 +231,41 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            <Pressable
-              onPress={(event) => {
-                event.stopPropagation();
-                showFeedback('Password reset email sent');
-              }}
-              style={styles.forgotButton}>
-              <Text style={styles.linkText}>Forgot password?</Text>
-            </Pressable>
+            <View style={styles.actionStack}>
+              <Pressable
+                onPress={(event) => {
+                  event.stopPropagation();
+                  showFeedback('Password reset mail sent');
+                }}
+                style={styles.forgotButton}>
+                <Text style={styles.linkText}>Forgot password?</Text>
+              </Pressable>
 
-            {feedbackMessage.length > 0 && (
-              <Animated.View
-                pointerEvents="none"
-                style={[styles.formFeedback, { opacity: feedbackOpacity }]}>
-                <Text style={styles.formFeedbackText}>{feedbackMessage}</Text>
-              </Animated.View>
-            )}
-
-            <Pressable
-              disabled={isSubmitting}
-              onPress={(event) => {
-                event.stopPropagation();
-                handleLogin();
-              }}
-              style={({ pressed }) => [
-                styles.loginButton,
-                (pressed || isSubmitting) && styles.loginButtonPressed,
-              ]}>
-              {isSubmitting ? (
-                <ActivityIndicator color="#031018" />
-              ) : (
-                <Text style={styles.loginButtonText}>Login</Text>
+              {feedbackMessage.length > 0 && (
+                <Animated.View
+                  pointerEvents="none"
+                  style={[styles.formFeedback, { opacity: feedbackOpacity }]}>
+                  <Text style={styles.formFeedbackText}>{feedbackMessage}</Text>
+                </Animated.View>
               )}
-            </Pressable>
+
+              <Pressable
+                disabled={isSubmitting}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  handleLogin();
+                }}
+                style={({ pressed }) => [
+                  styles.loginButton,
+                  (pressed || isSubmitting) && styles.loginButtonPressed,
+                ]}>
+                {isSubmitting ? (
+                  <ActivityIndicator color="#031018" />
+                ) : (
+                  <Text style={styles.loginButtonText}>Login</Text>
+                )}
+              </Pressable>
+            </View>
           </View>
 
           <Pressable
@@ -330,16 +339,20 @@ const styles = StyleSheet.create({
   },
   fixedContent: {
     flex: 1,
-    justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 24,
-    transform: [{ translateY: -30 }],
+    paddingTop: Platform.OS === 'web' ? 52 : 38,
+    paddingBottom: 24,
+    transform: [{ translateY: 10 }],
+  },
+  brandingSection: {
+    alignItems: 'center',
+    flexShrink: 0,
   },
   brandBlock: {
     alignItems: 'center',
     marginBottom: 18,
     position: 'relative',
-    transform: [{ translateY: 5 }],
+    transform: [{ translateY: 22 }],
   },
   logoGlow: {
     position: 'absolute',
@@ -361,8 +374,8 @@ const styles = StyleSheet.create({
   },
   heroBlock: {
     alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 20,
+    marginTop: 30,
+    marginBottom: 22,
     paddingHorizontal: 10,
   },
   subtitlePill: {
@@ -380,14 +393,15 @@ const styles = StyleSheet.create({
   heroSubtitle: {
     color: '#d5d9df',
     fontSize: 11,
-    lineHeight: 22,
+    lineHeight: 18,
     maxWidth: 300,
     textAlign: 'center',
   },
   loginCard: {
     position: 'relative',
-    gap: 17,
-    height: 356,
+    gap: 16,
+    flexShrink: 0,
+    minHeight: 320,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.11)',
@@ -400,6 +414,9 @@ const styles = StyleSheet.create({
     shadowRadius: 28,
     elevation: 7,
   },
+  loginCardEmail: {
+    paddingBottom: 24,
+  },
   cardGloss: {
     position: 'absolute',
     top: 0,
@@ -410,9 +427,9 @@ const styles = StyleSheet.create({
   },
   formFeedback: {
     position: 'absolute',
-    left: 22,
-    right: 22,
-    bottom: 74,
+    left: 0,
+    right: 0,
+    bottom: 70,
     zIndex: 10,
     alignItems: 'center',
     alignSelf: 'center',
@@ -438,10 +455,6 @@ const styles = StyleSheet.create({
   },
   inputGroup: {
     gap: 8,
-  },
-  identifierGroup: {
-    height: 114,
-    justifyContent: 'flex-start',
   },
   loginModeHeader: {
     minHeight: 24,
@@ -470,6 +483,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#080809',
     color: '#f8fafc',
     fontSize: 16,
+    paddingHorizontal: 16,
+  },
+  emailNotice: {
+    color: '#8b96a6',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0,
+    lineHeight: 16,
     paddingHorizontal: 16,
   },
   phoneRow: {
@@ -535,6 +556,10 @@ const styles = StyleSheet.create({
     minHeight: 34,
     alignSelf: 'flex-end',
     justifyContent: 'center',
+  },
+  actionStack: {
+    position: 'relative',
+    gap: 10,
   },
   linkText: {
     color: accentColor,
