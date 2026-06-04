@@ -6,6 +6,7 @@ import {
   Animated,
   Image,
   Keyboard,
+  Linking,
   Platform,
   Pressable,
   StyleSheet,
@@ -36,8 +37,10 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isContactOpen, setIsContactOpen] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const feedbackOpacity = useRef(new Animated.Value(0)).current;
+  const contactRaysProgress = useRef(new Animated.Value(0)).current;
   const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const hideFeedback = () => {
@@ -116,12 +119,104 @@ export default function LoginScreen() {
     router.replace('/(tabs)');
   };
 
+  const setContactHubOpen = (open: boolean) => {
+    setIsContactOpen(open);
+    Animated.spring(contactRaysProgress, {
+      toValue: open ? 1 : 0,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 90,
+    }).start();
+  };
+
+  const handleContactOption = async (url: string) => {
+    setContactHubOpen(false);
+
+    try {
+      await Linking.openURL(url);
+    } catch {
+      showFeedback('Unable to open contact option.');
+    }
+  };
+
+  const contactRayScale = contactRaysProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.82, 1],
+  });
+  const whatsappRayStyle = {
+    opacity: contactRaysProgress,
+    transform: [
+      { scale: contactRayScale },
+      {
+        translateX: contactRaysProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [18, 0],
+        }),
+      },
+    ],
+  };
+  const callRayStyle = {
+    opacity: contactRaysProgress,
+    transform: [
+      { scale: contactRayScale },
+      {
+        translateY: contactRaysProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-18, 0],
+        }),
+      },
+    ],
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
       <View style={styles.phoneFrame}>
-        <View style={styles.glowLarge} />
         <View style={styles.glowSmall} />
+
+        <View pointerEvents="box-none" style={styles.contactHubLayer}>
+          <View pointerEvents="none" style={styles.contactHubGlow} />
+
+          <Animated.View
+            pointerEvents={isContactOpen ? 'auto' : 'none'}
+            style={[styles.contactRay, styles.whatsappRay, whatsappRayStyle]}>
+            <Pressable
+              hitSlop={10}
+              onPress={() => handleContactOption('https://wa.me/96179197997')}
+              style={({ pressed }) => [
+                styles.contactRayButton,
+                pressed && styles.contactPressed,
+              ]}>
+              <Text style={styles.contactRayText}>WhatsApp</Text>
+            </Pressable>
+          </Animated.View>
+
+          <Animated.View
+            pointerEvents={isContactOpen ? 'auto' : 'none'}
+            style={[styles.contactRay, styles.callRay, callRayStyle]}>
+            <Pressable
+              hitSlop={10}
+              onPress={() => handleContactOption('tel:+96179197997')}
+              style={({ pressed }) => [
+                styles.contactRayButton,
+                styles.callRayButton,
+                pressed && styles.contactPressed,
+              ]}>
+              <Text style={styles.contactRayText}>Call</Text>
+            </Pressable>
+          </Animated.View>
+
+          <Pressable
+            hitSlop={12}
+            onPress={() => setContactHubOpen(!isContactOpen)}
+            style={({ pressed }) => [
+              styles.contactHub,
+              isContactOpen && styles.contactHubOpen,
+              pressed && styles.contactPressed,
+            ]}>
+            <Text style={styles.contactHubText}>Contact Us</Text>
+          </Pressable>
+        </View>
 
         <Pressable onPress={Keyboard.dismiss} style={styles.fixedContent}>
           <View style={styles.brandingSection}>
@@ -317,16 +412,6 @@ const styles = StyleSheet.create({
     shadowOpacity: Platform.OS === 'web' ? 0.2 : 0,
     shadowRadius: 42,
   },
-  glowLarge: {
-    position: 'absolute',
-    top: -96,
-    right: -88,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: accentColor,
-    opacity: 0.14,
-  },
   glowSmall: {
     position: 'absolute',
     bottom: 88,
@@ -336,6 +421,102 @@ const styles = StyleSheet.create({
     borderRadius: 95,
     backgroundColor: accentColor,
     opacity: 0.08,
+  },
+  contactHubLayer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    zIndex: 20,
+    width: 230,
+    height: 176,
+  },
+  contactHubGlow: {
+    position: 'absolute',
+    top: -108,
+    right: -108,
+    zIndex: 0,
+    width: 212,
+    height: 212,
+    borderRadius: 106,
+    backgroundColor: accentColor,
+    opacity: 0.14,
+    shadowColor: accentColor,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.34,
+    shadowRadius: 36,
+  },
+  contactHub: {
+    position: 'absolute',
+    top: -88,
+    right: -88,
+    zIndex: 2,
+    width: 180,
+    height: 180,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(225, 29, 46, 0.34)',
+    borderRadius: 90,
+    backgroundColor: 'rgba(225, 29, 46, 0.32)',
+    shadowColor: accentColor,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 22,
+    elevation: 8,
+  },
+  contactHubOpen: {
+    borderColor: 'rgba(255, 255, 255, 0.24)',
+    backgroundColor: 'rgba(225, 29, 46, 0.34)',
+  },
+  contactHubText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 14,
+    marginTop: 83,
+    marginRight: 70,
+    maxWidth: 58,
+    textAlign: 'center',
+  },
+  contactRay: {
+    position: 'absolute',
+    zIndex: 1,
+  },
+  whatsappRay: {
+    top: 28,
+    right: 100,
+  },
+  callRay: {
+    top: 92,
+    right: 42,
+  },
+  contactRayButton: {
+    width: 72,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(225, 29, 46, 0.38)',
+    borderRadius: 14,
+    backgroundColor: 'rgba(8, 8, 9, 0.92)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.26,
+    shadowRadius: 14,
+    elevation: 7,
+  },
+  callRayButton: {
+    width: 54,
+  },
+  contactRayText: {
+    color: '#f8fafc',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0,
+  },
+  contactPressed: {
+    opacity: 0.8,
   },
   fixedContent: {
     flex: 1,
