@@ -30,19 +30,42 @@ function formatLebanesePhone(value: string) {
 
 export default function LoginScreen() {
   const router = useRouter();
+  const [loginMode, setLoginMode] = useState<'phone' | 'email'>('phone');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleLogin = async () => {
     setStatusMessage('');
+    setErrorMessage('');
+    const normalizedPhone = phoneNumber.replace(/\D/g, '');
+    const normalizedEmail = email.trim().toLowerCase();
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (loginMode === 'phone' && normalizedPhone.length !== 8) {
+      setErrorMessage('Phone number must be 8-digits.');
+      return;
+    }
+
+    if (loginMode === 'email' && !emailPattern.test(normalizedEmail)) {
+      setErrorMessage('Enter a valid email address.');
+      return;
+    }
+
+    if (!password.trim()) {
+      setErrorMessage('Enter your password.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       await authService.loginMember({
-        email: phoneNumber.replace(/\D/g, ''),
+        email: loginMode === 'phone' ? normalizedPhone : normalizedEmail,
         password,
       });
       router.replace('/(tabs)');
@@ -90,24 +113,64 @@ export default function LoginScreen() {
             <View style={styles.loginCard}>
               <View style={styles.cardGloss} />
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Phone Number</Text>
-                <View style={styles.phoneRow}>
-                  <View style={styles.countryCodeBox}>
-                    <Text style={styles.countryCodeText}>+961</Text>
+                <View style={styles.loginModeHeader}>
+                  <Text style={styles.label}>
+                    {loginMode === 'phone' ? 'Phone Number' : 'Email'}
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      setLoginMode((mode) => (mode === 'phone' ? 'email' : 'phone'));
+                      setErrorMessage('');
+                    }}
+                    hitSlop={8}>
+                    <Text style={styles.modeToggleText}>
+                      {loginMode === 'phone' ? 'Use email instead' : 'Use phone instead'}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {loginMode === 'phone' ? (
+                  <View style={styles.phoneRow}>
+                    <View style={styles.countryCodeBox}>
+                      <Text style={styles.countryCodeText}>+961</Text>
+                    </View>
+                    <TextInput
+                      value={formatLebanesePhone(phoneNumber)}
+                      onChangeText={(value) => setPhoneNumber(value.replace(/\D/g, '').slice(0, 8))}
+                      placeholder="70 123 456"
+                      placeholderTextColor="#667282"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="number-pad"
+                      textContentType="telephoneNumber"
+                      selectionColor={accentColor}
+                      style={styles.phoneInput}
+                    />
                   </View>
+                ) : (
                   <TextInput
-                    value={formatLebanesePhone(phoneNumber)}
-                    onChangeText={(value) => setPhoneNumber(value.replace(/\D/g, '').slice(0, 8))}
-                    placeholder="70 123 456"
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="member@marvelgym.com"
                     placeholderTextColor="#667282"
                     autoCapitalize="none"
                     autoCorrect={false}
-                    keyboardType="number-pad"
-                    textContentType="telephoneNumber"
+                    autoComplete="email"
+                    keyboardType="email-address"
+                    textContentType="emailAddress"
                     selectionColor={accentColor}
-                    style={styles.phoneInput}
+                    style={styles.input}
                   />
-                </View>
+                )}
+
+                <Text style={styles.helperText}>
+                  {loginMode === 'phone'
+                    ? 'Use the phone number linked to your membership.'
+                    : 'Login via email only if email is linked to account.'}
+                </Text>
+                {errorMessage.length > 0 && (
+                  <Text style={styles.errorText}>{errorMessage}</Text>
+                )}
               </View>
 
               <View style={styles.inputGroup}>
@@ -332,11 +395,35 @@ const styles = StyleSheet.create({
   inputGroup: {
     gap: 8,
   },
+  loginModeHeader: {
+    minHeight: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   label: {
     color: '#e7edf5',
     fontSize: 13,
     fontWeight: '800',
     letterSpacing: 0,
+  },
+  modeToggleText: {
+    color: accentColor,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0,
+  },
+  helperText: {
+    color: '#8f98a6',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  errorText: {
+    color: '#ff6875',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 16,
   },
   input: {
     minHeight: 54,
