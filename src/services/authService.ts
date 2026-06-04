@@ -19,6 +19,14 @@ export type LoginMemberInput = {
   password: string;
 };
 
+const mockLoginPassword = 'password';
+const mockLoginIdentifiers = [
+  currentMember.email.toLowerCase(),
+  currentMember.phone.replace(/\D/g, ''),
+  currentMember.phone.replace(/\D/g, '').slice(-8),
+  '79197997',
+];
+
 export const registerMember = async (
   _input: RegisterMemberInput,
 ): Promise<Member> => {
@@ -26,8 +34,16 @@ export const registerMember = async (
 };
 
 export const loginMember = async (
-  _input: LoginMemberInput,
+  input: LoginMemberInput,
 ): Promise<Member> => {
+  const normalizedIdentifier = input.email.trim().toLowerCase().replace(/\s/g, '');
+  const isKnownIdentifier = mockLoginIdentifiers.includes(normalizedIdentifier);
+  const isValidPassword = input.password === mockLoginPassword;
+
+  if (!isKnownIdentifier || !isValidPassword) {
+    throw new Error('Invalid credentials');
+  }
+
   return currentMember;
 };
 

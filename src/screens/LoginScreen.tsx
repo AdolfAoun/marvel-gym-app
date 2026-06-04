@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -38,11 +38,40 @@ export default function LoginScreen() {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isContactOpen, setIsContactOpen] = useState(false);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [identifierMessage, setIdentifierMessage] = useState('');
+  const [passwordMessage, setPasswordMessage] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const feedbackOpacity = useRef(new Animated.Value(0)).current;
   const contactRaysProgress = useRef(new Animated.Value(0)).current;
+  const keyboardLift = useRef(new Animated.Value(0)).current;
   const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSubscription = Keyboard.addListener(showEvent, () => {
+      setIsKeyboardVisible(true);
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setIsKeyboardVisible(false);
+      setIsPasswordFocused(false);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    Animated.timing(keyboardLift, {
+      toValue: isPasswordFocused && isKeyboardVisible ? -51 : 0,
+      duration: isPasswordFocused && isKeyboardVisible ? 220 : 180,
+      useNativeDriver: true,
+    }).start();
+  }, [isKeyboardVisible, isPasswordFocused, keyboardLift]);
 
   const hideFeedback = () => {
     Animated.timing(feedbackOpacity, {
@@ -79,13 +108,14 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     clearFeedback();
     setIdentifierMessage('');
+    setPasswordMessage('');
     const normalizedPhone = phoneNumber.replace(/\D/g, '');
     const normalizedEmail = email.trim().toLowerCase();
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const loginFailureMessage =
       loginMode === 'phone'
         ? 'Phone number or password is invalid.'
-        : 'Email or password is invalid.';
+        : 'Invalid Email or Password.';
 
     if (loginMode === 'phone' && normalizedPhone.length !== 8) {
       showFeedback('Enter an 8-digit phone number.');
@@ -111,11 +141,7 @@ export default function LoginScreen() {
       });
       router.replace('/(tabs)');
     } catch {
-      if (loginMode === 'email') {
-        setIdentifierMessage(loginFailureMessage);
-      } else {
-        showFeedback(loginFailureMessage);
-      }
+      setPasswordMessage(loginFailureMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -178,7 +204,6 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
       <View style={styles.phoneFrame}>
-        <View style={styles.glowSmall} />
         <View pointerEvents="none" style={styles.prototypeAtmosphereLayer}>
           <Image
             source={require('@/assets/images/prototype-three-finger-back-pose-background.png')}
@@ -188,6 +213,7 @@ export default function LoginScreen() {
           <View style={styles.prototypeAtmosphereVeil} />
           <View style={styles.prototypeAtmosphereLowerFade} />
         </View>
+        <View pointerEvents="none" style={styles.glowSmall} />
 
         <View pointerEvents="box-none" style={styles.contactHubLayer}>
           <View pointerEvents="none" style={styles.contactHubGlow} />
@@ -233,7 +259,14 @@ export default function LoginScreen() {
           </Pressable>
         </View>
 
-        <Pressable onPress={Keyboard.dismiss} style={styles.fixedContent}>
+        <Animated.View
+          style={[
+            styles.keyboardLiftLayer,
+            {
+              transform: [{ translateY: keyboardLift }],
+            },
+          ]}>
+          <Pressable onPress={Keyboard.dismiss} style={styles.fixedContent}>
           <View style={styles.brandingSection}>
             <View style={styles.brandBlock}>
               <View style={styles.logoGlow} />
@@ -265,6 +298,7 @@ export default function LoginScreen() {
                     event.stopPropagation();
                     setLoginMode((mode) => (mode === 'phone' ? 'email' : 'phone'));
                     setIdentifierMessage('');
+                    setPasswordMessage('');
                     clearFeedback();
                   }}
                   hitSlop={8}>
@@ -290,6 +324,7 @@ export default function LoginScreen() {
                     autoCorrect={false}
                     keyboardType="number-pad"
                     textContentType="telephoneNumber"
+                    onFocus={() => setIsPasswordFocused(false)}
                     selectionColor={accentColor}
                     style={styles.phoneInput}
                   />
@@ -305,6 +340,7 @@ export default function LoginScreen() {
                   autoComplete="email"
                   keyboardType="email-address"
                   textContentType="emailAddress"
+                  onFocus={() => setIsPasswordFocused(false)}
                   selectionColor={accentColor}
                   style={styles.input}
                 />
@@ -329,6 +365,8 @@ export default function LoginScreen() {
                   autoCorrect={false}
                   secureTextEntry={!isPasswordVisible}
                   textContentType="password"
+                  onFocus={() => setIsPasswordFocused(true)}
+                  onBlur={() => setIsPasswordFocused(false)}
                   selectionColor={accentColor}
                   style={styles.passwordInput}
                 />
@@ -340,6 +378,11 @@ export default function LoginScreen() {
                     {isPasswordVisible ? 'Hide' : 'Show'}
                   </Text>
                 </Pressable>
+              </View>
+              <View style={styles.passwordMessageArea}>
+                {passwordMessage.length > 0 && (
+                  <Text style={styles.passwordMessageText}>{passwordMessage}</Text>
+                )}
               </View>
             </View>
 
@@ -401,7 +444,8 @@ export default function LoginScreen() {
               <Text style={styles.bottomActionText}>Continue as Guest</Text>
             </Pressable>
           </Pressable>
-        </Pressable>
+          </Pressable>
+        </Animated.View>
       </View>
     </SafeAreaView>
   );
@@ -431,6 +475,7 @@ const styles = StyleSheet.create({
   },
   glowSmall: {
     position: 'absolute',
+    zIndex: 1,
     bottom: 88,
     left: -96,
     width: 190,
@@ -441,16 +486,18 @@ const styles = StyleSheet.create({
   },
   prototypeAtmosphereLayer: {
     position: 'absolute',
+    zIndex: 0,
     top: 0,
     left: 0,
     right: 0,
     height: 460,
+    overflow: 'hidden',
     opacity: 1,
   },
   prototypeAtmosphereImage: {
     position: 'absolute',
     top: -90,
-    left: -290,
+    left: -300,
     right: 12,
     height: 650,
     opacity: 0.5,//0.12
@@ -547,13 +594,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.38)',
+    borderColor: 'rgba(225, 29, 46, 0.56)',
     borderRadius: 14,
-    backgroundColor: 'rgba(8, 8, 9, 0.92)',
-    shadowColor: '#000000',
+    backgroundColor: 'rgba(8, 8, 9, 0.08)',
+    shadowColor: accentColor,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.26,
-    shadowRadius: 14,
+    shadowOpacity: 0.34,
+    shadowRadius: 16,
     elevation: 7,
   },
   callRayButton: {
@@ -568,12 +615,17 @@ const styles = StyleSheet.create({
   contactPressed: {
     opacity: 0.8,
   },
+  keyboardLiftLayer: {
+    zIndex: 2,
+    flex: 1,
+  },
   fixedContent: {
+    zIndex: 2,
     flex: 1,
     paddingHorizontal: 24,
     paddingTop: Platform.OS === 'web' ? 52 : 38,
     paddingBottom: 24,
-    transform: [{ translateY: 15 }],
+    transform: [{ translateY: 30 }],//Move whole content up or down
   },
   brandingSection: {
     alignItems: 'center',
@@ -632,7 +684,7 @@ const styles = StyleSheet.create({
   },
   loginCard: {
     position: 'relative',
-    gap: 16,
+    gap: 8,
     flexShrink: 0,
     minHeight: 320,
     overflow: 'hidden',
@@ -640,7 +692,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.11)',
     borderRadius: 30,
     backgroundColor: 'rgba(18, 18, 20, 0.86)',
-    padding: 22,
+    paddingHorizontal: 22,
+    paddingVertical: 18,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.35,
@@ -684,7 +737,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   inputGroup: {
-    gap: 8,
+    gap: 4,
   },
   loginModeHeader: {
     minHeight: 24,
@@ -716,7 +769,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   identifierMessageArea: {
-    minHeight: 18,
+    minHeight: 14,
     justifyContent: 'center',
     paddingHorizontal: 16,
   },
@@ -725,7 +778,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0,
-    lineHeight: 16,
+    lineHeight: 14,
+  },
+  passwordMessageArea: {
+    minHeight: 16,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  passwordMessageText: {
+    color: '#f2b8bf',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0,
+    lineHeight: 14,
   },
   phoneRow: {
     minHeight: 54,
@@ -787,13 +852,13 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   forgotButton: {
-    minHeight: 34,
+    minHeight: 24,
     alignSelf: 'flex-end',
     justifyContent: 'center',
   },
   actionStack: {
     position: 'relative',
-    gap: 10,
+    gap: 6,
   },
   linkText: {
     color: accentColor,
