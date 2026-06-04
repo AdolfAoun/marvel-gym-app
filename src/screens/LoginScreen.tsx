@@ -489,7 +489,12 @@ export default function LoginScreen() {
               <Text style={styles.bottomActionText}>Create Account</Text>
             </Pressable>
 
-            <View style={styles.footerDivider} />
+            <Image
+              accessible={false}
+              source={require('@/assets/images/marvel-x-red-separator.png')}
+              style={styles.footerDivider}
+              resizeMode="contain"
+            />
 
             <Pressable
               onPress={(event) => {
@@ -955,8 +960,9 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   footerDivider: {
-    width: 1,
+    width: 12,
     height: 18,
-    backgroundColor: '#263241',
+    tintColor: accentColor,
+    opacity: 0.62,
   },
 });
