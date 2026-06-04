@@ -46,6 +46,9 @@ export default function LoginScreen() {
   const feedbackOpacity = useRef(new Animated.Value(0)).current;
   const contactRaysProgress = useRef(new Animated.Value(0)).current;
   const keyboardLift = useRef(new Animated.Value(0)).current;
+  const phoneInputRef = useRef<TextInput>(null);
+  const emailInputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
   const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
@@ -72,6 +75,40 @@ export default function LoginScreen() {
       useNativeDriver: true,
     }).start();
   }, [isKeyboardVisible, isPasswordFocused, keyboardLift]);
+
+  const setContactHubOpen = (open: boolean) => {
+    setIsContactOpen(open);
+    Animated.spring(contactRaysProgress, {
+      toValue: open ? 1 : 0,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 90,
+    }).start();
+  };
+
+  const closeContactHub = () => {
+    if (isContactOpen) {
+      setContactHubOpen(false);
+    }
+  };
+
+  const clearInputFocus = () => {
+    phoneInputRef.current?.blur();
+    emailInputRef.current?.blur();
+    passwordInputRef.current?.blur();
+    Keyboard.dismiss();
+    keyboardLift.stopAnimation();
+    keyboardLift.setValue(0);
+    setIsPasswordFocused(false);
+    setIsKeyboardVisible(false);
+  };
+
+  const handleContactHubPress = () => {
+    const shouldOpen = !isContactOpen;
+
+    clearInputFocus();
+    setContactHubOpen(shouldOpen);
+  };
 
   const hideFeedback = () => {
     Animated.timing(feedbackOpacity, {
@@ -106,6 +143,7 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
+    closeContactHub();
     clearFeedback();
     setIdentifierMessage('');
     setPasswordMessage('');
@@ -114,7 +152,7 @@ export default function LoginScreen() {
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const loginFailureMessage =
       loginMode === 'phone'
-        ? 'Phone number or password is invalid.'
+        ? 'Invalid Phone number or Password.'
         : 'Invalid Email or Password.';
 
     if (loginMode === 'phone' && normalizedPhone.length !== 8) {
@@ -148,17 +186,8 @@ export default function LoginScreen() {
   };
 
   const handleGuestAccess = () => {
+    closeContactHub();
     router.replace('/(tabs)');
-  };
-
-  const setContactHubOpen = (open: boolean) => {
-    setIsContactOpen(open);
-    Animated.spring(contactRaysProgress, {
-      toValue: open ? 1 : 0,
-      useNativeDriver: true,
-      friction: 8,
-      tension: 90,
-    }).start();
   };
 
   const handleContactOption = async (url: string) => {
@@ -249,7 +278,7 @@ export default function LoginScreen() {
 
           <Pressable
             hitSlop={12}
-            onPress={() => setContactHubOpen(!isContactOpen)}
+            onPress={handleContactHubPress}
             style={({ pressed }) => [
               styles.contactHub,
               isContactOpen && styles.contactHubOpen,
@@ -266,7 +295,12 @@ export default function LoginScreen() {
               transform: [{ translateY: keyboardLift }],
             },
           ]}>
-          <Pressable onPress={Keyboard.dismiss} style={styles.fixedContent}>
+          <Pressable
+            onPress={() => {
+              closeContactHub();
+              clearInputFocus();
+            }}
+            style={styles.fixedContent}>
           <View style={styles.brandingSection}>
             <View style={styles.brandBlock}>
               <View style={styles.logoGlow} />
@@ -296,6 +330,7 @@ export default function LoginScreen() {
                 <Pressable
                   onPress={(event) => {
                     event.stopPropagation();
+                    closeContactHub();
                     setLoginMode((mode) => (mode === 'phone' ? 'email' : 'phone'));
                     setIdentifierMessage('');
                     setPasswordMessage('');
@@ -314,6 +349,7 @@ export default function LoginScreen() {
                     <Text style={styles.countryCodeText}>+961</Text>
                   </View>
                   <TextInput
+                    ref={phoneInputRef}
                     value={formatLebanesePhone(phoneNumber)}
                     onChangeText={(value) =>
                       setPhoneNumber(value.replace(/\D/g, '').slice(0, 8))
@@ -324,13 +360,17 @@ export default function LoginScreen() {
                     autoCorrect={false}
                     keyboardType="number-pad"
                     textContentType="telephoneNumber"
-                    onFocus={() => setIsPasswordFocused(false)}
+                    onFocus={() => {
+                      closeContactHub();
+                      setIsPasswordFocused(false);
+                    }}
                     selectionColor={accentColor}
                     style={styles.phoneInput}
                   />
                 </View>
               ) : (
                 <TextInput
+                  ref={emailInputRef}
                   value={email}
                   onChangeText={setEmail}
                   placeholder="member@marvelgym.com"
@@ -340,7 +380,10 @@ export default function LoginScreen() {
                   autoComplete="email"
                   keyboardType="email-address"
                   textContentType="emailAddress"
-                  onFocus={() => setIsPasswordFocused(false)}
+                  onFocus={() => {
+                    closeContactHub();
+                    setIsPasswordFocused(false);
+                  }}
                   selectionColor={accentColor}
                   style={styles.input}
                 />
@@ -357,6 +400,7 @@ export default function LoginScreen() {
               <Text style={styles.label}>Password</Text>
               <View style={styles.passwordRow}>
                 <TextInput
+                  ref={passwordInputRef}
                   value={password}
                   onChangeText={setPassword}
                   placeholder="Enter your password"
@@ -365,13 +409,19 @@ export default function LoginScreen() {
                   autoCorrect={false}
                   secureTextEntry={!isPasswordVisible}
                   textContentType="password"
-                  onFocus={() => setIsPasswordFocused(true)}
+                  onFocus={() => {
+                    closeContactHub();
+                    setIsPasswordFocused(true);
+                  }}
                   onBlur={() => setIsPasswordFocused(false)}
                   selectionColor={accentColor}
                   style={styles.passwordInput}
                 />
                 <Pressable
-                  onPress={() => setIsPasswordVisible((value) => !value)}
+                  onPress={() => {
+                    closeContactHub();
+                    setIsPasswordVisible((value) => !value);
+                  }}
                   hitSlop={10}
                   style={styles.passwordToggle}>
                   <Text style={styles.passwordToggleText}>
@@ -390,6 +440,7 @@ export default function LoginScreen() {
               <Pressable
                 onPress={(event) => {
                   event.stopPropagation();
+                  closeContactHub();
                   showFeedback('Password reset mail sent');
                 }}
                 style={styles.forgotButton}>
@@ -424,11 +475,15 @@ export default function LoginScreen() {
           </View>
 
           <Pressable
-            onPress={(event) => event.stopPropagation()}
+            onPress={(event) => {
+              event.stopPropagation();
+              closeContactHub();
+            }}
             style={styles.bottomActions}>
             <Pressable
               onPress={(event) => {
                 event.stopPropagation();
+                closeContactHub();
                 showFeedback('Registration coming soon');
               }}>
               <Text style={styles.bottomActionText}>Create Account</Text>
