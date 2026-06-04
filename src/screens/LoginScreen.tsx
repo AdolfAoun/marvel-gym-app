@@ -38,6 +38,7 @@ export default function LoginScreen() {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isContactOpen, setIsContactOpen] = useState(false);
+  const [identifierMessage, setIdentifierMessage] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const feedbackOpacity = useRef(new Animated.Value(0)).current;
   const contactRaysProgress = useRef(new Animated.Value(0)).current;
@@ -77,6 +78,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     clearFeedback();
+    setIdentifierMessage('');
     const normalizedPhone = phoneNumber.replace(/\D/g, '');
     const normalizedEmail = email.trim().toLowerCase();
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -91,7 +93,7 @@ export default function LoginScreen() {
     }
 
     if (loginMode === 'email' && !emailPattern.test(normalizedEmail)) {
-      showFeedback('Enter a valid email address.');
+      setIdentifierMessage('Enter a valid email address.');
       return;
     }
 
@@ -109,7 +111,11 @@ export default function LoginScreen() {
       });
       router.replace('/(tabs)');
     } catch {
-      showFeedback(loginFailureMessage);
+      if (loginMode === 'email') {
+        setIdentifierMessage(loginFailureMessage);
+      } else {
+        showFeedback(loginFailureMessage);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -173,6 +179,15 @@ export default function LoginScreen() {
       <StatusBar style="light" />
       <View style={styles.phoneFrame}>
         <View style={styles.glowSmall} />
+        <View pointerEvents="none" style={styles.prototypeAtmosphereLayer}>
+          <Image
+            source={require('@/assets/images/prototype-three-finger-back-pose-background.png')}
+            style={styles.prototypeAtmosphereImage}
+            resizeMode="contain"
+          />
+          <View style={styles.prototypeAtmosphereVeil} />
+          <View style={styles.prototypeAtmosphereLowerFade} />
+        </View>
 
         <View pointerEvents="box-none" style={styles.contactHubLayer}>
           <View pointerEvents="none" style={styles.contactHubGlow} />
@@ -232,13 +247,13 @@ export default function LoginScreen() {
             <View style={styles.heroBlock}>
               <View style={styles.subtitlePill}>
                 <Text style={styles.heroSubtitle}>
-                  Access your Membership, Classes, and Gym Essentials.
+                  View Membership, Classes, and Gym Essentials.
                 </Text>
               </View>
             </View>
           </View>
 
-          <View style={[styles.loginCard, loginMode === 'email' && styles.loginCardEmail]}>
+          <View style={styles.loginCard}>
             <View style={styles.cardGloss} />
             <View style={styles.inputGroup}>
               <View style={styles.loginModeHeader}>
@@ -249,6 +264,7 @@ export default function LoginScreen() {
                   onPress={(event) => {
                     event.stopPropagation();
                     setLoginMode((mode) => (mode === 'phone' ? 'email' : 'phone'));
+                    setIdentifierMessage('');
                     clearFeedback();
                   }}
                   hitSlop={8}>
@@ -279,25 +295,26 @@ export default function LoginScreen() {
                   />
                 </View>
               ) : (
-                <>
-                  <TextInput
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder="member@marvelgym.com"
-                    placeholderTextColor="#667282"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="email"
-                    keyboardType="email-address"
-                    textContentType="emailAddress"
-                    selectionColor={accentColor}
-                    style={styles.input}
-                  />
-                  <Text style={styles.emailNotice}>
-                    Enter the email address associated to your account.
-                  </Text>
-                </>
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="member@marvelgym.com"
+                  placeholderTextColor="#667282"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  keyboardType="email-address"
+                  textContentType="emailAddress"
+                  selectionColor={accentColor}
+                  style={styles.input}
+                />
               )}
+
+              <View style={styles.identifierMessageArea}>
+                {identifierMessage.length > 0 && (
+                  <Text style={styles.identifierMessageText}>{identifierMessage}</Text>
+                )}
+              </View>
             </View>
 
             <View style={styles.inputGroup}>
@@ -422,6 +439,39 @@ const styles = StyleSheet.create({
     backgroundColor: accentColor,
     opacity: 0.08,
   },
+  prototypeAtmosphereLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 460,
+    opacity: 1,
+  },
+  prototypeAtmosphereImage: {
+    position: 'absolute',
+    top: -90,
+    left: -290,
+    right: 12,
+    height: 650,
+    opacity: 0.5,//0.12
+    
+  },
+  prototypeAtmosphereVeil: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(3, 4, 5, 0.22)',
+  },
+  prototypeAtmosphereLowerFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 120,
+    backgroundColor: 'rgba(6, 8, 10, 0.66)',
+  },
   contactHubLayer: {
     position: 'absolute',
     top: 0,
@@ -489,10 +539,10 @@ const styles = StyleSheet.create({
   },
   callRay: {
     top: 92,
-    right: 42,
+    right: 47,
   },
   contactRayButton: {
-    width: 72,
+    width: 70,
     height: 42,
     alignItems: 'center',
     justifyContent: 'center',
@@ -507,11 +557,11 @@ const styles = StyleSheet.create({
     elevation: 7,
   },
   callRayButton: {
-    width: 54,
+    width: 52,
   },
   contactRayText: {
     color: '#f8fafc',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0,
   },
@@ -523,7 +573,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: Platform.OS === 'web' ? 52 : 38,
     paddingBottom: 24,
-    transform: [{ translateY: 10 }],
+    transform: [{ translateY: 15 }],
   },
   brandingSection: {
     alignItems: 'center',
@@ -533,7 +583,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 18,
     position: 'relative',
-    transform: [{ translateY: 22 }],
+    transform: [{ translateY: 28 }],
   },
   logoGlow: {
     position: 'absolute',
@@ -558,6 +608,7 @@ const styles = StyleSheet.create({
     marginTop: 30,
     marginBottom: 22,
     paddingHorizontal: 10,
+    transform: [{ translateY: 5 }],
   },
   subtitlePill: {
     borderWidth: 1,
@@ -565,7 +616,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: 'rgba(18, 18, 20, 0.62)',
     paddingHorizontal: 18,
-    paddingVertical: 13,
+    paddingVertical: 10,
     shadowColor: accentColor,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.13,
@@ -577,6 +628,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     maxWidth: 300,
     textAlign: 'center',
+    transform: [{ translateY: 0}],
   },
   loginCard: {
     position: 'relative',
@@ -594,9 +646,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 28,
     elevation: 7,
-  },
-  loginCardEmail: {
-    paddingBottom: 24,
   },
   cardGloss: {
     position: 'absolute',
@@ -666,13 +715,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingHorizontal: 16,
   },
-  emailNotice: {
-    color: '#8b96a6',
+  identifierMessageArea: {
+    minHeight: 18,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  identifierMessageText: {
+    color: '#f2b8bf',
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: 0,
     lineHeight: 16,
-    paddingHorizontal: 16,
   },
   phoneRow: {
     minHeight: 54,
