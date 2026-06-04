@@ -230,7 +230,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <StatusBar style="light" />
       <View style={styles.phoneFrame}>
         <View pointerEvents="none" style={styles.prototypeAtmosphereLayer}>
@@ -244,63 +244,64 @@ export default function LoginScreen() {
         </View>
         <View pointerEvents="none" style={styles.glowSmall} />
 
-        <View pointerEvents="box-none" style={styles.contactHubLayer}>
-          <View pointerEvents="none" style={styles.contactHubGlow} />
+        <SafeAreaView style={styles.contentSafeArea}>
+          <View pointerEvents="box-none" style={styles.contactHubLayer}>
+            <View pointerEvents="none" style={styles.contactHubGlow} />
 
-          <Animated.View
-            pointerEvents={isContactOpen ? 'auto' : 'none'}
-            style={[styles.contactRay, styles.whatsappRay, whatsappRayStyle]}>
+            <Animated.View
+              pointerEvents={isContactOpen ? 'auto' : 'none'}
+              style={[styles.contactRay, styles.whatsappRay, whatsappRayStyle]}>
+              <Pressable
+                hitSlop={10}
+                onPress={() => handleContactOption('https://wa.me/96179197997')}
+                style={({ pressed }) => [
+                  styles.contactRayButton,
+                  pressed && styles.contactPressed,
+                ]}>
+                <Text style={styles.contactRayText}>WhatsApp</Text>
+              </Pressable>
+            </Animated.View>
+
+            <Animated.View
+              pointerEvents={isContactOpen ? 'auto' : 'none'}
+              style={[styles.contactRay, styles.callRay, callRayStyle]}>
+              <Pressable
+                hitSlop={10}
+                onPress={() => handleContactOption('tel:+96179197997')}
+                style={({ pressed }) => [
+                  styles.contactRayButton,
+                  styles.callRayButton,
+                  pressed && styles.contactPressed,
+                ]}>
+                <Text style={styles.contactRayText}>Call</Text>
+              </Pressable>
+            </Animated.View>
+
             <Pressable
-              hitSlop={10}
-              onPress={() => handleContactOption('https://wa.me/96179197997')}
+              hitSlop={12}
+              onPress={handleContactHubPress}
               style={({ pressed }) => [
-                styles.contactRayButton,
+                styles.contactHub,
+                isContactOpen && styles.contactHubOpen,
                 pressed && styles.contactPressed,
               ]}>
-              <Text style={styles.contactRayText}>WhatsApp</Text>
+              <Text style={styles.contactHubText}>Contact Us</Text>
             </Pressable>
-          </Animated.View>
+          </View>
 
           <Animated.View
-            pointerEvents={isContactOpen ? 'auto' : 'none'}
-            style={[styles.contactRay, styles.callRay, callRayStyle]}>
-            <Pressable
-              hitSlop={10}
-              onPress={() => handleContactOption('tel:+96179197997')}
-              style={({ pressed }) => [
-                styles.contactRayButton,
-                styles.callRayButton,
-                pressed && styles.contactPressed,
-              ]}>
-              <Text style={styles.contactRayText}>Call</Text>
-            </Pressable>
-          </Animated.View>
-
-          <Pressable
-            hitSlop={12}
-            onPress={handleContactHubPress}
-            style={({ pressed }) => [
-              styles.contactHub,
-              isContactOpen && styles.contactHubOpen,
-              pressed && styles.contactPressed,
+            style={[
+              styles.keyboardLiftLayer,
+              {
+                transform: [{ translateY: keyboardLift }],
+              },
             ]}>
-            <Text style={styles.contactHubText}>Contact Us</Text>
-          </Pressable>
-        </View>
-
-        <Animated.View
-          style={[
-            styles.keyboardLiftLayer,
-            {
-              transform: [{ translateY: keyboardLift }],
-            },
-          ]}>
-          <Pressable
-            onPress={() => {
-              closeContactHub();
-              clearInputFocus();
-            }}
-            style={styles.fixedContent}>
+            <Pressable
+              onPress={() => {
+                closeContactHub();
+                clearInputFocus();
+              }}
+              style={styles.fixedContent}>
           <View style={styles.brandingSection}>
             <View style={styles.brandBlock}>
               <View style={styles.logoGlow} />
@@ -504,10 +505,11 @@ export default function LoginScreen() {
               <Text style={styles.bottomActionText}>Continue as Guest</Text>
             </Pressable>
           </Pressable>
-          </Pressable>
-        </Animated.View>
+            </Pressable>
+          </Animated.View>
+        </SafeAreaView>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -533,6 +535,9 @@ const styles = StyleSheet.create({
     shadowOpacity: Platform.OS === 'web' ? 0.2 : 0,
     shadowRadius: 42,
   },
+  contentSafeArea: {
+    flex: 1,
+  },
   glowSmall: {
     position: 'absolute',
     zIndex: 1,
@@ -556,11 +561,11 @@ const styles = StyleSheet.create({
   },
   prototypeAtmosphereImage: {
     position: 'absolute',
-    top: -90,
-    left: -300,
+    top: -80,
+    left: -308,
     right: 12,
-    height: 650,
-    opacity: 0.5,//0.12
+    height: 680,
+    opacity: 0.45,//0.12
     
   },
   prototypeAtmosphereVeil: {
@@ -580,74 +585,70 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.66)',
   },
   contactHubLayer: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    zIndex: 20,
-    width: 230,
-    height: 176,
-  },
-  contactHubGlow: {
-    position: 'absolute',
-    top: -108,
-    right: -108,
-    zIndex: 0,
-    width: 212,
-    height: 212,
-    borderRadius: 106,
-    backgroundColor: accentColor,
-    opacity: 0.14,
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.34,
-    shadowRadius: 36,
-  },
-  contactHub: {
-    position: 'absolute',
-    top: -88,
-    right: -88,
-    zIndex: 2,
-    width: 180,
-    height: 180,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.34)',
-    borderRadius: 90,
-    backgroundColor: 'rgba(225, 29, 46, 0.32)',
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 22,
-    elevation: 8,
-  },
-  contactHubOpen: {
-    borderColor: 'rgba(255, 255, 255, 0.24)',
-    backgroundColor: 'rgba(225, 29, 46, 0.34)',
-  },
-  contactHubText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0,
-    lineHeight: 14,
-    marginTop: 83,
-    marginRight: 70,
-    maxWidth: 58,
-    textAlign: 'center',
-  },
-  contactRay: {
-    position: 'absolute',
-    zIndex: 1,
-  },
-  whatsappRay: {
-    top: 28,
-    right: 100,
-  },
-  callRay: {
-    top: 92,
-    right: 47,
-  },
+  position: 'absolute',
+  top: 57,
+  right: 0,
+  zIndex: 20,
+  width: 40,
+  height: 210,
+},
+
+contactHubGlow: {
+  position: 'absolute',
+  top: 17,
+  right: -135,
+  zIndex: 0,
+  width: 193,
+  height: 130,
+  borderRadius: 121,
+  backgroundColor: accentColor,
+  opacity: 0.14,
+  shadowColor: accentColor,
+  shadowOffset: { width: 0, height: 12 },
+  shadowOpacity: 0.34,
+  shadowRadius: 36,
+},
+
+contactHub: {
+  position: 'absolute',
+  top: 22,
+  right: -112,
+  zIndex: 2,
+  width: 165,
+  height: 120,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderWidth: 1,
+  borderColor: 'rgba(225, 29, 46, 0.34)',
+  borderRadius: 104,
+  backgroundColor: 'rgba(225, 29, 46, 0.32)',
+  shadowColor: accentColor,
+  shadowOffset: { width: 0, height: 10 },
+  shadowOpacity: 0.3,
+  shadowRadius: 22,
+  elevation: 8,
+},
+
+contactHubText: {
+  color: '#ffffff',
+  fontSize: 11,
+  fontWeight: '900',
+  letterSpacing: 0,
+  lineHeight: 14,
+  marginRight: 107,
+  maxWidth: 58,
+  textAlign: 'center',
+},
+
+whatsappRay: {
+  top: 40,
+  right: 95,
+},
+
+callRay: {
+  top: 55,
+  right: 78,
+},
   contactRayButton: {
     width: 70,
     height: 42,
