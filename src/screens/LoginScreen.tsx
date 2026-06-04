@@ -516,14 +516,14 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
     justifyContent: Platform.OS === 'web' ? 'center' : 'flex-start',
-    backgroundColor: '#030405',
+    backgroundColor: '#000000',
   },
   phoneFrame: {
     flex: 1,
     width: '100%',
     maxWidth: Platform.OS === 'web' ? 414 : undefined,
     overflow: 'hidden',
-    backgroundColor: '#06080a',
+    backgroundColor: '#000000',
     borderColor: Platform.OS === 'web' ? '#1d2733' : 'transparent',
     borderRadius: Platform.OS === 'web' ? 34 : 0,
     borderWidth: Platform.OS === 'web' ? 1 : 0,
@@ -542,7 +542,7 @@ const styles = StyleSheet.create({
     height: 190,
     borderRadius: 95,
     backgroundColor: accentColor,
-    opacity: 0.08,
+    opacity: 0.1,
   },
   prototypeAtmosphereLayer: {
     position: 'absolute',
@@ -569,7 +569,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(3, 4, 5, 0.22)',
+    backgroundColor: 'rgba(0, 0, 0, 0.22)',
   },
   prototypeAtmosphereLowerFade: {
     position: 'absolute',
@@ -577,7 +577,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: 120,
-    backgroundColor: 'rgba(6, 8, 10, 0.66)',
+    backgroundColor: 'rgba(0, 0, 0, 0.66)',
   },
   contactHubLayer: {
     position: 'absolute',
