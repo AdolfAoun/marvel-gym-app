@@ -7,7 +7,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -88,11 +87,7 @@ export default function LoginScreen() {
         <KeyboardAvoidingView
           style={styles.keyboardView}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView
-            bounces={false}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}>
+          <View style={styles.fixedContent}>
             <View style={styles.brandBlock}>
               <View style={styles.logoGlow} />
               <Image
@@ -163,11 +158,11 @@ export default function LoginScreen() {
                   />
                 )}
 
-                <Text style={styles.helperText}>
-                  {loginMode === 'phone'
-                    ? 'Use the phone number linked to your membership.'
-                    : 'Login via email only if email is linked to account.'}
-                </Text>
+                {loginMode === 'email' && (
+                  <Text style={styles.helperText}>
+                    Email login is available only for the email address linked to your account.
+                  </Text>
+                )}
                 {errorMessage.length > 0 && (
                   <Text style={styles.errorText}>{errorMessage}</Text>
                 )}
@@ -242,7 +237,7 @@ export default function LoginScreen() {
                 <Text style={styles.bottomActionText}>Continue as Guest</Text>
               </Pressable>
             </View>
-          </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       </View>
     </SafeAreaView>
@@ -313,11 +308,12 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
-  scrollContent: {
-    flexGrow: 1,
+  fixedContent: {
+    flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 34,
+    paddingVertical: 24,
+    transform: [{ translateY: -14 }],
   },
   brandBlock: {
     alignItems: 'center',
