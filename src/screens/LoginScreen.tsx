@@ -124,162 +124,163 @@ export default function LoginScreen() {
         <View style={styles.glowSmall} />
 
         <Pressable onPress={Keyboard.dismiss} style={styles.fixedContent}>
-            <View style={styles.brandBlock}>
-              <View style={styles.logoGlow} />
-              <Image
-                source={require('@/assets/images/marvel-logo-transparent.png')}
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-            </View>
+          <View style={styles.brandBlock}>
+            <View style={styles.logoGlow} />
+            <Image
+              source={require('@/assets/images/marvel-logo-transparent.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+          </View>
 
-            <View style={styles.heroBlock}>
-              <View style={styles.subtitlePill}>
-                <Text style={styles.heroSubtitle}>
-                  Access your Membership, Classes, and Gym Essentials.
+          <View style={styles.heroBlock}>
+            <View style={styles.subtitlePill}>
+              <Text style={styles.heroSubtitle}>
+                Access your Membership, Classes, and Gym Essentials.
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.loginCard}>
+            <View style={styles.cardGloss} />
+            <View style={[styles.inputGroup, styles.identifierGroup]}>
+              <View style={styles.loginModeHeader}>
+                <Text style={styles.label}>
+                  {loginMode === 'phone' ? 'Phone Number' : 'Email'}
                 </Text>
+                <Pressable
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    setLoginMode((mode) => (mode === 'phone' ? 'email' : 'phone'));
+                    clearFeedback();
+                  }}
+                  hitSlop={8}>
+                  <Text style={styles.modeToggleText}>
+                    {loginMode === 'phone' ? 'Use email instead' : 'Use phone instead'}
+                  </Text>
+                </Pressable>
               </View>
+
+              {loginMode === 'phone' ? (
+                <View style={styles.phoneRow}>
+                  <View style={styles.countryCodeBox}>
+                    <Text style={styles.countryCodeText}>+961</Text>
+                  </View>
+                  <TextInput
+                    value={formatLebanesePhone(phoneNumber)}
+                    onChangeText={(value) =>
+                      setPhoneNumber(value.replace(/\D/g, '').slice(0, 8))
+                    }
+                    placeholder="70 123 456"
+                    placeholderTextColor="#667282"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="number-pad"
+                    textContentType="telephoneNumber"
+                    selectionColor={accentColor}
+                    style={styles.phoneInput}
+                  />
+                </View>
+              ) : (
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="member@marvelgym.com"
+                  placeholderTextColor="#667282"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  keyboardType="email-address"
+                  textContentType="emailAddress"
+                  selectionColor={accentColor}
+                  style={styles.input}
+                />
+              )}
             </View>
 
-            <View style={styles.loginCard}>
-              <View style={styles.cardGloss} />
-              <View style={[styles.inputGroup, styles.identifierGroup]}>
-                <View style={styles.loginModeHeader}>
-                  <Text style={styles.label}>
-                    {loginMode === 'phone' ? 'Phone Number' : 'Email'}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Password</Text>
+              <View style={styles.passwordRow}>
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Enter your password"
+                  placeholderTextColor="#667282"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  secureTextEntry={!isPasswordVisible}
+                  textContentType="password"
+                  selectionColor={accentColor}
+                  style={styles.passwordInput}
+                />
+                <Pressable
+                  onPress={() => setIsPasswordVisible((value) => !value)}
+                  hitSlop={10}
+                  style={styles.passwordToggle}>
+                  <Text style={styles.passwordToggleText}>
+                    {isPasswordVisible ? 'Hide' : 'Show'}
                   </Text>
-                  <Pressable
-                    onPress={(event) => {
-                      event.stopPropagation();
-                      setLoginMode((mode) => (mode === 'phone' ? 'email' : 'phone'));
-                      clearFeedback();
-                    }}
-                    hitSlop={8}>
-                    <Text style={styles.modeToggleText}>
-                      {loginMode === 'phone' ? 'Use email instead' : 'Use phone instead'}
-                    </Text>
-                  </Pressable>
-                </View>
-
-                {loginMode === 'phone' ? (
-                  <View style={styles.phoneRow}>
-                    <View style={styles.countryCodeBox}>
-                      <Text style={styles.countryCodeText}>+961</Text>
-                    </View>
-                    <TextInput
-                      value={formatLebanesePhone(phoneNumber)}
-                      onChangeText={(value) => setPhoneNumber(value.replace(/\D/g, '').slice(0, 8))}
-                      placeholder="70 123 456"
-                      placeholderTextColor="#667282"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="number-pad"
-                      textContentType="telephoneNumber"
-                      selectionColor={accentColor}
-                      style={styles.phoneInput}
-                    />
-                  </View>
-                ) : (
-                  <TextInput
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder="member@marvelgym.com"
-                    placeholderTextColor="#667282"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="email"
-                    keyboardType="email-address"
-                    textContentType="emailAddress"
-                    selectionColor={accentColor}
-                    style={styles.input}
-                  />
-                )}
+                </Pressable>
               </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Password</Text>
-                <View style={styles.passwordRow}>
-                  <TextInput
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder="Enter your password"
-                    placeholderTextColor="#667282"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    secureTextEntry={!isPasswordVisible}
-                    textContentType="password"
-                    selectionColor={accentColor}
-                    style={styles.passwordInput}
-                  />
-                  <Pressable
-                    onPress={() => setIsPasswordVisible((value) => !value)}
-                    hitSlop={10}
-                    style={styles.passwordToggle}>
-                    <Text style={styles.passwordToggleText}>
-                      {isPasswordVisible ? 'Hide' : 'Show'}
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-
-              <Pressable
-                onPress={(event) => {
-                  event.stopPropagation();
-                  showFeedback('Password reset email sent');
-                }}
-                style={styles.forgotButton}>
-                <Text style={styles.linkText}>Forgot password?</Text>
-              </Pressable>
-
-              {feedbackMessage.length > 0 && (
-                <Animated.View
-                  pointerEvents="none"
-                  style={[styles.formFeedback, { opacity: feedbackOpacity }]}>
-                  <Text style={styles.formFeedbackText}>{feedbackMessage}</Text>
-                </Animated.View>
-              )}
-
-              <Pressable
-                disabled={isSubmitting}
-                onPress={(event) => {
-                  event.stopPropagation();
-                  handleLogin();
-                }}
-                style={({ pressed }) => [
-                  styles.loginButton,
-                  (pressed || isSubmitting) && styles.loginButtonPressed,
-                ]}>
-                {isSubmitting ? (
-                  <ActivityIndicator color="#031018" />
-                ) : (
-                  <Text style={styles.loginButtonText}>Login</Text>
-                )}
-              </Pressable>
-
             </View>
 
             <Pressable
-              onPress={(event) => event.stopPropagation()}
-              style={styles.bottomActions}>
-              <Pressable
-                onPress={(event) => {
-                  event.stopPropagation();
-                  showFeedback('Registration coming soon');
-                }}>
-                <Text style={styles.bottomActionText}>Create Account</Text>
-              </Pressable>
+              onPress={(event) => {
+                event.stopPropagation();
+                showFeedback('Password reset email sent');
+              }}
+              style={styles.forgotButton}>
+              <Text style={styles.linkText}>Forgot password?</Text>
+            </Pressable>
 
-              <View style={styles.footerDivider} />
+            {feedbackMessage.length > 0 && (
+              <Animated.View
+                pointerEvents="none"
+                style={[styles.formFeedback, { opacity: feedbackOpacity }]}>
+                <Text style={styles.formFeedbackText}>{feedbackMessage}</Text>
+              </Animated.View>
+            )}
 
-              <Pressable
-                onPress={(event) => {
-                  event.stopPropagation();
-                  handleGuestAccess();
-                }}>
-                <Text style={styles.bottomActionText}>Continue as Guest</Text>
-              </Pressable>
+            <Pressable
+              disabled={isSubmitting}
+              onPress={(event) => {
+                event.stopPropagation();
+                handleLogin();
+              }}
+              style={({ pressed }) => [
+                styles.loginButton,
+                (pressed || isSubmitting) && styles.loginButtonPressed,
+              ]}>
+              {isSubmitting ? (
+                <ActivityIndicator color="#031018" />
+              ) : (
+                <Text style={styles.loginButtonText}>Login</Text>
+              )}
+            </Pressable>
+          </View>
+
+          <Pressable
+            onPress={(event) => event.stopPropagation()}
+            style={styles.bottomActions}>
+            <Pressable
+              onPress={(event) => {
+                event.stopPropagation();
+                showFeedback('Registration coming soon');
+              }}>
+              <Text style={styles.bottomActionText}>Create Account</Text>
+            </Pressable>
+
+            <View style={styles.footerDivider} />
+
+            <Pressable
+              onPress={(event) => {
+                event.stopPropagation();
+                handleGuestAccess();
+              }}>
+              <Text style={styles.bottomActionText}>Continue as Guest</Text>
             </Pressable>
           </Pressable>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -332,19 +333,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 24,
     paddingVertical: 24,
-    transform: [{ translateY: -14 }],
+    transform: [{ translateY: -30 }],
   },
   brandBlock: {
     alignItems: 'center',
     marginBottom: 18,
     position: 'relative',
     transform: [{ translateY: 5 }],
-
   },
   logoGlow: {
     position: 'absolute',
     top: 0,
-    width:158,
+    width: 158,
     height: 158,
     borderRadius: 79,
     backgroundColor: accentColor,
@@ -357,12 +357,11 @@ const styles = StyleSheet.create({
   logoImage: {
     width: 150,
     height: 150,
-    transform: [{ translateY: 6 },{ translateX: 0.3 }],
-   
+    transform: [{ translateY: 6 }, { translateX: 0.3 }],
   },
   heroBlock: {
     alignItems: 'center',
-    marginTop:20,
+    marginTop: 20,
     marginBottom: 20,
     paddingHorizontal: 10,
   },
@@ -399,7 +398,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.35,
     shadowRadius: 28,
-    elevation: 6,
+    elevation: 7,
   },
   cardGloss: {
     position: 'absolute',
@@ -413,7 +412,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 22,
     right: 22,
-    bottom: 82,
+    bottom: 74,
     zIndex: 10,
     alignItems: 'center',
     alignSelf: 'center',
