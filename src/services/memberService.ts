@@ -8,6 +8,8 @@ export type UpdateProfileInput = Partial<
     | 'lastName'
     | 'email'
     | 'phone'
+    | 'location'
+    | 'preferredPaymentMethod'
     | 'dateOfBirth'
     | 'emergencyContactName'
     | 'emergencyContactPhone'

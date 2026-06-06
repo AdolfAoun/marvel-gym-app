@@ -1,5 +1,6 @@
 import type {
   AppNotification,
+  GymActivityLevel,
   GymClass,
   Member,
   Membership,
@@ -14,6 +15,8 @@ export const currentMember: Member = {
   lastName: 'Stark',
   email: 'tony.stark@example.com',
   phone: '+1 212 555 0185',
+  location: 'Beirut, Lebanon',
+  preferredPaymentMethod: 'Visa',
   dateOfBirth: '1985-05-29',
   emergencyContactName: 'Pepper Potts',
   emergencyContactPhone: '+1 212 555 0199',
@@ -198,11 +201,50 @@ export const products: Product[] = [
     description: 'Vanilla whey protein tub.',
     price: 42,
     currency: 'USD',
-    isAvailable: true,
+    isAvailable: false,
     imageUrl: 'https://example.com/images/products/whey-protein.jpg',
     isActive: true,
     createdAt: '2026-01-05T08:00:00.000Z',
     updatedAt: '2026-05-20T11:00:00.000Z',
+  },
+];
+
+export const gymActivityLevels: GymActivityLevel[] = [
+  {
+    id: 'activity-001',
+    label: '6 AM',
+    count: 18,
+    intensity: 'Low',
+  },
+  {
+    id: 'activity-002',
+    label: '9 AM',
+    count: 42,
+    intensity: 'Medium',
+  },
+  {
+    id: 'activity-003',
+    label: '12 PM',
+    count: 34,
+    intensity: 'Medium',
+  },
+  {
+    id: 'activity-004',
+    label: '3 PM',
+    count: 27,
+    intensity: 'Low',
+  },
+  {
+    id: 'activity-005',
+    label: '6 PM',
+    count: 76,
+    intensity: 'High',
+  },
+  {
+    id: 'activity-006',
+    label: '9 PM',
+    count: 51,
+    intensity: 'High',
   },
 ];
 

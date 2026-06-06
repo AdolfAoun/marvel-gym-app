@@ -21,6 +21,8 @@ export type Member = {
   lastName: string;
   email: string;
   phone: string;
+  location?: string;
+  preferredPaymentMethod?: PaymentMethod;
   dateOfBirth?: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
@@ -108,4 +110,11 @@ export type AppNotification = {
   type: NotificationType;
   isRead: boolean;
   createdAt: string;
+};
+
+export type GymActivityLevel = {
+  id: string;
+  label: string;
+  count: number;
+  intensity: 'Low' | 'Medium' | 'High';
 };

@@ -629,6 +629,11 @@ contactHub: {
   elevation: 8,
 },
 
+contactHubOpen: {
+  borderColor: 'rgba(225, 29, 46, 0.62)',
+  backgroundColor: 'rgba(225, 29, 46, 0.42)',
+},
+
 contactHubText: {
   color: '#ffffff',
   fontSize: 11,
@@ -649,6 +654,10 @@ callRay: {
   top: 55,
   right: 78,
 },
+  contactRay: {
+    position: 'absolute',
+    zIndex: 3,
+  },
   contactRayButton: {
     width: 70,
     height: 42,

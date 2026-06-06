@@ -15,6 +15,10 @@ export const getMembershipStatus = async (): Promise<MembershipStatus> => {
   return activeMembership.status;
 };
 
+export const getCurrentMembership = async (): Promise<Membership> => {
+  return activeMembership;
+};
+
 export const getMembershipPlans = async (): Promise<MembershipPlan[]> => {
   return membershipPlans;
 };
@@ -70,6 +74,7 @@ export const showQRCode = async (): Promise<string | undefined> => {
 
 export const membershipService = {
   getMembershipStatus,
+  getCurrentMembership,
   getMembershipPlans,
   activateMembership,
   freezeMembership,
