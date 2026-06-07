@@ -50,6 +50,24 @@ function createProfileForm(member: Member): ProfileForm {
   };
 }
 
+function formatProfileDate(value?: string) {
+  if (!value) {
+    return 'Not available';
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat('en', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+}
+
 export default function ProfileScreen() {
   const [member, setMember] = useState<Member>();
   const [initialForm, setInitialForm] = useState<ProfileForm>();
@@ -190,25 +208,39 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Locked member details</Text>
-          <View style={styles.lockedGrid}>
-            <View style={styles.lockedField}>
+          <Text style={styles.sectionTitle}>Details</Text>
+
+          <View style={styles.detailsGrid}>
+            <View style={styles.fieldGroup}>
               <Text style={styles.label}>First name</Text>
-              <Text style={styles.lockedValue}>{member.firstName}</Text>
+              <View style={styles.disabledField}>
+                <Text style={styles.disabledValue}>{member.firstName}</Text>
+              </View>
             </View>
-            <View style={styles.lockedField}>
+
+            <View style={styles.fieldGroup}>
               <Text style={styles.label}>Family name</Text>
-              <Text style={styles.lockedValue}>{member.lastName}</Text>
+              <View style={styles.disabledField}>
+                <Text style={styles.disabledValue}>{member.lastName}</Text>
+              </View>
             </View>
-            <View style={styles.lockedField}>
+
+            <View style={styles.fieldGroup}>
               <Text style={styles.label}>Phone number</Text>
-              <Text style={styles.lockedValue}>{member.phone}</Text>
+              <View style={styles.disabledField}>
+                <Text style={styles.disabledValue}>{member.phone}</Text>
+              </View>
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>Date of birth</Text>
+              <View style={styles.disabledField}>
+                <Text style={styles.disabledValue}>
+                  {formatProfileDate(member.dateOfBirth)}
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Editable profile</Text>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Email</Text>
@@ -398,16 +430,21 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginBottom: 14,
   },
-  lockedGrid: {
-    gap: 10,
+  detailsGrid: {
+    gap: 12,
+    marginBottom: 16,
   },
-  lockedField: {
+  fieldGroup: {
+    gap: 8,
+  },
+  disabledField: {
+    minHeight: 54,
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.1)',
+    borderColor: 'rgba(102, 112, 133, 0.14)',
     borderRadius: 16,
-    backgroundColor: '#FFF7F8',
+    backgroundColor: '#F3F4F6',
     paddingHorizontal: 14,
-    paddingVertical: 12,
   },
   label: {
     color: '#667085',
@@ -416,8 +453,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textTransform: 'uppercase',
   },
-  lockedValue: {
-    color: '#181A20',
+  disabledValue: {
+    color: '#667085',
     fontSize: 15,
     fontWeight: '900',
   },

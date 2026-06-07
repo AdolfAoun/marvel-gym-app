@@ -1,18 +1,14 @@
 import { currentMember } from '../mock';
 import type { Member } from '../types';
 
-export type RegisterMemberInput = Pick<
-  Member,
-  'firstName' | 'lastName' | 'email' | 'phone'
-> &
-  Partial<
-    Pick<
-      Member,
-      | 'dateOfBirth'
-      | 'emergencyContactName'
-      | 'emergencyContactPhone'
-    >
-  >;
+export type RegisterMemberInput = {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  dateOfBirth: string;
+  gender: 'Male' | 'Female' | 'Prefer not to say';
+  password: string;
+};
 
 export type LoginMemberInput = {
   email: string;
@@ -28,9 +24,15 @@ const mockLoginIdentifiers = [
 ];
 
 export const registerMember = async (
-  _input: RegisterMemberInput,
+  input: RegisterMemberInput,
 ): Promise<Member> => {
-  return currentMember;
+  return {
+    ...currentMember,
+    firstName: input.firstName,
+    lastName: input.lastName,
+    phone: input.phone,
+    dateOfBirth: input.dateOfBirth,
+  };
 };
 
 export const loginMember = async (

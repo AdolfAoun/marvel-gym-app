@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -31,6 +31,7 @@ function formatLebanesePhone(value: string) {
 
 export default function LoginScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ created?: string }>();
   const [loginMode, setLoginMode] = useState<'phone' | 'email'>('phone');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
@@ -141,6 +142,12 @@ export default function LoginScreen() {
 
     feedbackTimeoutRef.current = setTimeout(hideFeedback, 2500);
   };
+
+  useEffect(() => {
+    if (params.created === '1') {
+      showFeedback('Account created successfully. Please log in.');
+    }
+  }, [params.created]);
 
   const handleLogin = async () => {
     closeContactHub();
@@ -257,20 +264,21 @@ export default function LoginScreen() {
               style={styles.fixedContent}>
           <View style={styles.brandingSection}>
             <View style={styles.brandBlock}>
-              <View style={styles.miniSignRow}>
-                <Text style={styles.miniSign}>•</Text>
-                <Text style={styles.miniSign}>X</Text>
-                <Text style={styles.miniSign}>/</Text>
-                <Text style={styles.miniSign}>÷</Text>
+              <Image
+                source={require('@/assets/images/marvel-logo-transparent.png')}
+                style={styles.brandLogo}
+                resizeMode="contain"
+              />
+              <View style={styles.brandCopy}>
+                <Text style={styles.miniLogoText}>MARVEL GYM</Text>
+                <Text style={styles.miniLogoSubtext}>fitness and health</Text>
               </View>
-              <Text style={styles.miniLogoText}>MARVEL</Text>
-              <Text style={styles.miniLogoSubtext}>fitness and health</Text>
             </View>
 
             <View style={styles.heroBlock}>
               <View style={styles.subtitlePill}>
                 <Text style={styles.heroSubtitle}>
-                  View Membership, Classes, and Gym Essentials.
+                  Member access for training, products, and membership tools.
                 </Text>
               </View>
             </View>
@@ -278,6 +286,10 @@ export default function LoginScreen() {
 
           <View style={styles.loginCard}>
             <View style={styles.cardGloss} />
+            <View style={styles.loginCardHeader}>
+              <Text style={styles.loginKicker}>Secure access</Text>
+              <Text style={styles.loginTitle}>Sign in</Text>
+            </View>
             <View style={styles.inputGroup}>
               <View style={styles.loginModeHeader}>
                 <Text style={styles.label}>
@@ -424,7 +436,7 @@ export default function LoginScreen() {
                 {isSubmitting ? (
                   <ActivityIndicator color="#031018" />
                 ) : (
-                  <Text style={styles.loginButtonText}>Login</Text>
+                  <Text style={styles.loginButtonText}>Sign In</Text>
                 )}
               </Pressable>
             </View>
@@ -442,7 +454,7 @@ export default function LoginScreen() {
               onPress={(event) => {
                 event.stopPropagation();
                 closeContactHub();
-                showFeedback('Registration coming soon');
+                router.push('/create-account');
             }}>
               <Text style={styles.bottomActionText}>Create Account</Text>
             </Pressable>
@@ -467,7 +479,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: Platform.OS === 'web' ? 414 : undefined,
     overflow: 'hidden',
-    backgroundColor: '#050506',
+    backgroundColor: '#06070A',
     borderColor: Platform.OS === 'web' ? '#1d2733' : 'transparent',
     borderRadius: Platform.OS === 'web' ? 34 : 0,
     borderWidth: Platform.OS === 'web' ? 1 : 0,
@@ -483,24 +495,24 @@ const styles = StyleSheet.create({
   glowSmall: {
     position: 'absolute',
     zIndex: 1,
-    bottom: 80,
-    left: -120,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
+    bottom: 70,
+    left: -110,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
     backgroundColor: accentColor,
-    opacity: 0.12,
+    opacity: 0.16,
   },
   glowLarge: {
     position: 'absolute',
     zIndex: 1,
-    top: -110,
-    right: -120,
-    width: 310,
-    height: 310,
-    borderRadius: 155,
-    backgroundColor: '#3A050C',
-    opacity: 0.74,
+    top: -92,
+    right: -90,
+    width: 230,
+    height: 230,
+    borderRadius: 115,
+    backgroundColor: '#5A0711',
+    opacity: 0.34,
   },
   futuristicBlade: {
     position: 'absolute',
@@ -510,7 +522,7 @@ const styles = StyleSheet.create({
     width: 102,
     height: 520,
     borderRadius: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     transform: [{ rotate: '24deg' }],
   },
   prototypeAtmosphereLayer: {
@@ -525,12 +537,11 @@ const styles = StyleSheet.create({
   },
   prototypeAtmosphereImage: {
     position: 'absolute',
-    top: -80,
-    left: -308,
+    top: -90,
+    left: -300,
     right: 12,
     height: 680,
-    opacity: 0.28,
-    
+    opacity: 0.3,
   },
   prototypeAtmosphereVeil: {
     position: 'absolute',
@@ -538,15 +549,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.52)',
+    backgroundColor: 'rgba(0, 0, 0, 0.58)',
   },
   prototypeAtmosphereLowerFade: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: 120,
-    backgroundColor: 'rgba(0, 0, 0, 0.86)',
+    height: 140,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
   },
   contactHubLayer: {
   position: 'absolute',
@@ -657,62 +668,66 @@ callRay: {
     zIndex: 2,
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'web' ? 52 : 42,
+    paddingTop: Platform.OS === 'web' ? 48 : 38,
     paddingBottom: 24,
-    transform: [{ translateY: 16 }],
+    transform: [{ translateY: 10 }],
   },
   brandingSection: {
     alignItems: 'flex-start',
     flexShrink: 0,
   },
   brandBlock: {
-    alignItems: 'flex-start',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    marginBottom: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    position: 'relative',
-    transform: [{ translateY: 10 }],
-  },
-  miniSignRow: {
+    zIndex: 3,
+    minHeight: 86,
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 2,
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    marginBottom: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    position: 'relative',
+    shadowColor: accentColor,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.16,
+    shadowRadius: 24,
   },
-  miniSign: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '900',
-    lineHeight: 17,
+  brandLogo: {
+    width: 72,
+    height: 58,
+  },
+  brandCopy: {
+    flex: 1,
   },
   miniLogoText: {
     color: '#FFFFFF',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
-    letterSpacing: 4,
-    lineHeight: 27,
+    letterSpacing: 2,
+    lineHeight: 25,
   },
   miniLogoSubtext: {
     color: '#F7D6DC',
-    fontSize: 8,
-    fontWeight: '600',
+    fontSize: 9,
+    fontWeight: '800',
     letterSpacing: 2,
+    textTransform: 'uppercase',
   },
   heroBlock: {
     alignItems: 'flex-start',
-    marginTop: 18,
-    marginBottom: 20,
+    marginTop: 12,
+    marginBottom: 16,
     paddingHorizontal: 0,
     transform: [{ translateY: 0 }],
   },
   subtitlePill: {
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 22,
-    backgroundColor: 'rgba(18, 18, 20, 0.48)',
+    backgroundColor: 'rgba(18, 18, 20, 0.58)',
     paddingHorizontal: 18,
     paddingVertical: 10,
     shadowColor: accentColor,
@@ -721,25 +736,25 @@ callRay: {
     shadowRadius: 20,
   },
   heroSubtitle: {
-    color: '#E5E7EB',
+    color: '#E9EEF6',
     fontSize: 11,
     lineHeight: 18,
     maxWidth: 300,
     textAlign: 'left',
-    transform: [{ translateY: 0}],
+    transform: [{ translateY: 0 }],
   },
   loginCard: {
     position: 'relative',
-    gap: 10,
+    gap: 11,
     flexShrink: 0,
-    minHeight: 326,
+    minHeight: 348,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 28,
-    backgroundColor: 'rgba(13, 14, 17, 0.88)',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 30,
+    backgroundColor: 'rgba(12, 13, 17, 0.9)',
     paddingHorizontal: 21,
-    paddingVertical: 20,
+    paddingVertical: 21,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 24 },
     shadowOpacity: 0.46,
@@ -753,6 +768,23 @@ callRay: {
     right: 22,
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.22)',
+  },
+  loginCardHeader: {
+    marginBottom: 2,
+  },
+  loginKicker: {
+    color: '#F7D6DC',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0,
+    textTransform: 'uppercase',
+  },
+  loginTitle: {
+    color: '#FFFFFF',
+    fontSize: 27,
+    fontWeight: '900',
+    lineHeight: 32,
+    marginTop: 2,
   },
   formFeedback: {
     position: 'absolute',
@@ -793,23 +825,23 @@ callRay: {
     gap: 12,
   },
   label: {
-    color: '#e7edf5',
+    color: '#EDF2F7',
     fontSize: 13,
     fontWeight: '800',
     letterSpacing: 0,
   },
   modeToggleText: {
-    color: accentColor,
+    color: '#FF5A6A',
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0,
   },
   input: {
-    minHeight: 54,
+    minHeight: 56,
     borderWidth: 1,
-    borderColor: '#30272b',
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: 'rgba(255, 255, 255, 0.13)',
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.075)',
     color: '#f8fafc',
     fontSize: 16,
     paddingHorizontal: 16,
@@ -845,13 +877,13 @@ callRay: {
     gap: 10,
   },
   countryCodeBox: {
-    minHeight: 54,
+    minHeight: 56,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#30272b',
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.13)',
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
     paddingHorizontal: 14,
   },
   countryCodeText: {
@@ -861,24 +893,24 @@ callRay: {
     letterSpacing: 0,
   },
   phoneInput: {
-    minHeight: 54,
+    minHeight: 56,
     flex: 1,
     borderWidth: 1,
-    borderColor: '#30272b',
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: 'rgba(255, 255, 255, 0.13)',
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.075)',
     color: '#f8fafc',
     fontSize: 16,
     paddingHorizontal: 16,
   },
   passwordRow: {
-    minHeight: 54,
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#30272b',
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: 'rgba(255, 255, 255, 0.13)',
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.075)',
   },
   passwordInput: {
     flex: 1,
@@ -893,7 +925,7 @@ callRay: {
     paddingHorizontal: 16,
   },
   passwordToggleText: {
-    color: accentColor,
+    color: '#FF5A6A',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -907,7 +939,7 @@ callRay: {
     gap: 6,
   },
   linkText: {
-    color: accentColor,
+    color: '#FF5A6A',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -915,7 +947,7 @@ callRay: {
     minHeight: 58,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 18,
+    borderRadius: 20,
     backgroundColor: accentColor,
     shadowColor: accentColor,
     shadowOffset: { width: 0, height: 12 },

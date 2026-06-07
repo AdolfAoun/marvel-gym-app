@@ -93,7 +93,7 @@ export default function ShopScreen() {
         showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
           <View pointerEvents="none" style={styles.heroGlow} />
-          <Text style={styles.kicker}>Member shop</Text>
+          <Text style={styles.kicker}>Gym Shop</Text>
           <Text style={styles.heroTitle}>Browse gym essentials.</Text>
           <Text style={styles.heroBody}>
             Check current availability and compare prices for Marvel Gym products.

@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Animated,
   Modal,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -37,7 +38,7 @@ const backgroundColor = '#FFF8F7';
 const surfaceColor = '#FFFFFF';
 const textColor = '#181A20';
 const mutedColor = '#667085';
-const voucherStatuses: VoucherStatus[] = ['Pending', 'Confirmed', 'Canceled'];
+const voucherStatuses: VoucherStatus[] = ['Confirmed', 'Pending', 'Canceled'];
 const weeklyFreezePrice = 10;
 const maxRenewMonths = 12;
 const minRenewMonths = 1;
@@ -60,33 +61,52 @@ function calculateDaysRemaining(endDate?: string) {
   return Math.max(0, Math.ceil((endTime - now) / 86400000));
 }
 
-function calculateMembershipDuration(membership?: Membership, plan?: MembershipPlan) {
-  if (membership?.startDate && membership.endDate) {
-    const startTime = new Date(membership.startDate).getTime();
-    const endTime = new Date(membership.endDate).getTime();
-
-    if (!Number.isNaN(startTime) && !Number.isNaN(endTime)) {
-      return Math.max(1, Math.ceil((endTime - startTime) / 86400000));
-    }
+function calculateMembershipProgress(membership?: Membership) {
+  if (!membership?.startDate || !membership.endDate) {
+    return 1;
   }
 
-  return Math.max(1, plan?.durationInDays ?? 30);
+  const startTime = new Date(membership.startDate).getTime();
+  const endTime = new Date(membership.endDate).getTime();
+  const now = Date.now();
+
+  if (
+    Number.isNaN(startTime) ||
+    Number.isNaN(endTime) ||
+    endTime <= startTime
+  ) {
+    return 1;
+  }
+
+  return Math.min(1, Math.max(0, (endTime - now) / (endTime - startTime)));
 }
 
-function getCountdownColor(daysRemaining: number, status?: MembershipStatus) {
+function getCountdownColor(progress: number, status?: MembershipStatus) {
   if (status === 'Frozen') {
     return '#F59E0B';
   }
 
-  if (daysRemaining <= 7 || status === 'Expired' || status === 'Suspended') {
-    return '#EF4444';
+  if (status === 'Expired' || status === 'Suspended' || progress <= 0.04) {
+    return '#7F1D1D';
   }
 
-  if (daysRemaining <= 21 || status === 'Pending Approval') {
+  if (progress <= 0.12) {
+    return '#DC2626';
+  }
+
+  if (progress <= 0.24) {
+    return '#F97316';
+  }
+
+  if (progress <= 0.42 || status === 'Pending Approval') {
     return '#F59E0B';
   }
 
-  return '#22C55E';
+  if (progress <= 0.62) {
+    return '#A3E635';
+  }
+
+  return '#16A34A';
 }
 
 function getStatusTone(status?: MembershipStatus) {
@@ -171,7 +191,7 @@ export default function HomeScreen() {
   const [selectedActivityDayId, setSelectedActivityDayId] = useState('');
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [selectedVoucherStatus, setSelectedVoucherStatus] =
-    useState<VoucherStatus>('Pending');
+    useState<VoucherStatus>('Confirmed');
   const [membershipModal, setMembershipModal] = useState<MembershipModal>();
   const [selectedFreezeWeeks, setSelectedFreezeWeeks] = useState(1);
   const [selectedRenewMonths, setSelectedRenewMonths] = useState(1);
@@ -182,6 +202,29 @@ export default function HomeScreen() {
   const [isCreatingVoucher, setIsCreatingVoucher] = useState(false);
   const [feedback, setFeedback] = useState('Ready when you are.');
   const modalProgress = useRef(new Animated.Value(0)).current;
+  const sheetPanY = useRef(new Animated.Value(0)).current;
+  const sheetPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) =>
+        Math.abs(gestureState.dy) > 8 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+      onPanResponderMove: (_, gestureState) => {
+        sheetPanY.setValue(Math.max(0, gestureState.dy));
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 64 || gestureState.vy > 0.8) {
+          closeMembershipModal();
+          return;
+        }
+
+        Animated.spring(sheetPanY, {
+          toValue: 0,
+          useNativeDriver: true,
+          friction: 8,
+          tension: 90,
+        }).start();
+      },
+    }),
+  ).current;
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -223,6 +266,7 @@ export default function HomeScreen() {
     }
 
     modalProgress.setValue(0);
+    sheetPanY.setValue(0);
     Animated.spring(modalProgress, {
       toValue: 1,
       useNativeDriver: true,
@@ -235,17 +279,13 @@ export default function HomeScreen() {
     () => calculateDaysRemaining(membership?.endDate),
     [membership?.endDate],
   );
-  const countdownColor = getCountdownColor(daysRemaining, status);
+  const membershipProgress = calculateMembershipProgress(membership);
+  const countdownColor = getCountdownColor(membershipProgress, status);
   const statusTone = getStatusTone(status);
   const plan = plans.find((item) => item.id === membership?.planId);
-  const membershipDurationDays = calculateMembershipDuration(membership, plan);
-  const membershipProgress = Math.min(
-    1,
-    Math.max(0, daysRemaining / membershipDurationDays),
-  );
   const progressSegmentCount = 36;
-  const activeProgressSegments = Math.round(
-    progressSegmentCount * membershipProgress,
+  const depletedProgressSegments = Math.round(
+    progressSegmentCount * (1 - membershipProgress),
   );
   const isFrozen = status === 'Frozen';
   const canShowQr = status === 'Active';
@@ -273,7 +313,10 @@ export default function HomeScreen() {
       toValue: 0,
       duration: 160,
       useNativeDriver: true,
-    }).start(() => setMembershipModal(undefined));
+    }).start(() => {
+      sheetPanY.setValue(0);
+      setMembershipModal(undefined);
+    });
   };
 
   const handleShowQr = async () => {
@@ -378,11 +421,13 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
           <View pointerEvents="none" style={styles.heroGlow} />
+          <View pointerEvents="none" style={styles.heroBlade} />
+          <View pointerEvents="none" style={styles.heroRing} />
           <View style={styles.heroTopRow}>
             <View style={styles.heroTextBlock}>
               <Text style={styles.kicker}>Welcome back</Text>
               <Text style={styles.title}>{member?.firstName ?? 'Member'}</Text>
-              <Text style={styles.subtitle}>Scan, train, and stay consistent.</Text>
+              <Text style={styles.subtitle}>Consistency is key.</Text>
             </View>
             <View style={styles.avatarBadge}>
               <Text style={styles.avatarText}>{memberInitials}</Text>
@@ -421,7 +466,7 @@ export default function HomeScreen() {
                 },
               ]}>
               {Array.from({ length: progressSegmentCount }).map((_, index) => {
-                const isActive = index < activeProgressSegments;
+                const isActive = index >= depletedProgressSegments;
                 const angle =
                   (index / progressSegmentCount) * Math.PI * 2 - Math.PI / 2;
                 const segmentRadius = 96;
@@ -471,7 +516,6 @@ export default function HomeScreen() {
                 !canShowQr && styles.actionCardDisabled,
                 pressed && styles.buttonPressed,
               ]}>
-              <Text style={styles.actionIcon}>QR</Text>
               <Text style={styles.actionTitle}>Open QR</Text>
             </Pressable>
 
@@ -490,7 +534,6 @@ export default function HomeScreen() {
                 styles.actionCard,
                 pressed && styles.buttonPressed,
               ]}>
-              <Text style={styles.actionIcon}>FR</Text>
               <Text style={styles.actionTitle}>Freeze</Text>
             </Pressable>
 
@@ -503,7 +546,6 @@ export default function HomeScreen() {
                 styles.actionCard,
                 pressed && styles.buttonPressed,
               ]}>
-              <Text style={styles.actionIcon}>RN</Text>
               <Text style={styles.actionTitle}>Renew/Extend</Text>
             </Pressable>
           </View>
@@ -599,8 +641,7 @@ export default function HomeScreen() {
         <View style={styles.voucherSection}>
           <View style={styles.sectionHeaderRow}>
             <View>
-              <Text style={styles.cardLabel}>Vouchers</Text>
-              <Text style={styles.sectionTitle}>Membership and shop</Text>
+              <Text style={styles.sectionTitle}>Vouchers</Text>
             </View>
             <Text style={styles.sectionHint}>{vouchers.length} total</Text>
           </View>
@@ -682,6 +723,9 @@ export default function HomeScreen() {
           )}
         </View>
 
+        <View style={styles.updatesHeader}>
+          <Text style={styles.sectionTitle}>Updates</Text>
+        </View>
         <View style={styles.infoGrid}>
           <View style={styles.infoCard}>
             <Text style={styles.cardLabel}>Latest update</Text>
@@ -707,7 +751,7 @@ export default function HomeScreen() {
             style={[
               styles.modalCard,
               {
-                transform: [{ scale: modalScale }],
+                transform: [{ translateY: sheetPanY }, { scale: modalScale }],
               },
             ]}>
             <Pressable
@@ -715,6 +759,7 @@ export default function HomeScreen() {
               style={styles.modalHandle}
               accessibilityLabel="Close sheet"
               accessibilityRole="button"
+              {...sheetPanResponder.panHandlers}
             />
 
             {membershipModal === 'freeze' ? (
@@ -754,7 +799,7 @@ export default function HomeScreen() {
                 </View>
 
                 <Text style={styles.modalTotal}>
-                  $10/week - Total: ${selectedFreezeAmount.toFixed(2)}
+                  Total: ${selectedFreezeAmount.toFixed(2)}
                 </Text>
 
                 <View style={styles.modalActionRow}>
@@ -946,8 +991,8 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderRadius: 28,
-    backgroundColor: accentColor,
-    padding: 20,
+    backgroundColor: wineColor,
+    padding: 22,
     marginBottom: 16,
     shadowColor: accentColor,
     shadowOffset: { width: 0, height: 18 },
@@ -957,12 +1002,32 @@ const styles = StyleSheet.create({
   },
   heroGlow: {
     position: 'absolute',
-    right: -72,
-    top: -78,
-    width: 190,
-    height: 190,
-    borderRadius: 95,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    right: -86,
+    top: -88,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: 'rgba(225, 29, 46, 0.44)',
+  },
+  heroBlade: {
+    position: 'absolute',
+    right: 40,
+    top: -46,
+    width: 54,
+    height: 212,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    transform: [{ rotate: '26deg' }],
+  },
+  heroRing: {
+    position: 'absolute',
+    right: -28,
+    bottom: -50,
+    width: 150,
+    height: 150,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderRadius: 75,
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -989,8 +1054,8 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: '#FCE7EA',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
     lineHeight: 20,
     marginTop: 6,
   },
@@ -1016,7 +1081,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 10,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.16)',
+    borderTopColor: 'rgba(255, 255, 255, 0.14)',
     marginTop: 18,
     paddingTop: 14,
   },
@@ -1155,7 +1220,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 26,
     backgroundColor: surfaceColor,
-    padding: 16,
+    padding: 12,
     marginBottom: 16,
     shadowColor: '#1D0A0D',
     shadowOffset: { width: 0, height: 12 },
@@ -1168,7 +1233,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   sectionTitle: {
     color: textColor,
@@ -1184,86 +1249,52 @@ const styles = StyleSheet.create({
   },
   actionGrid: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 7,
   },
   actionCard: {
-    minHeight: 112,
+    minHeight: 50,
     flex: 1,
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.14)',
-    borderRadius: 22,
-    backgroundColor: '#FFFFFF',
-    padding: 13,
-  },
-  actionCardPrimary: {
-    borderColor: 'transparent',
+    borderColor: 'rgba(177, 18, 38, 0.18)',
+    borderRadius: 15,
     backgroundColor: accentColor,
+    paddingHorizontal: 8,
+    paddingVertical: 9,
     shadowColor: accentColor,
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.24,
-    shadowRadius: 16,
-    elevation: 5,
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 3,
   },
   actionCardDisabled: {
     opacity: 0.48,
   },
-  actionIcon: {
-    alignSelf: 'flex-start',
-    overflow: 'hidden',
-    borderRadius: 12,
-    backgroundColor: '#FFF1F3',
-    color: accentColor,
-    fontSize: 12,
-    fontWeight: '900',
-    paddingHorizontal: 9,
-    paddingVertical: 7,
-  },
-  actionIconPrimary: {
-    alignSelf: 'flex-start',
-    overflow: 'hidden',
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '900',
-    paddingHorizontal: 9,
-    paddingVertical: 7,
-  },
   actionTitle: {
-    color: textColor,
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  actionTitlePrimary: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '900',
-  },
-  actionSubtitle: {
-    color: mutedColor,
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 15,
-  },
-  actionSubtitlePrimary: {
-    color: '#FCE7EA',
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 15,
+    lineHeight: 17,
+    textAlign: 'center',
   },
   unfreezeButton: {
-    minHeight: 48,
+    minHeight: 46,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(34, 197, 94, 0.24)',
-    borderRadius: 16,
-    backgroundColor: '#F0FDF4',
+    borderRadius: 18,
+    backgroundColor: '#16A34A',
     marginTop: 12,
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 3,
   },
   unfreezeButtonText: {
-    color: '#15803D',
+    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -1360,35 +1391,6 @@ const styles = StyleSheet.create({
   },
   voucherSection: {
     marginBottom: 16,
-  },
-  voucherGroup: {
-    marginBottom: 14,
-  },
-  voucherGroupHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  voucherGroupDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  voucherGroupTitle: {
-    color: textColor,
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  voucherGroupCount: {
-    overflow: 'hidden',
-    borderRadius: 999,
-    backgroundColor: '#FFF1F3',
-    color: wineColor,
-    fontSize: 11,
-    fontWeight: '900',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
   },
   emptyVoucherText: {
     color: mutedColor,
@@ -1500,6 +1502,9 @@ const styles = StyleSheet.create({
     marginTop: 5,
     textTransform: 'uppercase',
   },
+  updatesHeader: {
+    marginBottom: 10,
+  },
   infoGrid: {
     gap: 12,
   },
@@ -1548,10 +1553,12 @@ const styles = StyleSheet.create({
   modalCard: {
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
-    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.12)',
+    backgroundColor: '#FFFDFD',
     paddingHorizontal: 22,
-    paddingTop: 12,
-    paddingBottom: 28,
+    paddingTop: 14,
+    paddingBottom: 30,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: -16 },
     shadowOpacity: 0.2,
@@ -1593,11 +1600,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   modalHandle: {
-    width: 48,
-    height: 5,
+    width: 54,
+    height: 6,
     alignSelf: 'center',
     borderRadius: 999,
-    backgroundColor: '#E8D4D8',
+    backgroundColor: '#D9B8BE',
     marginBottom: 18,
   },
   modalKicker: {
@@ -1625,11 +1632,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.1)',
+    borderRadius: 24,
+    backgroundColor: '#FFF8F7',
     marginTop: 18,
+    padding: 10,
   },
   stepperButton: {
-    width: 54,
-    height: 54,
+    width: 50,
+    height: 50,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 18,
@@ -1643,11 +1655,10 @@ const styles = StyleSheet.create({
   stepperValueCard: {
     flex: 1,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
+    borderWidth: 0,
     borderRadius: 20,
-    backgroundColor: '#FFF8F7',
-    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 12,
   },
   stepperValue: {
     color: textColor,
@@ -1673,8 +1684,8 @@ const styles = StyleSheet.create({
     backgroundColor: accentColor,
   },
   modalTotal: {
-    color: wineColor,
-    fontSize: 15,
+    color: textColor,
+    fontSize: 17,
     fontWeight: '900',
     marginTop: 16,
     textAlign: 'right',

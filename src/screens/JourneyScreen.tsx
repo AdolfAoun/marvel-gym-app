@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -56,7 +55,6 @@ function estimateCalories(durationSeconds: number) {
 }
 
 export default function JourneyScreen() {
-  const router = useRouter();
   const [member, setMember] = useState<Member>();
   const [profile, setProfile] = useState<JourneyProfile>();
   const [biographyDraft, setBiographyDraft] = useState('');
@@ -286,12 +284,12 @@ export default function JourneyScreen() {
             <Text style={styles.statLabel}>Visits this month</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{stats.visitsThisYear}</Text>
-            <Text style={styles.statLabel}>Visits this year</Text>
-          </View>
-          <View style={styles.statCard}>
             <Text style={styles.statValue}>{stats.estimatedCaloriesBurned}</Text>
             <Text style={styles.statLabel}>Avg calories burned</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{stats.visitsThisYear}</Text>
+            <Text style={styles.statLabel}>Visits this year</Text>
           </View>
         </View>
 
@@ -397,22 +395,6 @@ export default function JourneyScreen() {
             ))}
           </View>
         </View>
-
-        <Pressable
-          onPress={() => router.push('/machine-guide')}
-          style={({ pressed }) => [
-            styles.machineGuideButton,
-            pressed && styles.buttonPressed,
-          ]}>
-          <View>
-            <Text style={styles.cardLabel}>How It Works</Text>
-            <Text style={styles.machineGuideTitle}>Open Machine Guide</Text>
-            <Text style={styles.machineGuideBody}>
-              Equipment setup by muscle target. AI Coach Coming Soon.
-            </Text>
-          </View>
-          <Text style={styles.machineGuideArrow}>Go</Text>
-        </Pressable>
 
         <View style={styles.card}>
           <View style={styles.sectionHeaderRow}>
@@ -521,7 +503,7 @@ const styles = StyleSheet.create({
   heroStatsRow: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 18,
+    marginTop: 20,
   },
   heroStatPill: {
     flex: 1,
@@ -529,7 +511,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 18,
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    padding: 12,
+    padding: 14,
   },
   heroStatValue: {
     color: '#FFFFFF',
@@ -561,7 +543,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 28,
     backgroundColor: surfaceColor,
-    padding: 18,
+    padding: 16,
     marginBottom: 16,
     shadowColor: '#1D0A0D',
     shadowOffset: { width: 0, height: 12 },
@@ -599,8 +581,10 @@ const styles = StyleSheet.create({
   timerFace: {
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.1)',
     borderRadius: 26,
-    backgroundColor: '#FFF8F7',
+    backgroundColor: '#FFFDFD',
     paddingVertical: 22,
   },
   timerValue: {
@@ -659,28 +643,28 @@ const styles = StyleSheet.create({
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 12,
     marginBottom: 16,
   },
   statCard: {
-    minHeight: 102,
+    minHeight: 108,
     flexBasis: '47%',
     flexGrow: 1,
     justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.12)',
-    borderRadius: 22,
+    borderRadius: 24,
     backgroundColor: surfaceColor,
-    padding: 15,
+    padding: 16,
     shadowColor: '#1D0A0D',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 2,
+    shadowOpacity: 0.07,
+    shadowRadius: 18,
+    elevation: 3,
   },
   statValue: {
     color: textColor,
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '900',
   },
   statLabel: {
@@ -836,47 +820,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 17,
     marginTop: 3,
-  },
-  machineGuideButton: {
-    minHeight: 124,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
-    borderRadius: 26,
-    backgroundColor: surfaceColor,
-    padding: 18,
-    marginBottom: 16,
-    shadowColor: '#1D0A0D',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.06,
-    shadowRadius: 18,
-    elevation: 4,
-  },
-  machineGuideTitle: {
-    color: textColor,
-    fontSize: 19,
-    fontWeight: '900',
-  },
-  machineGuideBody: {
-    color: mutedColor,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 19,
-    marginTop: 6,
-    maxWidth: 250,
-  },
-  machineGuideArrow: {
-    overflow: 'hidden',
-    borderRadius: 999,
-    backgroundColor: accentColor,
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '900',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
   },
   buttonPressed: {
     opacity: 0.76,

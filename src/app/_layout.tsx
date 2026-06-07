@@ -8,6 +8,7 @@ export default function RootLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="welcome" />
       <Stack.Screen name="login" />
+      <Stack.Screen name="create-account" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen
         name="profile"
