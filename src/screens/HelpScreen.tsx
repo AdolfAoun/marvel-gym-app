@@ -1,87 +1,129 @@
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import {
+  Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-const accentColor = '#B11226';
-const wineColor = '#58111B';
-const backgroundColor = '#FFF8F7';
-const surfaceColor = '#FFFFFF';
-const textColor = '#181A20';
-const mutedColor = '#667085';
+import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
+import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
+import { authService } from '@/services';
+
+const accentColor = premiumColors.red;
+const wineColor = premiumColors.redBright;
+const backgroundColor = premiumColors.background;
+const surfaceColor = premiumColors.surface;
+const textColor = premiumColors.text;
+const mutedColor = premiumColors.textMuted;
 
 export default function HelpScreen() {
   const router = useRouter();
 
+  const handleContact = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Contact unavailable', 'This contact option could not be opened.');
+    }
+  };
+
+  const handleSignOut = () => {
+    Alert.alert('Sign out?', 'You will return to the welcome screen.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          await authService.logoutMember();
+          router.replace('/welcome');
+        },
+      },
+    ]);
+  };
+
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
-      <StatusBar style="dark" />
+    <PremiumScreenBackground>
+      <StatusBar style="light" />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
           <View pointerEvents="none" style={styles.heroGlow} />
           <Text style={styles.kicker}>Help</Text>
-          <Text style={styles.heroTitle}>How it works</Text>
+          <Text style={styles.heroTitle}>Support Hub</Text>
           <Text style={styles.heroBody}>
-            Quick guidance for using your Marvel Gym membership tools.
+            How to use the app, contact options, and the future Marvel Gym assistant.
           </Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>How to use the app</Text>
+          <Text style={styles.cardLabel}>How it works</Text>
+          <Text style={styles.supportTitle}>How to use the app</Text>
+          <Text style={styles.supportBody}>
+            A quick guide to the main Marvel Gym member tools.
+          </Text>
           <View style={styles.stepList}>
             <View style={styles.stepRow}>
-              <Text style={styles.stepNumber}>1</Text>
+              <Text style={styles.stepNumber}>01</Text>
               <View style={styles.stepCopy}>
-                <Text style={styles.stepTitle}>Open QR at entry</Text>
+                <Text style={styles.stepTitle}>Entry and membership</Text>
                 <Text style={styles.stepBody}>
-                  Use the Home tab to show your active member QR for gym access.
+                  Use Home to check your membership status and open your QR when your plan is active.
                 </Text>
               </View>
             </View>
             <View style={styles.stepRow}>
-              <Text style={styles.stepNumber}>2</Text>
+              <Text style={styles.stepNumber}>02</Text>
               <View style={styles.stepCopy}>
-                <Text style={styles.stepTitle}>Manage membership actions</Text>
+                <Text style={styles.stepTitle}>Freeze, renew, or extend</Text>
                 <Text style={styles.stepBody}>
-                  Freeze or renew from Home. Requests stay voucher-backed for Phase 1.
+                  Request membership changes from Home and choose Pay at Counter or card payment.
                 </Text>
               </View>
             </View>
             <View style={styles.stepRow}>
-              <Text style={styles.stepNumber}>3</Text>
+              <Text style={styles.stepNumber}>03</Text>
               <View style={styles.stepCopy}>
-                <Text style={styles.stepTitle}>Track your journey</Text>
+                <Text style={styles.stepTitle}>Vouchers</Text>
                 <Text style={styles.stepBody}>
-                  Use Journey for visits, workout timing, calories, and attendance.
+                  Track pending, confirmed, and canceled payment requests in the Vouchers section.
+                </Text>
+              </View>
+            </View>
+            <View style={styles.stepRow}>
+              <Text style={styles.stepNumber}>04</Text>
+              <View style={styles.stepCopy}>
+                <Text style={styles.stepTitle}>Classes and Gym Shop</Text>
+                <Text style={styles.stepBody}>
+                  Browse classes when available and check product availability, prices, and filters in Gym Shop.
+                </Text>
+              </View>
+            </View>
+            <View style={styles.stepRow}>
+              <Text style={styles.stepNumber}>05</Text>
+              <View style={styles.stepCopy}>
+                <Text style={styles.stepTitle}>Journey</Text>
+                <Text style={styles.stepBody}>
+                  Follow your visits, attendance streak, workout timer, and progress stats.
+                </Text>
+              </View>
+            </View>
+            <View style={styles.stepRow}>
+              <Text style={styles.stepNumber}>06</Text>
+              <View style={styles.stepCopy}>
+                <Text style={styles.stepTitle}>Profile</Text>
+                <Text style={styles.stepBody}>
+                  Open Profile from the top-right icon to review member details and update editable preferences.
                 </Text>
               </View>
             </View>
           </View>
         </View>
-
-        <Pressable
-          onPress={() => router.push('/machine-guide')}
-          style={({ pressed }) => [
-            styles.machineGuideCard,
-            pressed && styles.buttonPressed,
-          ]}>
-          <View>
-            <Text style={styles.cardLabel}>How It Works</Text>
-            <Text style={styles.machineGuideTitle}>Open Machine Guide</Text>
-            <Text style={styles.machineGuideBody}>
-              Equipment setup by muscle target with simple setup cues.
-            </Text>
-          </View>
-          <Text style={styles.machineGuideArrow}>Go</Text>
-        </Pressable>
 
         <View style={styles.aiCard}>
           <View style={styles.aiBadge}>
@@ -95,8 +137,44 @@ export default function HelpScreen() {
             <Text style={styles.aiInputText}>Ask Marvel Gym...</Text>
           </View>
         </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>Contact Us</Text>
+          <Text style={styles.supportTitle}>Need help from Marvel Gym?</Text>
+          <Text style={styles.supportBody}>
+            Reach the team through WhatsApp or a direct phone call.
+          </Text>
+          <View style={styles.contactRow}>
+            <Pressable
+              onPress={() => handleContact('https://wa.me/96179197997')}
+              style={({ pressed }) => [
+                styles.contactButton,
+                pressed && styles.buttonPressed,
+              ]}>
+              <Text style={styles.contactButtonText}>WhatsApp</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => handleContact('tel:+96179197997')}
+              style={({ pressed }) => [
+                styles.contactButton,
+                styles.contactButtonDark,
+                pressed && styles.buttonPressed,
+              ]}>
+              <Text style={styles.contactButtonTextDark}>Phone call</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <Pressable
+          onPress={handleSignOut}
+          style={({ pressed }) => [
+            styles.signOutButton,
+            pressed && styles.buttonPressed,
+          ]}>
+          <Text style={styles.signOutText}>Sign Out</Text>
+        </Pressable>
       </ScrollView>
-    </SafeAreaView>
+    </PremiumScreenBackground>
   );
 }
 
@@ -113,15 +191,13 @@ const styles = StyleSheet.create({
   heroCard: {
     position: 'relative',
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: premiumColors.borderStrong,
     borderRadius: 28,
-    backgroundColor: wineColor,
+    backgroundColor: premiumColors.surfaceAlt,
     padding: 22,
     marginBottom: 16,
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.18,
-    shadowRadius: 26,
-    elevation: 7,
+    ...premiumShadow,
   },
   heroGlow: {
     position: 'absolute',
@@ -130,7 +206,7 @@ const styles = StyleSheet.create({
     width: 214,
     height: 214,
     borderRadius: 107,
-    backgroundColor: 'rgba(225, 29, 46, 0.38)',
+    backgroundColor: 'rgba(225, 29, 46, 0.24)',
   },
   kicker: {
     color: '#F7D6DC',
@@ -155,16 +231,12 @@ const styles = StyleSheet.create({
   },
   card: {
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
+    borderColor: premiumColors.border,
     borderRadius: 26,
     backgroundColor: surfaceColor,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#1D0A0D',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.06,
-    shadowRadius: 18,
-    elevation: 4,
+    ...premiumShadow,
   },
   cardLabel: {
     color: accentColor,
@@ -176,14 +248,55 @@ const styles = StyleSheet.create({
   },
   stepList: {
     gap: 12,
+    marginTop: 14,
+  },
+  supportTitle: {
+    color: textColor,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  supportBody: {
+    color: mutedColor,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 6,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+  },
+  contactButton: {
+    minHeight: 48,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.18)',
+    borderRadius: 16,
+    backgroundColor: accentColor,
+  },
+  contactButtonDark: {
+    backgroundColor: premiumColors.surfaceSoft,
+  },
+  contactButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  contactButtonTextDark: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
   },
   stepRow: {
     flexDirection: 'row',
     gap: 12,
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.1)',
+    borderColor: premiumColors.border,
     borderRadius: 20,
-    backgroundColor: '#FFF8F7',
+    backgroundColor: premiumColors.surfaceSoft,
     padding: 14,
   },
   stepNumber: {
@@ -213,59 +326,15 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 4,
   },
-  machineGuideCard: {
-    minHeight: 112,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.14)',
-    borderRadius: 26,
-    backgroundColor: '#FFFDFD',
-    padding: 18,
-    marginBottom: 16,
-    shadowColor: '#1D0A0D',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.06,
-    shadowRadius: 18,
-    elevation: 4,
-  },
-  machineGuideTitle: {
-    color: textColor,
-    fontSize: 19,
-    fontWeight: '900',
-  },
-  machineGuideBody: {
-    color: mutedColor,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 19,
-    marginTop: 6,
-    maxWidth: 250,
-  },
-  machineGuideArrow: {
-    overflow: 'hidden',
-    borderRadius: 999,
-    backgroundColor: accentColor,
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '900',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
   aiCard: {
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.14)',
+    borderColor: premiumColors.border,
     borderRadius: 28,
-    backgroundColor: '#181A20',
+    backgroundColor: premiumColors.surfaceAlt,
     padding: 18,
-    shadowColor: '#1D0A0D',
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.14,
-    shadowRadius: 22,
-    elevation: 6,
+    marginBottom: 16,
+    ...premiumShadow,
   },
   aiBadge: {
     alignSelf: 'flex-start',
@@ -309,6 +378,20 @@ const styles = StyleSheet.create({
     color: '#9AA3AF',
     fontSize: 13,
     fontWeight: '800',
+  },
+  signOutButton: {
+    minHeight: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.2)',
+    borderRadius: 18,
+    backgroundColor: premiumColors.surfaceSoft,
+  },
+  signOutText: {
+    color: wineColor,
+    fontSize: 14,
+    fontWeight: '900',
   },
   buttonPressed: {
     opacity: 0.76,

@@ -8,17 +8,18 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
+import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
 import { productService } from '@/services';
 import type { Product, ProductCategory } from '@/types';
 
-const accentColor = '#B11226';
-const wineColor = '#58111B';
-const backgroundColor = '#FFF8F7';
-const surfaceColor = '#FFFFFF';
-const textColor = '#181A20';
-const mutedColor = '#667085';
+const accentColor = premiumColors.red;
+const wineColor = premiumColors.redBright;
+const backgroundColor = premiumColors.background;
+const surfaceColor = premiumColors.surface;
+const textColor = premiumColors.text;
+const mutedColor = premiumColors.textMuted;
 
 type SortMode = 'price-asc' | 'price-desc';
 
@@ -75,36 +76,42 @@ export default function ShopScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
-        <StatusBar style="dark" />
+      <PremiumScreenBackground>
+        <StatusBar style="light" />
         <View style={styles.loadingState}>
           <ActivityIndicator color={accentColor} />
           <Text style={styles.loadingText}>Loading marketplace...</Text>
         </View>
-      </SafeAreaView>
+      </PremiumScreenBackground>
     );
   }
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
-      <StatusBar style="dark" />
+    <PremiumScreenBackground>
+      <StatusBar style="light" />
+      <View pointerEvents="none" style={styles.pageGlow} />
+      <View pointerEvents="none" style={styles.pageBlade} />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
           <View pointerEvents="none" style={styles.heroGlow} />
+          <View pointerEvents="none" style={styles.heroBlade} />
           <Text style={styles.kicker}>Gym Shop</Text>
-          <Text style={styles.heroTitle}>Browse gym essentials.</Text>
+          <Text style={styles.heroTitle}>Premium gym essentials.</Text>
           <Text style={styles.heroBody}>
             Check current availability and compare prices for Marvel Gym products.
           </Text>
+          <View style={styles.heroPill}>
+            <Text style={styles.heroPillText}>Browse-only product display</Text>
+          </View>
         </View>
 
         <View style={styles.card}>
           <View style={styles.sectionHeaderRow}>
             <View>
               <Text style={styles.cardLabel}>Categories</Text>
-              <Text style={styles.sectionTitle}>Product filters</Text>
+              <Text style={styles.sectionTitle}>Browse by category</Text>
             </View>
           </View>
 
@@ -186,6 +193,20 @@ export default function ShopScreen() {
                 <Text style={styles.productImageText}>
                   {getProductImageLabel(product)}
                 </Text>
+                <View
+                  style={[
+                    styles.availabilityBadge,
+                    !product.isAvailable && styles.availabilityBadgeUnavailable,
+                  ]}>
+                  <Text
+                    style={[
+                      styles.availabilityBadgeText,
+                      !product.isAvailable &&
+                        styles.availabilityBadgeTextUnavailable,
+                    ]}>
+                    {product.isAvailable ? 'Available' : 'Out'}
+                  </Text>
+                </View>
               </View>
 
               <View style={styles.productCopy}>
@@ -199,19 +220,13 @@ export default function ShopScreen() {
 
               <View style={styles.productFooter}>
                 <Text style={styles.productPrice}>{formatPrice(product)}</Text>
-                <Text
-                  style={[
-                    styles.availabilityText,
-                    !product.isAvailable && styles.unavailableText,
-                  ]}>
-                  {product.isAvailable ? 'Available' : 'Out of Stock'}
-                </Text>
+                <Text style={styles.productCategoryText}>{product.category}</Text>
               </View>
             </View>
           ))}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </PremiumScreenBackground>
   );
 }
 
@@ -219,6 +234,25 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor,
+  },
+  pageGlow: {
+    position: 'absolute',
+    right: -120,
+    top: 80,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: 'rgba(177, 18, 38, 0.08)',
+  },
+  pageBlade: {
+    position: 'absolute',
+    left: -40,
+    top: 260,
+    width: 74,
+    height: 360,
+    borderRadius: 34,
+    backgroundColor: 'rgba(177, 18, 38, 0.04)',
+    transform: [{ rotate: '20deg' }],
   },
   content: {
     paddingHorizontal: 20,
@@ -239,15 +273,13 @@ const styles = StyleSheet.create({
   heroCard: {
     position: 'relative',
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: premiumColors.borderStrong,
     borderRadius: 28,
-    backgroundColor: accentColor,
-    padding: 20,
+    backgroundColor: premiumColors.surfaceAlt,
+    padding: 22,
     marginBottom: 14,
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.2,
-    shadowRadius: 26,
-    elevation: 7,
+    ...premiumShadow,
   },
   heroGlow: {
     position: 'absolute',
@@ -256,7 +288,17 @@ const styles = StyleSheet.create({
     width: 190,
     height: 190,
     borderRadius: 95,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    backgroundColor: 'rgba(177, 18, 38, 0.3)',
+  },
+  heroBlade: {
+    position: 'absolute',
+    right: 46,
+    top: -48,
+    width: 48,
+    height: 210,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    transform: [{ rotate: '24deg' }],
   },
   kicker: {
     color: '#F7D6DC',
@@ -279,18 +321,29 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 10,
   },
+  heroPill: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginTop: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  heroPillText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+  },
   card: {
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
+    borderColor: premiumColors.border,
     borderRadius: 26,
     backgroundColor: surfaceColor,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#1D0A0D',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.06,
-    shadowRadius: 18,
-    elevation: 4,
+    ...premiumShadow,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -328,7 +381,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 999,
-    backgroundColor: '#FFF8F7',
+    backgroundColor: premiumColors.surfaceSoft,
     paddingHorizontal: 16,
   },
   categoryChipSelected: {
@@ -356,7 +409,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.14)',
     borderRadius: 999,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: premiumColors.surfaceSoft,
   },
   sortButton: {
     minHeight: 36,
@@ -382,36 +435,55 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   productCard: {
-    minHeight: 228,
+    minHeight: 246,
     flexBasis: '47%',
     flexGrow: 1,
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
-    borderRadius: 24,
+    borderColor: premiumColors.border,
+    borderRadius: 26,
     backgroundColor: surfaceColor,
-    padding: 14,
-    shadowColor: '#1D0A0D',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 3,
+    padding: 13,
+    ...premiumShadow,
   },
   productCardUnavailable: {
     opacity: 0.58,
   },
   productImage: {
-    height: 86,
+    height: 100,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 18,
-    backgroundColor: '#FFF1F3',
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: 20,
+    backgroundColor: premiumColors.surfaceSoft,
     marginBottom: 12,
   },
   productImageText: {
     color: accentColor,
     fontSize: 22,
     fontWeight: '900',
+  },
+  availabilityBadge: {
+    position: 'absolute',
+    right: 8,
+    top: 8,
+    borderRadius: 999,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  availabilityBadgeUnavailable: {
+    backgroundColor: '#FEF3C7',
+  },
+  availabilityBadgeText: {
+    color: '#15803D',
+    fontSize: 9,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  availabilityBadgeTextUnavailable: {
+    color: '#B45309',
   },
   productCopy: {
     flex: 1,
@@ -431,7 +503,7 @@ const styles = StyleSheet.create({
   },
   productFooter: {
     borderTopWidth: 1,
-    borderTopColor: 'rgba(177, 18, 38, 0.1)',
+    borderTopColor: premiumColors.border,
     marginTop: 12,
     paddingTop: 12,
   },
@@ -440,14 +512,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
   },
-  availabilityText: {
-    color: '#22C55E',
+  productCategoryText: {
+    color: mutedColor,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '800',
     marginTop: 5,
-    textTransform: 'uppercase',
-  },
-  unavailableText: {
-    color: '#F59E0B',
   },
 });

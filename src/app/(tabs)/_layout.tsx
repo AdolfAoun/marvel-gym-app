@@ -1,8 +1,10 @@
 import { Tabs, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-const accentColor = '#B11226';
-const inactiveColor = '#8E6670';
+import { premiumColors } from '@/constants/premiumTheme';
+
+const accentColor = premiumColors.redBright;
+const inactiveColor = premiumColors.textMuted;
 
 function TabIcon({ label, color }: { label: string; color: string }) {
   return (
@@ -46,12 +48,12 @@ export default function TabsLayout() {
         headerShadowVisible: false,
         headerShown: true,
         headerStyle: {
-          backgroundColor: '#FFF8F7',
+          backgroundColor: premiumColors.background,
         },
         headerTintColor: accentColor,
         headerTitleAlign: 'left',
         headerTitleStyle: {
-          color: '#181A20',
+          color: premiumColors.text,
           fontSize: 18,
           fontWeight: '900',
         },
@@ -64,12 +66,12 @@ export default function TabsLayout() {
         },
         tabBarStyle: {
           height: 72,
-          borderTopColor: 'rgba(177, 18, 38, 0.12)',
+          borderTopColor: premiumColors.border,
           borderTopWidth: 1,
-          backgroundColor: '#FFFFFF',
+          backgroundColor: '#080A0F',
           paddingTop: 8,
           paddingBottom: 10,
-          shadowColor: '#1D0A0D',
+          shadowColor: '#000000',
           shadowOffset: { width: 0, height: -8 },
           shadowOpacity: 0.06,
           shadowRadius: 18,
@@ -86,7 +88,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="shop"
         options={{
-          title: 'Shop',
+          title: 'Gym Shop',
+          tabBarLabel: 'Shop',
           tabBarIcon: ({ color }) => <TabIcon color={color} label="S" />,
         }}
       />
@@ -115,10 +118,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.26)',
+    borderColor: premiumColors.borderStrong,
     borderRadius: 19,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#1D0A0D',
+    backgroundColor: premiumColors.surface,
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
     shadowRadius: 12,

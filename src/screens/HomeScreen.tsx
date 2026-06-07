@@ -1,4 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
+import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,6 +14,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
+import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
 import {
   activityService,
   journeyService,
@@ -32,12 +35,12 @@ import type {
   VoucherStatus,
 } from '@/types';
 
-const accentColor = '#B11226';
-const wineColor = '#58111B';
-const backgroundColor = '#FFF8F7';
-const surfaceColor = '#FFFFFF';
-const textColor = '#181A20';
-const mutedColor = '#667085';
+const accentColor = premiumColors.red;
+const wineColor = premiumColors.redBright;
+const backgroundColor = premiumColors.background;
+const surfaceColor = premiumColors.surface;
+const textColor = premiumColors.text;
+const mutedColor = premiumColors.textMuted;
 const voucherStatuses: VoucherStatus[] = ['Confirmed', 'Pending', 'Canceled'];
 const weeklyFreezePrice = 10;
 const maxRenewMonths = 12;
@@ -182,6 +185,7 @@ function getRenewalAmount(months: number, plans: MembershipPlan[]) {
 }
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [member, setMember] = useState<Member>();
   const [membership, setMembership] = useState<Membership>();
   const [status, setStatus] = useState<MembershipStatus>();
@@ -203,6 +207,7 @@ export default function HomeScreen() {
   const [feedback, setFeedback] = useState('Ready when you are.');
   const modalProgress = useRef(new Animated.Value(0)).current;
   const sheetPanY = useRef(new Animated.Value(0)).current;
+  const qrPanY = useRef(new Animated.Value(0)).current;
   const sheetPanResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) =>
@@ -217,6 +222,30 @@ export default function HomeScreen() {
         }
 
         Animated.spring(sheetPanY, {
+          toValue: 0,
+          useNativeDriver: true,
+          friction: 8,
+          tension: 90,
+        }).start();
+      },
+    }),
+  ).current;
+  const qrPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) =>
+        gestureState.dy > 8 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+      onPanResponderMove: (_, gestureState) => {
+        qrPanY.setValue(Math.max(0, gestureState.dy));
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 64 || gestureState.vy > 0.8) {
+          qrPanY.setValue(0);
+          setIsQrModalVisible(false);
+          setIsVisitPromptVisible(true);
+          return;
+        }
+
+        Animated.spring(qrPanY, {
           toValue: 0,
           useNativeDriver: true,
           friction: 8,
@@ -333,11 +362,13 @@ export default function HomeScreen() {
     }
 
     setQrCodeValue(qrCode);
+    qrPanY.setValue(0);
     setIsQrModalVisible(true);
     setFeedback('QR ready for entry scan.');
   };
 
   const handleCloseQr = () => {
+    qrPanY.setValue(0);
     setIsQrModalVisible(false);
     setIsVisitPromptVisible(true);
   };
@@ -396,15 +427,28 @@ export default function HomeScreen() {
     }
   };
 
+  const handleCancelVoucher = async (voucherId: string) => {
+    const canceledVoucher = await voucherService.cancelVoucher(voucherId);
+
+    if (!canceledVoucher) {
+      setFeedback('Voucher could not be canceled.');
+      return;
+    }
+
+    await refreshVouchers();
+    setSelectedVoucherStatus('Canceled');
+    setFeedback(`${canceledVoucher.id} was canceled.`);
+  };
+
   if (isLoading) {
     return (
-      <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
-        <StatusBar style="dark" />
+      <PremiumScreenBackground>
+        <StatusBar style="light" />
         <View style={styles.loadingState}>
           <ActivityIndicator color={accentColor} />
           <Text style={styles.loadingText}>Loading member dashboard...</Text>
         </View>
-      </SafeAreaView>
+      </PremiumScreenBackground>
     );
   }
 
@@ -414,8 +458,8 @@ export default function HomeScreen() {
   });
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
-      <StatusBar style="dark" />
+    <PremiumScreenBackground>
+      <StatusBar style="light" />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
@@ -562,11 +606,27 @@ export default function HomeScreen() {
           )}
         </View>
 
+        <Pressable
+          onPress={() => router.push('/machine-guide')}
+          style={({ pressed }) => [
+            styles.machineGuideCard,
+            pressed && styles.buttonPressed,
+          ]}>
+          <View style={styles.machineGuideCopy}>
+            <Text style={styles.cardLabel}>Machine Guide</Text>
+            <Text style={styles.machineGuideTitle}>Find the right equipment</Text>
+            <Text style={styles.machineGuideBody}>
+              Choose a muscle group and open setup cues for each machine.
+            </Text>
+          </View>
+          <Text style={styles.machineGuideAction}>Go</Text>
+        </Pressable>
+
         <View style={styles.activityCard}>
           <View style={styles.sectionHeaderRow}>
             <View>
               <Text style={styles.cardLabel}>Gym Activity</Text>
-              <Text style={styles.sectionTitle}>Hourly intensity</Text>
+              <Text style={styles.sectionTitle}>Crowd level</Text>
             </View>
             <Text style={styles.sectionHint}>
               {selectedActivityDay?.scheduleLabel ?? 'Today'}
@@ -638,6 +698,26 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        <View style={styles.updatesHeader}>
+          <Text style={styles.sectionTitle}>Updates</Text>
+        </View>
+        <View style={styles.infoGrid}>
+          <View style={styles.infoCard}>
+            <Text style={styles.cardLabel}>Latest update</Text>
+            <Text style={styles.infoTitle}>
+              {notification?.title ?? 'No notifications yet'}
+            </Text>
+            <Text style={styles.infoBody}>
+              {notification?.message ?? 'Important membership updates will appear here.'}
+            </Text>
+          </View>
+
+          <View style={styles.infoCard}>
+            <Text style={styles.cardLabel}>Action status</Text>
+            <Text style={styles.infoBody}>{feedback}</Text>
+          </View>
+        </View>
+
         <View style={styles.voucherSection}>
           <View style={styles.sectionHeaderRow}>
             <View>
@@ -694,53 +774,50 @@ export default function HomeScreen() {
               No {selectedVoucherStatus.toLowerCase()} vouchers.
             </Text>
           ) : (
-            visibleVouchers.map((voucher) => (
-              <View key={voucher.id} style={styles.voucherCard}>
-                <View style={styles.voucherTear} />
-                <View style={styles.voucherContent}>
-                  <Text style={styles.voucherType}>{voucher.type}</Text>
-                  <Text style={styles.voucherDescription}>
-                    {voucher.description}
-                  </Text>
-                  <Text style={styles.voucherMeta}>
-                    {formatVoucherDate(voucher.date)} - {voucher.id}
-                  </Text>
+            visibleVouchers.map((voucher) => {
+              const canCancelVoucher =
+                voucher.status === 'Pending' &&
+                (voucher.type === 'Membership Freeze' ||
+                  voucher.type === 'Membership Renewal');
+
+              return (
+                <View key={voucher.id} style={styles.voucherCard}>
+                  <View style={styles.voucherTear} />
+                  <View style={styles.voucherContent}>
+                    <Text style={styles.voucherType}>{voucher.type}</Text>
+                    <Text style={styles.voucherDescription}>
+                      {voucher.description}
+                    </Text>
+                    <Text style={styles.voucherMeta}>
+                      {formatVoucherDate(voucher.date)} - {voucher.id}
+                    </Text>
+                    {canCancelVoucher && (
+                      <Pressable
+                        onPress={() => handleCancelVoucher(voucher.id)}
+                        style={({ pressed }) => [
+                          styles.voucherCancelButton,
+                          pressed && styles.buttonPressed,
+                        ]}>
+                        <Text style={styles.voucherCancelText}>Cancel request</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                  <View style={styles.voucherAmountBlock}>
+                    <Text style={styles.voucherAmount}>
+                      ${voucher.amount.toFixed(2)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.voucherStatus,
+                        { color: getVoucherStatusColor(voucher.status) },
+                      ]}>
+                      {voucher.status}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.voucherAmountBlock}>
-                  <Text style={styles.voucherAmount}>
-                    ${voucher.amount.toFixed(2)}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.voucherStatus,
-                      { color: getVoucherStatusColor(voucher.status) },
-                    ]}>
-                    {voucher.status}
-                  </Text>
-                </View>
-              </View>
-            ))
+              );
+            })
           )}
-        </View>
-
-        <View style={styles.updatesHeader}>
-          <Text style={styles.sectionTitle}>Updates</Text>
-        </View>
-        <View style={styles.infoGrid}>
-          <View style={styles.infoCard}>
-            <Text style={styles.cardLabel}>Latest update</Text>
-            <Text style={styles.infoTitle}>
-              {notification?.title ?? 'No notifications yet'}
-            </Text>
-            <Text style={styles.infoBody}>
-              {notification?.message ?? 'Important membership updates will appear here.'}
-            </Text>
-          </View>
-
-          <View style={styles.infoCard}>
-            <Text style={styles.cardLabel}>Action status</Text>
-            <Text style={styles.infoBody}>{feedback}</Text>
-          </View>
         </View>
       </ScrollView>
 
@@ -753,7 +830,8 @@ export default function HomeScreen() {
               {
                 transform: [{ translateY: sheetPanY }, { scale: modalScale }],
               },
-            ]}>
+            ]}
+            {...sheetPanResponder.panHandlers}>
             <Pressable
               onPress={closeMembershipModal}
               style={styles.modalHandle}
@@ -828,8 +906,8 @@ export default function HomeScreen() {
                 <Text style={styles.modalKicker}>Renew / Extend Membership</Text>
                 <Text style={styles.modalTitle}>Choose any duration.</Text>
                 <Text style={styles.modalBody}>
-                  Select 1 to 12 months. Pricing is mocked from service-backed
-                  membership plans and will later come from Gmind.
+                  Select 1 to 12 months. Pricing follows the available
+                  membership plans.
                 </Text>
 
                 <View style={styles.stepperRow}>
@@ -901,7 +979,21 @@ export default function HomeScreen() {
       <Modal transparent visible={isQrModalVisible} animationType="fade">
         <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.centerModalOverlay}>
           <Pressable style={styles.modalBackdrop} onPress={handleCloseQr} />
-          <View style={styles.qrCard}>
+          <Animated.View
+            style={[
+              styles.qrCard,
+              {
+                transform: [{ translateY: qrPanY }],
+              },
+            ]}
+            {...qrPanResponder.panHandlers}>
+            <Pressable
+              onPress={handleCloseQr}
+              style={styles.qrModalHandle}
+              accessibilityLabel="Close QR"
+              accessibilityRole="button"
+              {...qrPanResponder.panHandlers}
+            />
             <Pressable
               onPress={handleCloseQr}
               style={({ pressed }) => [
@@ -922,10 +1014,10 @@ export default function HomeScreen() {
               style={({ pressed }) => [
                 styles.qrPrimaryButton,
                 pressed && styles.buttonPressed,
-              ]}>
-              <Text style={styles.modalPrimaryText}>Close after scan</Text>
+            ]}>
+              <Text style={styles.modalPrimaryText}>Close</Text>
             </Pressable>
-          </View>
+          </Animated.View>
         </SafeAreaView>
       </Modal>
 
@@ -948,7 +1040,7 @@ export default function HomeScreen() {
                   styles.modalSecondaryButton,
                   pressed && styles.buttonPressed,
                 ]}>
-                <Text style={styles.modalSecondaryText}>Cancel</Text>
+                <Text style={styles.modalSecondaryText}>No</Text>
               </Pressable>
               <Pressable
                 onPress={handleAddTodayVisit}
@@ -956,13 +1048,13 @@ export default function HomeScreen() {
                   styles.modalPrimaryButton,
                   pressed && styles.buttonPressed,
                 ]}>
-                <Text style={styles.modalPrimaryText}>Add</Text>
+                <Text style={styles.modalPrimaryText}>Yes</Text>
               </Pressable>
             </View>
           </View>
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+    </PremiumScreenBackground>
   );
 }
 
@@ -990,15 +1082,13 @@ const styles = StyleSheet.create({
   heroCard: {
     position: 'relative',
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: premiumColors.borderStrong,
     borderRadius: 28,
-    backgroundColor: wineColor,
+    backgroundColor: premiumColors.surfaceAlt,
     padding: 22,
     marginBottom: 16,
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.2,
-    shadowRadius: 26,
-    elevation: 7,
+    ...premiumShadow,
   },
   heroGlow: {
     position: 'absolute',
@@ -1007,7 +1097,7 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderRadius: 110,
-    backgroundColor: 'rgba(225, 29, 46, 0.44)',
+    backgroundColor: 'rgba(225, 29, 46, 0.28)',
   },
   heroBlade: {
     position: 'absolute',
@@ -1115,16 +1205,12 @@ const styles = StyleSheet.create({
   },
   progressCard: {
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
+    borderColor: premiumColors.border,
     borderRadius: 28,
     backgroundColor: surfaceColor,
     padding: 18,
     marginBottom: 16,
-    shadowColor: '#1D0A0D',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 5,
+    ...premiumShadow,
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -1149,14 +1235,14 @@ const styles = StyleSheet.create({
   expiryPill: {
     alignItems: 'flex-end',
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.14)',
+    borderColor: premiumColors.border,
     borderRadius: 18,
-    backgroundColor: '#FFF1F3',
+    backgroundColor: premiumColors.surfaceSoft,
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
   expiryPillLabel: {
-    color: '#8E6670',
+    color: mutedColor,
     fontSize: 10,
     fontWeight: '900',
     textTransform: 'uppercase',
@@ -1181,7 +1267,7 @@ const styles = StyleSheet.create({
     overflow: 'visible',
     borderWidth: 0,
     borderRadius: 107,
-    backgroundColor: '#FFF3F5',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     shadowOffset: { width: 0, height: 20 },
     shadowOpacity: 0.24,
     shadowRadius: 26,
@@ -1199,7 +1285,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 82,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: premiumColors.background,
   },
   daysNumber: {
     color: textColor,
@@ -1217,16 +1303,12 @@ const styles = StyleSheet.create({
   },
   quickActionsCard: {
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
+    borderColor: premiumColors.border,
     borderRadius: 26,
     backgroundColor: surfaceColor,
     padding: 12,
     marginBottom: 16,
-    shadowColor: '#1D0A0D',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.06,
-    shadowRadius: 18,
-    elevation: 4,
+    ...premiumShadow,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -1241,7 +1323,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   sectionHint: {
-    color: '#8E6670',
+    color: mutedColor,
     flexShrink: 1,
     fontSize: 12,
     fontWeight: '800',
@@ -1298,31 +1380,66 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
   },
+  machineGuideCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 24,
+    backgroundColor: surfaceColor,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    marginBottom: 16,
+    ...premiumShadow,
+  },
+  machineGuideCopy: {
+    flex: 1,
+    paddingRight: 14,
+  },
+  machineGuideTitle: {
+    color: textColor,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  machineGuideBody: {
+    color: mutedColor,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 5,
+  },
+  machineGuideAction: {
+    overflow: 'hidden',
+    borderRadius: 999,
+    backgroundColor: accentColor,
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+  },
   activityCard: {
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
-    borderRadius: 26,
+    borderColor: premiumColors.border,
+    borderRadius: 28,
     backgroundColor: surfaceColor,
-    padding: 16,
+    padding: 17,
     marginBottom: 16,
-    shadowColor: '#1D0A0D',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.06,
-    shadowRadius: 18,
-    elevation: 4,
+    ...premiumShadow,
   },
   daySelector: {
     gap: 8,
     paddingBottom: 14,
   },
   dayChip: {
-    minHeight: 34,
+    minHeight: 36,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 999,
-    backgroundColor: '#FFF8F7',
+    backgroundColor: premiumColors.surfaceSoft,
     paddingHorizontal: 14,
   },
   dayChipSelected: {
@@ -1339,30 +1456,40 @@ const styles = StyleSheet.create({
   },
   activityChart: {
     alignItems: 'flex-end',
-    gap: 8,
-    minHeight: 198,
-    paddingRight: 4,
+    gap: 10,
+    minHeight: 188,
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.08)',
+    borderRadius: 24,
+    backgroundColor: premiumColors.surfaceSoft,
+    paddingHorizontal: 12,
+    paddingTop: 16,
+    paddingBottom: 12,
+    paddingRight: 14,
   },
   activityColumn: {
-    width: 34,
+    width: 36,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    gap: 7,
+    gap: 8,
   },
   activityTrack: {
-    width: 26,
-    height: 152,
+    width: 24,
+    height: 136,
     justifyContent: 'flex-end',
     overflow: 'hidden',
-    borderRadius: 999,
-    backgroundColor: '#F3E2E5',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.08)',
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   activityFill: {
     width: '100%',
-    borderRadius: 999,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
   },
   activityLabel: {
-    color: '#8E6670',
+    color: mutedColor,
     fontSize: 10,
     fontWeight: '900',
   },
@@ -1410,7 +1537,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 999,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: premiumColors.surfaceSoft,
     paddingHorizontal: 12,
   },
   voucherTabSelected: {
@@ -1433,7 +1560,7 @@ const styles = StyleSheet.create({
   voucherTabCount: {
     overflow: 'hidden',
     borderRadius: 999,
-    backgroundColor: '#FFF1F3',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     color: wineColor,
     fontSize: 11,
     fontWeight: '900',
@@ -1449,15 +1576,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.14)',
+    borderColor: premiumColors.border,
     borderRadius: 24,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: surfaceColor,
     marginBottom: 10,
-    shadowColor: '#1D0A0D',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 3,
+    ...premiumShadow,
   },
   voucherTear: {
     width: 10,
@@ -1481,7 +1604,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   voucherMeta: {
-    color: '#8E6670',
+    color: premiumColors.textFaint,
     fontSize: 11,
     fontWeight: '800',
     marginTop: 7,
@@ -1502,11 +1625,29 @@ const styles = StyleSheet.create({
     marginTop: 5,
     textTransform: 'uppercase',
   },
+  voucherCancelButton: {
+    alignSelf: 'flex-start',
+    minHeight: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.2)',
+    borderRadius: 999,
+    backgroundColor: premiumColors.surfaceSoft,
+    marginTop: 10,
+    paddingHorizontal: 12,
+  },
+  voucherCancelText: {
+    color: wineColor,
+    fontSize: 11,
+    fontWeight: '900',
+  },
   updatesHeader: {
     marginBottom: 10,
   },
   infoGrid: {
     gap: 12,
+    marginBottom: 16,
   },
   infoCard: {
     borderWidth: 1,
@@ -1514,11 +1655,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: surfaceColor,
     padding: 18,
-    shadowColor: '#1D0A0D',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 2,
+    ...premiumShadow,
   },
   infoTitle: {
     color: textColor,
@@ -1527,7 +1664,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   infoBody: {
-    color: '#4B5563',
+    color: mutedColor,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
@@ -1555,7 +1692,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 30,
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.12)',
-    backgroundColor: '#FFFDFD',
+    backgroundColor: premiumColors.surface,
     paddingHorizontal: 22,
     paddingTop: 14,
     paddingBottom: 30,
@@ -1574,7 +1711,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.18)',
     borderRadius: 28,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: premiumColors.surface,
     padding: 22,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 18 },
@@ -1592,19 +1729,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 17,
-    backgroundColor: '#FFF1F3',
+    backgroundColor: premiumColors.surfaceSoft,
   },
   qrCloseText: {
     color: wineColor,
     fontSize: 13,
     fontWeight: '900',
   },
+  qrModalHandle: {
+    width: 58,
+    height: 6,
+    alignSelf: 'center',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+    marginBottom: 16,
+  },
   modalHandle: {
     width: 54,
     height: 6,
     alignSelf: 'center',
     borderRadius: 999,
-    backgroundColor: '#D9B8BE',
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
     marginBottom: 18,
   },
   modalKicker: {
@@ -1635,7 +1780,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.1)',
     borderRadius: 24,
-    backgroundColor: '#FFF8F7',
+    backgroundColor: premiumColors.surfaceSoft,
     marginTop: 18,
     padding: 10,
   },
@@ -1645,7 +1790,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 18,
-    backgroundColor: '#FFF1F3',
+    backgroundColor: premiumColors.surfaceSoft,
   },
   stepperButtonText: {
     color: accentColor,
@@ -1657,7 +1802,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 0,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: premiumColors.background,
     paddingVertical: 12,
   },
   stepperValue: {
@@ -1675,7 +1820,7 @@ const styles = StyleSheet.create({
     height: 8,
     overflow: 'hidden',
     borderRadius: 999,
-    backgroundColor: '#F3E2E5',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     marginTop: 16,
   },
   durationFill: {
@@ -1703,7 +1848,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.24)',
     borderRadius: 18,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: premiumColors.surfaceSoft,
   },
   modalSecondaryText: {
     color: wineColor,
@@ -1747,7 +1892,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.16)',
     borderRadius: 24,
-    backgroundColor: '#FFF8F7',
+    backgroundColor: premiumColors.surfaceSoft,
     marginVertical: 18,
     padding: 18,
   },

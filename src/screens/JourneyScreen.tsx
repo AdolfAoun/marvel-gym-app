@@ -9,8 +9,9 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
+import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
 import { journeyService, memberService } from '@/services';
 import type {
   Achievement,
@@ -20,12 +21,12 @@ import type {
   Member,
 } from '@/types';
 
-const accentColor = '#B11226';
-const wineColor = '#58111B';
-const backgroundColor = '#FFF8F7';
-const surfaceColor = '#FFFFFF';
-const textColor = '#181A20';
-const mutedColor = '#667085';
+const accentColor = premiumColors.red;
+const wineColor = premiumColors.redBright;
+const backgroundColor = premiumColors.background;
+const surfaceColor = premiumColors.surface;
+const textColor = premiumColors.text;
+const mutedColor = premiumColors.textMuted;
 
 type TimerState = 'idle' | 'running' | 'paused';
 
@@ -184,19 +185,19 @@ export default function JourneyScreen() {
 
   if (isLoading || !profile || !stats) {
     return (
-      <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
-        <StatusBar style="dark" />
+      <PremiumScreenBackground>
+        <StatusBar style="light" />
         <View style={styles.loadingState}>
           <ActivityIndicator color={accentColor} />
           <Text style={styles.loadingText}>Loading journey...</Text>
         </View>
-      </SafeAreaView>
+      </PremiumScreenBackground>
     );
   }
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
-      <StatusBar style="dark" />
+    <PremiumScreenBackground>
+      <StatusBar style="light" />
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -208,12 +209,12 @@ export default function JourneyScreen() {
             {member?.firstName ?? 'Member'}'s fitness dashboard
           </Text>
           <Text style={styles.heroBody}>
-            Track visits, measure consistency, and time lightweight workouts.
+            Track consistency, training time, attendance, and personal notes.
           </Text>
           <View style={styles.heroStatsRow}>
             <View style={styles.heroStatPill}>
               <Text style={styles.heroStatValue}>{stats.visitsThisMonth}</Text>
-              <Text style={styles.heroStatLabel}>month visits</Text>
+              <Text style={styles.heroStatLabel}>monthly visits</Text>
             </View>
             <View style={styles.heroStatPill}>
               <Text style={styles.heroStatValue}>{unlockedCount}</Text>
@@ -277,19 +278,55 @@ export default function JourneyScreen() {
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{stats.averageWorkoutDuration}</Text>
-            <Text style={styles.statLabel}>Avg workout</Text>
+            <Text style={styles.statLabel}>Avg Duration</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{stats.visitsThisMonth}</Text>
-            <Text style={styles.statLabel}>Visits this month</Text>
+            <Text style={styles.statLabel}>Monthly visits</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{stats.estimatedCaloriesBurned}</Text>
-            <Text style={styles.statLabel}>Avg calories burned</Text>
+            <Text style={styles.statLabel}>Avg Calories Burned</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{stats.visitsThisYear}</Text>
-            <Text style={styles.statLabel}>Visits this year</Text>
+            <Text style={styles.statLabel}>Yearly visits</Text>
+          </View>
+        </View>
+
+        <View style={styles.milestoneCard}>
+          <View style={styles.sectionHeaderRow}>
+            <View>
+              <Text style={styles.cardLabel}>Achievements</Text>
+              <Text style={styles.sectionTitle}>Training milestones</Text>
+            </View>
+            <Text style={styles.sectionHint}>Motivation</Text>
+          </View>
+          <View style={styles.milestoneGrid}>
+            <View style={styles.milestoneTile}>
+              <Text style={styles.milestoneValue}>{stats.consecutiveStreak}</Text>
+              <Text style={styles.milestoneLabel}>Longest streak</Text>
+            </View>
+            <View style={styles.milestoneTile}>
+              <Text style={styles.milestoneValue}>
+                {Number.parseInt(stats.averageWorkoutDuration, 10) >= 60
+                  ? 'Done'
+                  : 'Next'}
+              </Text>
+              <Text style={styles.milestoneLabel}>1-hour workout</Text>
+            </View>
+            <View style={styles.milestoneTile}>
+              <Text style={styles.milestoneValue}>
+                {Math.min(stats.visitsThisMonth, 12)}/12
+              </Text>
+              <Text style={styles.milestoneLabel}>Monthly attendance goal</Text>
+            </View>
+            <View style={styles.milestoneTile}>
+              <Text style={styles.milestoneValue}>
+                {stats.estimatedCaloriesBurned >= 1000 ? 'On' : 'Build'}
+              </Text>
+              <Text style={styles.milestoneLabel}>Calories milestone</Text>
+            </View>
           </View>
         </View>
 
@@ -358,8 +395,8 @@ export default function JourneyScreen() {
         <View style={styles.card}>
           <View style={styles.sectionHeaderRow}>
             <View>
-              <Text style={styles.cardLabel}>Achievements</Text>
-              <Text style={styles.sectionTitle}>Milestones</Text>
+              <Text style={styles.cardLabel}>Badges</Text>
+              <Text style={styles.sectionTitle}>Consistency badges</Text>
             </View>
             <Text style={styles.sectionHint}>{unlockedCount} unlocked</Text>
           </View>
@@ -431,7 +468,7 @@ export default function JourneyScreen() {
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </PremiumScreenBackground>
   );
 }
 
@@ -459,15 +496,13 @@ const styles = StyleSheet.create({
   heroCard: {
     position: 'relative',
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: premiumColors.borderStrong,
     borderRadius: 28,
-    backgroundColor: accentColor,
+    backgroundColor: premiumColors.surfaceAlt,
     padding: 20,
     marginBottom: 16,
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.2,
-    shadowRadius: 26,
-    elevation: 7,
+    ...premiumShadow,
   },
   heroGlow: {
     position: 'absolute',
@@ -476,7 +511,7 @@ const styles = StyleSheet.create({
     width: 210,
     height: 210,
     borderRadius: 105,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    backgroundColor: 'rgba(177, 18, 38, 0.28)',
   },
   kicker: {
     color: '#F7D6DC',
@@ -527,29 +562,21 @@ const styles = StyleSheet.create({
   },
   card: {
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
+    borderColor: premiumColors.border,
     borderRadius: 26,
     backgroundColor: surfaceColor,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#1D0A0D',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.06,
-    shadowRadius: 18,
-    elevation: 4,
+    ...premiumShadow,
   },
   timerCard: {
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
+    borderColor: premiumColors.border,
     borderRadius: 28,
     backgroundColor: surfaceColor,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#1D0A0D',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.06,
-    shadowRadius: 18,
-    elevation: 4,
+    ...premiumShadow,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -572,7 +599,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   sectionHint: {
-    color: '#8E6670',
+    color: mutedColor,
     flexShrink: 1,
     fontSize: 12,
     fontWeight: '800',
@@ -584,7 +611,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.1)',
     borderRadius: 26,
-    backgroundColor: '#FFFDFD',
+    backgroundColor: premiumColors.surfaceSoft,
     paddingVertical: 22,
   },
   timerValue: {
@@ -622,7 +649,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.18)',
     borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: premiumColors.surfaceSoft,
   },
   secondaryButtonText: {
     color: wineColor,
@@ -652,15 +679,11 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
+    borderColor: premiumColors.border,
     borderRadius: 24,
     backgroundColor: surfaceColor,
     padding: 16,
-    shadowColor: '#1D0A0D',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.07,
-    shadowRadius: 18,
-    elevation: 3,
+    ...premiumShadow,
   },
   statValue: {
     color: textColor,
@@ -673,14 +696,50 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 17,
   },
+  milestoneCard: {
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 28,
+    backgroundColor: surfaceColor,
+    padding: 16,
+    marginBottom: 16,
+    ...premiumShadow,
+  },
+  milestoneGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  milestoneTile: {
+    minHeight: 88,
+    flexBasis: '47%',
+    flexGrow: 1,
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.1)',
+    borderRadius: 20,
+    backgroundColor: premiumColors.surfaceSoft,
+    padding: 14,
+  },
+  milestoneValue: {
+    color: accentColor,
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  milestoneLabel: {
+    color: mutedColor,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+  },
   smallButton: {
     minHeight: 36,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.18)',
+    borderColor: premiumColors.border,
     borderRadius: 999,
-    backgroundColor: '#FFF1F3',
+    backgroundColor: premiumColors.surfaceSoft,
     paddingHorizontal: 16,
   },
   smallButtonText: {
@@ -689,7 +748,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   bodyText: {
-    color: '#4B5563',
+    color: mutedColor,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 21,
@@ -699,7 +758,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.18)',
     borderRadius: 18,
-    backgroundColor: '#FFF8F7',
+    backgroundColor: premiumColors.surfaceSoft,
     color: textColor,
     fontSize: 14,
     fontWeight: '700',
@@ -718,7 +777,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.1)',
     borderRadius: 999,
-    backgroundColor: '#FFF8F7',
+    backgroundColor: premiumColors.surfaceSoft,
     marginBottom: 12,
     paddingHorizontal: 8,
   },
@@ -728,7 +787,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 17,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: premiumColors.surfaceSoft,
   },
   monthArrowButtonDisabled: {
     opacity: 0.36,
@@ -756,14 +815,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.1)',
     borderRadius: 13,
-    backgroundColor: '#FFF8F7',
+    backgroundColor: premiumColors.surfaceSoft,
   },
   calendarDayActive: {
     borderColor: accentColor,
     backgroundColor: accentColor,
   },
   calendarDayText: {
-    color: '#8E6670',
+    color: mutedColor,
     fontSize: 11,
     fontWeight: '900',
   },
@@ -781,7 +840,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 18,
-    backgroundColor: '#FFF8F7',
+    backgroundColor: premiumColors.surfaceSoft,
     padding: 12,
   },
   achievementLocked: {
@@ -793,13 +852,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 14,
-    backgroundColor: '#E6E8EC',
+    backgroundColor: premiumColors.surfaceSoft,
   },
   achievementIconUnlocked: {
     backgroundColor: accentColor,
   },
   achievementIconText: {
-    color: '#8B95A5',
+    color: premiumColors.textFaint,
     fontSize: 11,
     fontWeight: '900',
   },

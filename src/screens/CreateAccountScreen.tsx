@@ -92,13 +92,35 @@ function parseDateOfBirth(value: string) {
     .padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
 }
 
-function isStrongPassword(value: string) {
-  return (
-    value.length >= 5 &&
-    /[A-Za-z]/.test(value) &&
-    /\d/.test(value) &&
-    /[^A-Za-z0-9]/.test(value)
-  );
+function formatDateInput(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  const day = digits.slice(0, 2);
+  const month = digits.slice(2, 4);
+  const year = digits.slice(4, 8);
+
+  return [day, month, year].filter(Boolean).join('/');
+}
+
+function getPasswordErrors(value: string) {
+  const missing: string[] = [];
+
+  if (value.length < 5) {
+    missing.push('Too short');
+  }
+
+  if (!/[A-Za-z]/.test(value)) {
+    missing.push('Missing letter');
+  }
+
+  if (!/\d/.test(value)) {
+    missing.push('Missing number');
+  }
+
+  if (!/[^A-Za-z0-9]/.test(value)) {
+    missing.push('Missing special character');
+  }
+
+  return missing;
 }
 
 export default function CreateAccountScreen() {
@@ -139,9 +161,10 @@ export default function CreateAccountScreen() {
       nextErrors.gender = 'Select a gender option.';
     }
 
-    if (!isStrongPassword(password.trim())) {
-      nextErrors.password =
-        'Use at least 5 characters with a letter, number, and special sign.';
+    const passwordErrors = getPasswordErrors(password.trim());
+
+    if (passwordErrors.length > 0) {
+      nextErrors.password = passwordErrors.join(', ');
     }
 
     setErrors(nextErrors);
@@ -214,7 +237,7 @@ export default function CreateAccountScreen() {
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.kicker}>Secure registration</Text>
+              <Text style={styles.kicker}>Member registration</Text>
               <Text style={styles.title}>Create Account</Text>
 
               <View style={styles.row}>
@@ -278,9 +301,7 @@ export default function CreateAccountScreen() {
                 <Text style={styles.label}>Date of birth</Text>
                 <TextInput
                   value={dateOfBirth}
-                  onChangeText={(value) =>
-                    setDateOfBirth(value.replace(/[^\d/]/g, '').slice(0, 10))
-                  }
+                  onChangeText={(value) => setDateOfBirth(formatDateInput(value))}
                   placeholder="DD/MM/YYYY"
                   placeholderTextColor="#667282"
                   keyboardType="number-pad"
@@ -337,6 +358,9 @@ export default function CreateAccountScreen() {
                 {errors.password ? (
                   <Text style={styles.errorText}>{errors.password}</Text>
                 ) : null}
+                <Text style={styles.passwordGuidance}>
+                  Use at least 5 characters with one letter, one number, and one special sign.
+                </Text>
               </View>
 
               <Pressable
@@ -401,11 +425,11 @@ const styles = StyleSheet.create({
     left: -300,
     right: 12,
     height: 690,
-    opacity: 0.28,
+    opacity: 0.38,
   },
   backgroundVeil: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.56)',
+    backgroundColor: 'rgba(0, 0, 0, 0.48)',
   },
   backgroundFade: {
     position: 'absolute',
@@ -417,13 +441,13 @@ const styles = StyleSheet.create({
   },
   redGlow: {
     position: 'absolute',
-    top: -84,
-    right: -84,
-    width: 230,
-    height: 230,
-    borderRadius: 115,
+    top: -72,
+    right: -72,
+    width: 188,
+    height: 188,
+    borderRadius: 94,
     backgroundColor: '#5A0711',
-    opacity: 0.32,
+    opacity: 0.22,
   },
   blade: {
     position: 'absolute',
@@ -459,15 +483,15 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   brandLogo: {
-    width: 72,
-    height: 58,
+    width: 88,
+    height: 68,
   },
   brandCopy: {
     flex: 1,
   },
   brandTitle: {
     color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: '900',
     letterSpacing: 2,
   },
@@ -568,10 +592,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   genderGrid: {
-    gap: 9,
+    flexDirection: 'row',
+    gap: 8,
   },
   genderOption: {
-    minHeight: 44,
+    minHeight: 42,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -585,7 +611,7 @@ const styles = StyleSheet.create({
   },
   genderOptionText: {
     color: '#D8DEE8',
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '900',
   },
   genderOptionTextSelected: {
@@ -597,6 +623,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 15,
     marginTop: 6,
+  },
+  passwordGuidance: {
+    color: '#A8B2C0',
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 15,
+    marginTop: 7,
   },
   primaryButton: {
     minHeight: 56,

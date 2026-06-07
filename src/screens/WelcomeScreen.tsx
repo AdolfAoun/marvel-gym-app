@@ -16,6 +16,7 @@ export default function WelcomeScreen() {
           <View pointerEvents="none" style={styles.heroRedField} />
           <View pointerEvents="none" style={styles.heroGlowPrimary} />
           <View pointerEvents="none" style={styles.heroGlowDark} />
+          <View pointerEvents="none" style={styles.heroRing} />
           <View pointerEvents="none" style={styles.athleticSlashOne} />
           <View pointerEvents="none" style={styles.athleticSlashTwo} />
           <Image
@@ -38,7 +39,7 @@ export default function WelcomeScreen() {
             <Text style={styles.kicker}>Marvel Fitness and Health</Text>
             <Text style={styles.title}>Your gym, ready when you are.</Text>
             <Text style={styles.subtitle}>
-              Membership, shop, and activity access in one clean member app.
+              Premium member access for training, shop essentials, and progress.
             </Text>
           </View>
         </View>
@@ -79,7 +80,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: Platform.OS === 'web' ? 414 : undefined,
     overflow: 'hidden',
-    backgroundColor: '#6F0715',
+    backgroundColor: '#090A0E',
     borderColor: Platform.OS === 'web' ? '#1d2733' : 'transparent',
     borderRadius: Platform.OS === 'web' ? 34 : 0,
     borderWidth: Platform.OS === 'web' ? 1 : 0,
@@ -89,7 +90,7 @@ const styles = StyleSheet.create({
     flex: 3,
     justifyContent: 'flex-end',
     overflow: 'hidden',
-    backgroundColor: '#8F0C1D',
+    backgroundColor: '#141016',
     paddingHorizontal: 24,
     paddingBottom: 34,
   },
@@ -99,17 +100,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#A50F22',
+    backgroundColor: '#1A0B10',
   },
   heroGlowPrimary: {
     position: 'absolute',
     top: -130,
     right: -110,
-    width: 340,
-    height: 340,
-    borderRadius: 170,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
     backgroundColor: '#F43F5E',
-    opacity: 0.32,
+    opacity: 0.24,
   },
   heroGlowDark: {
     position: 'absolute',
@@ -119,7 +120,17 @@ const styles = StyleSheet.create({
     height: 320,
     borderRadius: 160,
     backgroundColor: '#180207',
-    opacity: 0.34,
+    opacity: 0.48,
+  },
+  heroRing: {
+    position: 'absolute',
+    right: -42,
+    bottom: 148,
+    width: 190,
+    height: 190,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 95,
   },
   athleticSlashOne: {
     position: 'absolute',
@@ -149,7 +160,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     height: '100%',
-    opacity: 0.56,
+    opacity: 0.62,
     transform: [{ scale: 1.06 }],
   },
   imageRedWash: {
@@ -158,7 +169,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(177, 18, 38, 0.22)',
+    backgroundColor: 'rgba(177, 18, 38, 0.14)',
   },
   heroVeil: {
     position: 'absolute',
@@ -166,7 +177,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.24)',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   heroLowerFade: {
     position: 'absolute',
@@ -174,7 +185,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: 260,
-    backgroundColor: 'rgba(17, 3, 7, 0.68)',
+    backgroundColor: 'rgba(10, 7, 10, 0.78)',
   },
   logoBlock: {
     position: 'absolute',
@@ -211,10 +222,10 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#FFFFFF',
-    fontSize: 34,
+    fontSize: 36,
     fontWeight: '900',
     letterSpacing: 0,
-    lineHeight: 38,
+    lineHeight: 40,
   },
   subtitle: {
     color: '#E8ECF2',
@@ -227,7 +238,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     gap: 12,
-    backgroundColor: '#FFF8F7',
+    backgroundColor: '#FFFDFD',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     marginTop: -18,

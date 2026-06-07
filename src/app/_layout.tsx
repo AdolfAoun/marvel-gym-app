@@ -1,6 +1,8 @@
 import { Stack } from 'expo-router';
 
-const accentColor = '#B11226';
+import { premiumColors } from '@/constants/premiumTheme';
+
+const accentColor = premiumColors.redBright;
 
 export default function RootLayout() {
   return (
@@ -15,10 +17,10 @@ export default function RootLayout() {
         options={{
           headerShown: true,
           headerShadowVisible: false,
-          headerStyle: { backgroundColor: '#FFF8F7' },
+          headerStyle: { backgroundColor: premiumColors.background },
           headerTintColor: accentColor,
           headerTitleStyle: {
-            color: '#181A20',
+            color: premiumColors.text,
             fontSize: 18,
             fontWeight: '900',
           },
@@ -31,10 +33,10 @@ export default function RootLayout() {
           headerBackTitle: '',
           headerShown: true,
           headerShadowVisible: false,
-          headerStyle: { backgroundColor: '#FFF8F7' },
+          headerStyle: { backgroundColor: premiumColors.background },
           headerTintColor: accentColor,
           headerTitleStyle: {
-            color: '#181A20',
+            color: premiumColors.text,
             fontSize: 18,
             fontWeight: '900',
           },

@@ -287,7 +287,6 @@ export default function LoginScreen() {
           <View style={styles.loginCard}>
             <View style={styles.cardGloss} />
             <View style={styles.loginCardHeader}>
-              <Text style={styles.loginKicker}>Secure access</Text>
               <Text style={styles.loginTitle}>Sign in</Text>
             </View>
             <View style={styles.inputGroup}>
@@ -506,13 +505,13 @@ const styles = StyleSheet.create({
   glowLarge: {
     position: 'absolute',
     zIndex: 1,
-    top: -92,
-    right: -90,
-    width: 230,
-    height: 230,
-    borderRadius: 115,
+    top: -76,
+    right: -76,
+    width: 186,
+    height: 186,
+    borderRadius: 93,
     backgroundColor: '#5A0711',
-    opacity: 0.34,
+    opacity: 0.22,
   },
   futuristicBlade: {
     position: 'absolute',
@@ -541,7 +540,7 @@ const styles = StyleSheet.create({
     left: -300,
     right: 12,
     height: 680,
-    opacity: 0.3,
+    opacity: 0.4,
   },
   prototypeAtmosphereVeil: {
     position: 'absolute',
@@ -549,7 +548,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.58)',
+    backgroundColor: 'rgba(0, 0, 0, 0.48)',
   },
   prototypeAtmosphereLowerFade: {
     position: 'absolute',
@@ -696,8 +695,8 @@ callRay: {
     shadowRadius: 24,
   },
   brandLogo: {
-    width: 72,
-    height: 58,
+    width: 98,
+    height: 76,
   },
   brandCopy: {
     flex: 1,
@@ -771,13 +770,6 @@ callRay: {
   },
   loginCardHeader: {
     marginBottom: 2,
-  },
-  loginKicker: {
-    color: '#F7D6DC',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0,
-    textTransform: 'uppercase',
   },
   loginTitle: {
     color: '#FFFFFF',

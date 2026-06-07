@@ -9,12 +9,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
+import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
 import { memberService } from '@/services';
 import type { Member, PaymentMethod } from '@/types';
 
-const accentColor = '#B11226';
+const accentColor = premiumColors.red;
 const paymentMethods = ['Visa', 'Mastercard', 'Whish Money'] as const;
 
 type ProfilePaymentMethod = Extract<
@@ -74,6 +75,7 @@ export default function ProfileScreen() {
   const [form, setForm] = useState<ProfileForm>();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [photoTone, setPhotoTone] = useState(0);
 
   useEffect(() => {
     const loadMember = async () => {
@@ -138,73 +140,57 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleChangePhoto = () => {
+    setPhotoTone((value) => (value + 1) % 3);
+  };
+
   if (!member || !form) {
     return (
-      <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
-        <StatusBar style="dark" />
+      <PremiumScreenBackground>
+        <StatusBar style="light" />
         <View style={styles.loadingState}>
           <ActivityIndicator color={accentColor} />
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
-      </SafeAreaView>
+      </PremiumScreenBackground>
     );
   }
 
   const doneDisabled = !isEditing || !hasChanges || isSaving;
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
-      <StatusBar style="dark" />
+    <PremiumScreenBackground>
+      <StatusBar style="light" />
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         <View style={styles.profileTop}>
-          <View style={styles.avatar}>
+          <Pressable
+            onPress={handleChangePhoto}
+            style={({ pressed }) => [
+              styles.avatar,
+              photoTone === 1 && styles.avatarAltOne,
+              photoTone === 2 && styles.avatarAltTwo,
+              pressed && styles.buttonPressed,
+            ]}>
             <Text style={styles.avatarText}>
               {member.firstName.slice(0, 1)}
               {member.lastName.slice(0, 1)}
             </Text>
-          </View>
+          </Pressable>
+          <Pressable
+            onPress={handleChangePhoto}
+            style={({ pressed }) => [
+              styles.photoButton,
+              pressed && styles.buttonPressed,
+            ]}>
+            <Text style={styles.photoButtonText}>Change Profile Picture</Text>
+          </Pressable>
           <Text style={styles.nameText}>
             {member.firstName} {member.lastName}
           </Text>
           <Text style={styles.phoneText}>{member.phone}</Text>
-        </View>
-
-        <View style={styles.actionRow}>
-          <Pressable
-            onPress={handleEditOrCancel}
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              isEditing && styles.cancelButton,
-              pressed && styles.buttonPressed,
-            ]}>
-            <Text style={styles.secondaryButtonText}>
-              {isEditing ? 'Cancel' : 'Edit Profile'}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            disabled={doneDisabled}
-            onPress={handleDone}
-            style={({ pressed }) => [
-              styles.doneButton,
-              doneDisabled && styles.doneButtonDisabled,
-              pressed && !doneDisabled && styles.buttonPressed,
-            ]}>
-            {isSaving ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text
-                style={[
-                  styles.doneButtonText,
-                  doneDisabled && styles.doneButtonTextDisabled,
-                ]}>
-                Done
-              </Text>
-            )}
-          </Pressable>
         </View>
 
         <View style={styles.card}>
@@ -305,15 +291,50 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
+
+        <View style={styles.actionRow}>
+          <Pressable
+            onPress={handleEditOrCancel}
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              isEditing && styles.cancelButton,
+              pressed && styles.buttonPressed,
+            ]}>
+            <Text style={styles.secondaryButtonText}>
+              {isEditing ? 'Cancel' : 'Edit Profile'}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            disabled={doneDisabled}
+            onPress={handleDone}
+            style={({ pressed }) => [
+              styles.doneButton,
+              doneDisabled && styles.doneButtonDisabled,
+              pressed && !doneDisabled && styles.buttonPressed,
+            ]}>
+            {isSaving ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text
+                style={[
+                  styles.doneButtonText,
+                  doneDisabled && styles.doneButtonTextDisabled,
+                ]}>
+                Done
+              </Text>
+            )}
+          </Pressable>
+        </View>
       </ScrollView>
-    </SafeAreaView>
+    </PremiumScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFF8F7',
+    backgroundColor: premiumColors.background,
   },
   content: {
     paddingHorizontal: 22,
@@ -327,7 +348,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    color: '#5B6472',
+    color: premiumColors.textMuted,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -341,14 +362,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: 'rgba(177, 18, 38, 0.3)',
+    borderColor: premiumColors.borderStrong,
     borderRadius: 54,
-    backgroundColor: '#FFFFFF',
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.16,
-    shadowRadius: 22,
-    elevation: 6,
+    backgroundColor: premiumColors.surface,
+    ...premiumShadow,
+  },
+  avatarAltOne: {
+    backgroundColor: premiumColors.surfaceAlt,
+  },
+  avatarAltTwo: {
+    backgroundColor: premiumColors.surfaceSoft,
   },
   avatarText: {
     color: accentColor,
@@ -356,15 +379,31 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0,
   },
+  photoButton: {
+    minHeight: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.16)',
+    borderRadius: 999,
+    backgroundColor: premiumColors.surfaceSoft,
+    marginTop: 12,
+    paddingHorizontal: 14,
+  },
+  photoButtonText: {
+    color: accentColor,
+    fontSize: 12,
+    fontWeight: '900',
+  },
   nameText: {
-    color: '#181A20',
+    color: premiumColors.text,
     fontSize: 26,
     fontWeight: '900',
     letterSpacing: 0,
     marginTop: 14,
   },
   phoneText: {
-    color: '#667085',
+    color: premiumColors.textMuted,
     fontSize: 14,
     fontWeight: '800',
     marginTop: 5,
@@ -372,6 +411,7 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     gap: 12,
+    marginTop: 2,
     marginBottom: 14,
   },
   secondaryButton: {
@@ -382,7 +422,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.28)',
     borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: premiumColors.surfaceSoft,
   },
   cancelButton: {
     borderColor: 'rgba(245, 158, 11, 0.5)',
@@ -401,7 +441,7 @@ const styles = StyleSheet.create({
     backgroundColor: accentColor,
   },
   doneButtonDisabled: {
-    backgroundColor: '#E6E8EC',
+    backgroundColor: premiumColors.surfaceSoft,
   },
   doneButtonText: {
     color: '#FFFFFF',
@@ -409,23 +449,19 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   doneButtonTextDisabled: {
-    color: '#8B95A5',
+    color: premiumColors.textFaint,
   },
   card: {
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 24,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: premiumColors.surface,
     padding: 18,
     marginBottom: 14,
-    shadowColor: '#1D0A0D',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.06,
-    shadowRadius: 18,
-    elevation: 3,
+    ...premiumShadow,
   },
   sectionTitle: {
-    color: '#181A20',
+    color: premiumColors.text,
     fontSize: 17,
     fontWeight: '900',
     marginBottom: 14,
@@ -443,18 +479,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(102, 112, 133, 0.14)',
     borderRadius: 16,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'rgba(255, 255, 255, 0.055)',
     paddingHorizontal: 14,
   },
   label: {
-    color: '#667085',
+    color: premiumColors.textMuted,
     fontSize: 12,
     fontWeight: '900',
     marginBottom: 8,
     textTransform: 'uppercase',
   },
   disabledValue: {
-    color: '#667085',
+    color: premiumColors.textMuted,
     fontSize: 15,
     fontWeight: '900',
   },
@@ -466,16 +502,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.28)',
     borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    color: '#181A20',
+    backgroundColor: premiumColors.surfaceSoft,
+    color: premiumColors.text,
     fontSize: 15,
     fontWeight: '800',
     paddingHorizontal: 14,
   },
   inputReadOnly: {
     borderColor: 'rgba(177, 18, 38, 0.08)',
-    backgroundColor: '#F8F2F3',
-    color: '#667085',
+    backgroundColor: 'rgba(255, 255, 255, 0.045)',
+    color: premiumColors.textMuted,
   },
   paymentGrid: {
     gap: 10,
@@ -487,17 +523,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: premiumColors.surfaceSoft,
   },
   paymentOptionSelected: {
     borderColor: 'rgba(177, 18, 38, 0.48)',
-    backgroundColor: '#FFF1F3',
+    backgroundColor: 'rgba(177, 18, 38, 0.18)',
   },
   paymentOptionReadOnly: {
     opacity: 0.72,
   },
   paymentOptionText: {
-    color: '#667085',
+    color: premiumColors.textMuted,
     fontSize: 14,
     fontWeight: '900',
   },

@@ -11,15 +11,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
+import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
 import { machineGuideService } from '@/services';
 import type { MachineGuide } from '@/types';
 
-const accentColor = '#B11226';
-const wineColor = '#58111B';
-const backgroundColor = '#FFF8F7';
-const surfaceColor = '#FFFFFF';
-const textColor = '#181A20';
-const mutedColor = '#667085';
+const accentColor = premiumColors.red;
+const wineColor = premiumColors.redBright;
+const backgroundColor = premiumColors.background;
+const surfaceColor = premiumColors.surface;
+const textColor = premiumColors.text;
+const mutedColor = premiumColors.textMuted;
 const muscleOrder: MachineGuide['muscleGroup'][] = [
   'Chest',
   'Back',
@@ -64,25 +66,25 @@ export default function MachineGuideScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
-        <StatusBar style="dark" />
+      <PremiumScreenBackground>
+        <StatusBar style="light" />
         <View style={styles.loadingState}>
           <ActivityIndicator color={accentColor} />
           <Text style={styles.loadingText}>Loading machine guide...</Text>
         </View>
-      </SafeAreaView>
+      </PremiumScreenBackground>
     );
   }
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
-      <StatusBar style="dark" />
+    <PremiumScreenBackground>
+      <StatusBar style="light" />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
           <View pointerEvents="none" style={styles.heroGlow} />
-          <Text style={styles.kicker}>How It Works</Text>
+          <Text style={styles.kicker}>Equipment Guide</Text>
           <Text style={styles.heroTitle}>Machine Guide</Text>
           <Text style={styles.heroBody}>
             Choose a muscle group, then open a machine for setup cues.
@@ -204,7 +206,7 @@ export default function MachineGuideScreen() {
           </View>
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+    </PremiumScreenBackground>
   );
 }
 
@@ -232,15 +234,13 @@ const styles = StyleSheet.create({
   heroCard: {
     position: 'relative',
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: premiumColors.borderStrong,
     borderRadius: 28,
-    backgroundColor: accentColor,
+    backgroundColor: premiumColors.surfaceAlt,
     padding: 20,
     marginBottom: 18,
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.2,
-    shadowRadius: 26,
-    elevation: 7,
+    ...premiumShadow,
   },
   heroGlow: {
     position: 'absolute',
@@ -289,16 +289,12 @@ const styles = StyleSheet.create({
   },
   card: {
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
+    borderColor: premiumColors.border,
     borderRadius: 26,
     backgroundColor: surfaceColor,
     padding: 16,
     marginBottom: 18,
-    shadowColor: '#1D0A0D',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.06,
-    shadowRadius: 18,
-    elevation: 4,
+    ...premiumShadow,
   },
   cardLabel: {
     color: accentColor,
@@ -321,7 +317,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 20,
-    backgroundColor: '#FFF8F7',
+    backgroundColor: premiumColors.surfaceSoft,
     padding: 12,
   },
   categoryCardSelected: {
@@ -358,7 +354,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   sectionHint: {
-    color: '#8E6670',
+    color: mutedColor,
     flexShrink: 1,
     fontSize: 12,
     fontWeight: '800',
@@ -374,22 +370,18 @@ const styles = StyleSheet.create({
     flexBasis: '30%',
     flexGrow: 1,
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
+    borderColor: premiumColors.border,
     borderRadius: 22,
     backgroundColor: surfaceColor,
     padding: 12,
-    shadowColor: '#1D0A0D',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 3,
+    ...premiumShadow,
   },
   machineImage: {
     height: 58,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 16,
-    backgroundColor: '#FFF1F3',
+    backgroundColor: premiumColors.surfaceSoft,
     marginBottom: 10,
   },
   machineImageText: {
@@ -428,14 +420,12 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 430,
     maxHeight: '92%',
+    borderWidth: 1,
+    borderColor: premiumColors.border,
     borderRadius: 28,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: premiumColors.surface,
     padding: 20,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.22,
-    shadowRadius: 28,
-    elevation: 14,
+    ...premiumShadow,
   },
   closeButton: {
     position: 'absolute',
@@ -447,7 +437,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 17,
-    backgroundColor: '#FFF1F3',
+    backgroundColor: premiumColors.surfaceSoft,
   },
   closeButtonText: {
     color: wineColor,
@@ -515,7 +505,7 @@ const styles = StyleSheet.create({
   },
   instructionText: {
     flex: 1,
-    color: '#4B5563',
+    color: mutedColor,
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 19,
