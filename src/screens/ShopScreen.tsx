@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { productService } from '@/services';
 import type { Product } from '@/types';
 
-const accentColor = '#E11D2E';
+const accentColor = '#B11226';
 
 function formatPrice(product: Product) {
   return `${product.currency} ${product.price.toFixed(2)}`;
@@ -46,8 +46,8 @@ export default function ShopScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" />
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
+      <StatusBar style="dark" />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
@@ -132,11 +132,11 @@ export default function ShopScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#FFF8F7',
   },
   content: {
     paddingHorizontal: 22,
-    paddingTop: 28,
+    paddingTop: 20,
     paddingBottom: 108,
   },
   header: {
@@ -150,14 +150,14 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   title: {
-    color: '#FFFFFF',
+    color: '#181A20',
     fontSize: 30,
     fontWeight: '900',
     letterSpacing: 0,
     marginTop: 4,
   },
   subtitle: {
-    color: '#A8B2C0',
+    color: '#667085',
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
@@ -165,14 +165,14 @@ const styles = StyleSheet.create({
   },
   feedbackCard: {
     borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.28)',
+    borderColor: 'rgba(177, 18, 38, 0.18)',
     borderRadius: 18,
-    backgroundColor: 'rgba(225, 29, 46, 0.1)',
+    backgroundColor: '#FFF1F3',
     padding: 14,
     marginBottom: 14,
   },
   feedbackText: {
-    color: '#F5D0D5',
+    color: '#58111B',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 19,
@@ -183,12 +183,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.09)',
+    borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 22,
-    backgroundColor: '#121214',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#1D0A0D',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.06,
+    shadowRadius: 18,
+    elevation: 3,
   },
   loadingText: {
-    color: '#D7DEE8',
+    color: '#5B6472',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -197,10 +202,15 @@ const styles = StyleSheet.create({
   },
   productCard: {
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.09)',
+    borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 22,
-    backgroundColor: '#121214',
+    backgroundColor: '#FFFFFF',
     padding: 16,
+    shadowColor: '#1D0A0D',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.06,
+    shadowRadius: 18,
+    elevation: 3,
   },
   productCardUnavailable: {
     opacity: 0.58,
@@ -217,9 +227,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.34)',
+    borderColor: 'rgba(177, 18, 38, 0.18)',
     borderRadius: 18,
-    backgroundColor: '#080809',
+    backgroundColor: '#FFF1F3',
   },
   productImageText: {
     color: accentColor,
@@ -230,13 +240,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   productName: {
-    color: '#FFFFFF',
+    color: '#181A20',
     fontSize: 17,
     fontWeight: '900',
     marginBottom: 5,
   },
   productDescription: {
-    color: '#A8B2C0',
+    color: '#667085',
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 18,
@@ -248,7 +258,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   priceText: {
-    color: '#FFFFFF',
+    color: '#181A20',
     fontSize: 18,
     fontWeight: '900',
   },
@@ -272,7 +282,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   reserveButtonDisabled: {
-    backgroundColor: '#2D3138',
+    backgroundColor: '#E6E8EC',
   },
   reserveButtonText: {
     color: '#FFFFFF',

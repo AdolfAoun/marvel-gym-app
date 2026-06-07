@@ -80,12 +80,15 @@ export type Product = {
   description?: string;
   price: number;
   currency: string;
+  category?: ProductCategory;
   isAvailable: boolean;
   imageUrl?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 };
+
+export type ProductCategory = 'Gym Equipment' | 'Beverages' | 'Snacks';
 
 export type Payment = {
   id: string;
@@ -117,4 +120,60 @@ export type GymActivityLevel = {
   label: string;
   count: number;
   intensity: 'Low' | 'Medium' | 'High';
+};
+
+export type GymActivityDay = {
+  id: string;
+  dayLabel: string;
+  scheduleLabel: string;
+  levels: GymActivityLevel[];
+};
+
+export type VoucherStatus = 'Pending' | 'Paid' | 'Redeemed';
+
+export type VoucherType =
+  | 'Membership Renewal'
+  | 'Membership Freeze'
+  | 'Shop Reservation';
+
+export type Voucher = {
+  id: string;
+  date: string;
+  type: VoucherType;
+  amount: number;
+  currency: string;
+  status: VoucherStatus;
+  description: string;
+};
+
+export type JourneyProfile = {
+  biography: string;
+};
+
+export type AttendanceDay = {
+  id: string;
+  date: string;
+  hasVisit: boolean;
+};
+
+export type JourneyStats = {
+  averageWorkoutDuration: string;
+  visitsThisMonth: number;
+  visitsThisYear: number;
+  consecutiveStreak: number;
+};
+
+export type Achievement = {
+  id: string;
+  title: string;
+  description: string;
+  isUnlocked: boolean;
+};
+
+export type MachineGuide = {
+  id: string;
+  name: string;
+  description: string;
+  imageLabel: string;
+  instructions: string[];
 };

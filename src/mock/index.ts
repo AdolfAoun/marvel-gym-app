@@ -1,12 +1,19 @@
 import type {
+  Achievement,
   AppNotification,
+  AttendanceDay,
   GymActivityLevel,
+  GymActivityDay,
   GymClass,
+  JourneyProfile,
+  JourneyStats,
+  MachineGuide,
   Member,
   Membership,
   MembershipPlan,
   Payment,
   Product,
+  Voucher,
 } from '../types';
 
 export const currentMember: Member = {
@@ -165,6 +172,7 @@ export const products: Product[] = [
     description: 'Cold bottled water.',
     price: 1.5,
     currency: 'USD',
+    category: 'Beverages',
     isAvailable: true,
     imageUrl: 'https://example.com/images/products/water.jpg',
     isActive: true,
@@ -177,6 +185,7 @@ export const products: Product[] = [
     description: 'Zero-sugar pre-workout energy drink.',
     price: 3.5,
     currency: 'USD',
+    category: 'Beverages',
     isAvailable: true,
     imageUrl: 'https://example.com/images/products/energy-drink.jpg',
     isActive: true,
@@ -189,6 +198,7 @@ export const products: Product[] = [
     description: 'Chocolate protein bar with 20g protein.',
     price: 2.75,
     currency: 'USD',
+    category: 'Snacks',
     isAvailable: true,
     imageUrl: 'https://example.com/images/products/protein-bar.jpg',
     isActive: true,
@@ -201,8 +211,35 @@ export const products: Product[] = [
     description: 'Vanilla whey protein tub.',
     price: 42,
     currency: 'USD',
+    category: 'Snacks',
     isAvailable: false,
     imageUrl: 'https://example.com/images/products/whey-protein.jpg',
+    isActive: true,
+    createdAt: '2026-01-05T08:00:00.000Z',
+    updatedAt: '2026-05-20T11:00:00.000Z',
+  },
+  {
+    id: 'product-005',
+    name: 'Training Gloves',
+    description: 'Breathable grip gloves for lifting sessions.',
+    price: 18,
+    currency: 'USD',
+    category: 'Gym Equipment',
+    isAvailable: true,
+    imageUrl: 'https://example.com/images/products/training-gloves.jpg',
+    isActive: true,
+    createdAt: '2026-01-05T08:00:00.000Z',
+    updatedAt: '2026-05-20T11:00:00.000Z',
+  },
+  {
+    id: 'product-006',
+    name: 'Lifting Straps',
+    description: 'Cotton straps for heavier pull sessions.',
+    price: 14,
+    currency: 'USD',
+    category: 'Gym Equipment',
+    isAvailable: true,
+    imageUrl: 'https://example.com/images/products/lifting-straps.jpg',
     isActive: true,
     createdAt: '2026-01-05T08:00:00.000Z',
     updatedAt: '2026-05-20T11:00:00.000Z',
@@ -245,6 +282,228 @@ export const gymActivityLevels: GymActivityLevel[] = [
     label: '9 PM',
     count: 51,
     intensity: 'High',
+  },
+];
+
+export const gymActivitySchedule: GymActivityDay[] = [
+  {
+    id: 'activity-day-monday',
+    dayLabel: 'Monday',
+    scheduleLabel: '7:00 AM - 11:00 PM',
+    levels: gymActivityLevels,
+  },
+  {
+    id: 'activity-day-tuesday',
+    dayLabel: 'Tuesday',
+    scheduleLabel: '7:00 AM - 11:00 PM',
+    levels: [
+      { id: 'tue-001', label: '7 AM', count: 22, intensity: 'Low' },
+      { id: 'tue-002', label: '10 AM', count: 36, intensity: 'Medium' },
+      { id: 'tue-003', label: '1 PM', count: 31, intensity: 'Medium' },
+      { id: 'tue-004', label: '4 PM', count: 44, intensity: 'Medium' },
+      { id: 'tue-005', label: '7 PM', count: 82, intensity: 'High' },
+      { id: 'tue-006', label: '10 PM', count: 38, intensity: 'Medium' },
+    ],
+  },
+  {
+    id: 'activity-day-wednesday',
+    dayLabel: 'Wednesday',
+    scheduleLabel: '7:00 AM - 11:00 PM',
+    levels: [
+      { id: 'wed-001', label: '7 AM', count: 24, intensity: 'Low' },
+      { id: 'wed-002', label: '10 AM', count: 48, intensity: 'Medium' },
+      { id: 'wed-003', label: '1 PM', count: 35, intensity: 'Medium' },
+      { id: 'wed-004', label: '4 PM', count: 29, intensity: 'Low' },
+      { id: 'wed-005', label: '7 PM', count: 78, intensity: 'High' },
+      { id: 'wed-006', label: '10 PM', count: 52, intensity: 'High' },
+    ],
+  },
+  {
+    id: 'activity-day-thursday',
+    dayLabel: 'Thursday',
+    scheduleLabel: '7:00 AM - 11:00 PM',
+    levels: [
+      { id: 'thu-001', label: '7 AM', count: 20, intensity: 'Low' },
+      { id: 'thu-002', label: '10 AM', count: 40, intensity: 'Medium' },
+      { id: 'thu-003', label: '1 PM', count: 33, intensity: 'Medium' },
+      { id: 'thu-004', label: '4 PM', count: 43, intensity: 'Medium' },
+      { id: 'thu-005', label: '7 PM', count: 86, intensity: 'High' },
+      { id: 'thu-006', label: '10 PM', count: 46, intensity: 'Medium' },
+    ],
+  },
+  {
+    id: 'activity-day-friday',
+    dayLabel: 'Friday',
+    scheduleLabel: '7:00 AM - 11:00 PM',
+    levels: [
+      { id: 'fri-001', label: '7 AM', count: 18, intensity: 'Low' },
+      { id: 'fri-002', label: '10 AM', count: 34, intensity: 'Medium' },
+      { id: 'fri-003', label: '1 PM', count: 44, intensity: 'Medium' },
+      { id: 'fri-004', label: '4 PM', count: 58, intensity: 'High' },
+      { id: 'fri-005', label: '7 PM', count: 72, intensity: 'High' },
+      { id: 'fri-006', label: '10 PM', count: 40, intensity: 'Medium' },
+    ],
+  },
+  {
+    id: 'activity-day-saturday',
+    dayLabel: 'Saturday',
+    scheduleLabel: '8:00 AM - 8:00 PM',
+    levels: [
+      { id: 'sat-001', label: '8 AM', count: 28, intensity: 'Low' },
+      { id: 'sat-002', label: '10 AM', count: 62, intensity: 'High' },
+      { id: 'sat-003', label: '12 PM', count: 70, intensity: 'High' },
+      { id: 'sat-004', label: '2 PM', count: 54, intensity: 'High' },
+      { id: 'sat-005', label: '5 PM', count: 42, intensity: 'Medium' },
+      { id: 'sat-006', label: '8 PM', count: 18, intensity: 'Low' },
+    ],
+  },
+  {
+    id: 'activity-day-sunday',
+    dayLabel: 'Sunday',
+    scheduleLabel: '8:00 AM - 1:00 PM',
+    levels: [
+      { id: 'sun-001', label: '8 AM', count: 20, intensity: 'Low' },
+      { id: 'sun-002', label: '9 AM', count: 30, intensity: 'Medium' },
+      { id: 'sun-003', label: '10 AM', count: 44, intensity: 'Medium' },
+      { id: 'sun-004', label: '11 AM', count: 52, intensity: 'High' },
+      { id: 'sun-005', label: '12 PM', count: 36, intensity: 'Medium' },
+      { id: 'sun-006', label: '1 PM', count: 16, intensity: 'Low' },
+    ],
+  },
+];
+
+export const vouchers: Voucher[] = [
+  {
+    id: 'voucher-001',
+    date: '2026-06-01T08:30:00.000Z',
+    type: 'Membership Renewal',
+    amount: 129,
+    currency: 'USD',
+    status: 'Pending',
+    description: '3 Months Membership - pay at counter',
+  },
+  {
+    id: 'voucher-002',
+    date: '2026-05-18T16:45:00.000Z',
+    type: 'Shop Reservation',
+    amount: 2.75,
+    currency: 'USD',
+    status: 'Redeemed',
+    description: 'Protein Bar reservation',
+  },
+];
+
+export const journeyProfile: JourneyProfile = {
+  biography:
+    'Training for strength, energy, and consistency. Focused on showing up four times a week.',
+};
+
+export const attendanceDays: AttendanceDay[] = [
+  { id: 'visit-001', date: '2026-06-01T18:30:00.000Z', hasVisit: true },
+  { id: 'visit-002', date: '2026-06-02T18:10:00.000Z', hasVisit: true },
+  { id: 'visit-003', date: '2026-06-03T18:20:00.000Z', hasVisit: false },
+  { id: 'visit-004', date: '2026-06-04T19:05:00.000Z', hasVisit: true },
+  { id: 'visit-005', date: '2026-06-05T17:45:00.000Z', hasVisit: true },
+  { id: 'visit-006', date: '2026-06-06T11:20:00.000Z', hasVisit: true },
+  { id: 'visit-007', date: '2026-06-07T10:00:00.000Z', hasVisit: false },
+  { id: 'visit-008', date: '2026-06-08T18:00:00.000Z', hasVisit: true },
+  { id: 'visit-009', date: '2026-06-09T18:35:00.000Z', hasVisit: true },
+  { id: 'visit-010', date: '2026-06-10T19:00:00.000Z', hasVisit: false },
+  { id: 'visit-011', date: '2026-06-11T18:45:00.000Z', hasVisit: true },
+  { id: 'visit-012', date: '2026-06-12T17:55:00.000Z', hasVisit: true },
+  { id: 'visit-013', date: '2026-06-13T10:30:00.000Z', hasVisit: true },
+  { id: 'visit-014', date: '2026-06-14T10:10:00.000Z', hasVisit: false },
+];
+
+export const journeyStats: JourneyStats = {
+  averageWorkoutDuration: '72 min',
+  visitsThisMonth: 10,
+  visitsThisYear: 84,
+  consecutiveStreak: 3,
+};
+
+export const achievements: Achievement[] = [
+  {
+    id: 'achievement-001',
+    title: 'First Workout',
+    description: 'Completed your first logged visit.',
+    isUnlocked: true,
+  },
+  {
+    id: 'achievement-002',
+    title: '10 Visits',
+    description: 'Built a reliable training rhythm.',
+    isUnlocked: true,
+  },
+  {
+    id: 'achievement-003',
+    title: '30 Visits',
+    description: 'Consistency is becoming your edge.',
+    isUnlocked: true,
+  },
+  {
+    id: 'achievement-004',
+    title: '100 Visits',
+    description: 'A long-term Marvel Gym milestone.',
+    isUnlocked: false,
+  },
+];
+
+export const machineGuides: MachineGuide[] = [
+  {
+    id: 'machine-001',
+    name: 'Chest Press',
+    description: 'Targets chest, shoulders, and triceps with guided pressing.',
+    imageLabel: 'CP',
+    instructions: [
+      'Set the handles at mid-chest height.',
+      'Keep your shoulders down and back.',
+      'Press forward smoothly, then return with control.',
+    ],
+  },
+  {
+    id: 'machine-002',
+    name: 'Leg Press',
+    description: 'Builds quads, glutes, and hamstrings with stable support.',
+    imageLabel: 'LP',
+    instructions: [
+      'Place feet shoulder-width on the platform.',
+      'Lower until knees bend comfortably.',
+      'Push through mid-foot without locking knees.',
+    ],
+  },
+  {
+    id: 'machine-003',
+    name: 'Cable Machine',
+    description: 'Versatile station for rows, presses, curls, and core work.',
+    imageLabel: 'CB',
+    instructions: [
+      'Choose a pulley height for your exercise.',
+      'Stand tall and brace your core.',
+      'Move through a controlled range of motion.',
+    ],
+  },
+  {
+    id: 'machine-004',
+    name: 'Lat Pulldown',
+    description: 'Trains the upper back and lats with vertical pulling.',
+    imageLabel: 'LD',
+    instructions: [
+      'Grip slightly wider than shoulder width.',
+      'Pull elbows down toward your ribs.',
+      'Return slowly until arms are extended.',
+    ],
+  },
+  {
+    id: 'machine-005',
+    name: 'Treadmill',
+    description: 'Cardio station for walking, intervals, and endurance runs.',
+    imageLabel: 'TM',
+    instructions: [
+      'Start with feet on the side rails.',
+      'Increase speed gradually after stepping on.',
+      'Use incline for intensity before sprinting.',
+    ],
   },
 ];
 

@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { memberService } from '@/services';
 import type { Member, PaymentMethod } from '@/types';
 
-const accentColor = '#E11D2E';
+const accentColor = '#B11226';
 const paymentMethods = ['Visa', 'Mastercard', 'Whish Money'] as const;
 
 type ProfilePaymentMethod = Extract<
@@ -122,8 +122,8 @@ export default function ProfileScreen() {
 
   if (!member || !form) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar style="light" />
+      <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
+        <StatusBar style="dark" />
         <View style={styles.loadingState}>
           <ActivityIndicator color={accentColor} />
           <Text style={styles.loadingText}>Loading profile...</Text>
@@ -135,8 +135,8 @@ export default function ProfileScreen() {
   const doneDisabled = !isEditing || !hasChanges || isSaving;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" />
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
+      <StatusBar style="dark" />
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -281,12 +281,12 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#FFF8F7',
   },
   content: {
     paddingHorizontal: 22,
-    paddingTop: 28,
-    paddingBottom: 108,
+    paddingTop: 20,
+    paddingBottom: 42,
   },
   loadingState: {
     flex: 1,
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    color: '#D7DEE8',
+    color: '#5B6472',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -309,30 +309,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: 'rgba(225, 29, 46, 0.62)',
+    borderColor: 'rgba(177, 18, 38, 0.3)',
     borderRadius: 54,
-    backgroundColor: '#121214',
+    backgroundColor: '#FFFFFF',
     shadowColor: accentColor,
     shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.22,
+    shadowOpacity: 0.16,
     shadowRadius: 22,
     elevation: 6,
   },
   avatarText: {
-    color: '#FFFFFF',
+    color: accentColor,
     fontSize: 30,
     fontWeight: '900',
     letterSpacing: 0,
   },
   nameText: {
-    color: '#FFFFFF',
+    color: '#181A20',
     fontSize: 26,
     fontWeight: '900',
     letterSpacing: 0,
     marginTop: 14,
   },
   phoneText: {
-    color: '#A8B2C0',
+    color: '#667085',
     fontSize: 14,
     fontWeight: '800',
     marginTop: 5,
@@ -348,15 +348,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.5)',
+    borderColor: 'rgba(177, 18, 38, 0.28)',
     borderRadius: 16,
-    backgroundColor: '#17171A',
+    backgroundColor: '#FFFFFF',
   },
   cancelButton: {
     borderColor: 'rgba(245, 158, 11, 0.5)',
   },
   secondaryButtonText: {
-    color: '#FFFFFF',
+    color: accentColor,
     fontSize: 14,
     fontWeight: '900',
   },
@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
     backgroundColor: accentColor,
   },
   doneButtonDisabled: {
-    backgroundColor: '#30343B',
+    backgroundColor: '#E6E8EC',
   },
   doneButtonText: {
     color: '#FFFFFF',
@@ -377,18 +377,23 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   doneButtonTextDisabled: {
-    color: '#87919F',
+    color: '#8B95A5',
   },
   card: {
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.09)',
+    borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 24,
-    backgroundColor: '#121214',
+    backgroundColor: '#FFFFFF',
     padding: 18,
     marginBottom: 14,
+    shadowColor: '#1D0A0D',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.06,
+    shadowRadius: 18,
+    elevation: 3,
   },
   sectionTitle: {
-    color: '#FFFFFF',
+    color: '#181A20',
     fontSize: 17,
     fontWeight: '900',
     marginBottom: 14,
@@ -398,21 +403,21 @@ const styles = StyleSheet.create({
   },
   lockedField: {
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(177, 18, 38, 0.1)',
     borderRadius: 16,
-    backgroundColor: '#080809',
+    backgroundColor: '#FFF7F8',
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   label: {
-    color: '#A8B2C0',
+    color: '#667085',
     fontSize: 12,
     fontWeight: '900',
     marginBottom: 8,
     textTransform: 'uppercase',
   },
   lockedValue: {
-    color: '#D7DEE8',
+    color: '#181A20',
     fontSize: 15,
     fontWeight: '900',
   },
@@ -422,17 +427,18 @@ const styles = StyleSheet.create({
   input: {
     minHeight: 54,
     borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.48)',
+    borderColor: 'rgba(177, 18, 38, 0.28)',
     borderRadius: 16,
-    backgroundColor: '#080809',
-    color: '#FFFFFF',
+    backgroundColor: '#FFFFFF',
+    color: '#181A20',
     fontSize: 15,
     fontWeight: '800',
     paddingHorizontal: 14,
   },
   inputReadOnly: {
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    color: '#A8B2C0',
+    borderColor: 'rgba(177, 18, 38, 0.08)',
+    backgroundColor: '#F8F2F3',
+    color: '#667085',
   },
   paymentGrid: {
     gap: 10,
@@ -442,24 +448,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.09)',
+    borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 16,
-    backgroundColor: '#080809',
+    backgroundColor: '#FFFFFF',
   },
   paymentOptionSelected: {
-    borderColor: 'rgba(225, 29, 46, 0.65)',
-    backgroundColor: 'rgba(225, 29, 46, 0.16)',
+    borderColor: 'rgba(177, 18, 38, 0.48)',
+    backgroundColor: '#FFF1F3',
   },
   paymentOptionReadOnly: {
     opacity: 0.72,
   },
   paymentOptionText: {
-    color: '#A8B2C0',
+    color: '#667085',
     fontSize: 14,
     fontWeight: '900',
   },
   paymentOptionTextSelected: {
-    color: '#FFFFFF',
+    color: accentColor,
   },
   buttonPressed: {
     opacity: 0.78,

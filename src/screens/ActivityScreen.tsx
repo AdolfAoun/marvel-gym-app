@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { activityService } from '@/services';
 import type { GymActivityLevel } from '@/types';
 
-const accentColor = '#E11D2E';
+const accentColor = '#B11226';
 
 function getBarColor(intensity: GymActivityLevel['intensity']) {
   if (intensity === 'High') {
@@ -47,8 +47,8 @@ export default function ActivityScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" />
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
+      <StatusBar style="dark" />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
@@ -112,11 +112,11 @@ export default function ActivityScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#FFF8F7',
   },
   content: {
     paddingHorizontal: 22,
-    paddingTop: 28,
+    paddingTop: 20,
     paddingBottom: 108,
   },
   header: {
@@ -130,14 +130,14 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   title: {
-    color: '#FFFFFF',
+    color: '#181A20',
     fontSize: 30,
     fontWeight: '900',
     letterSpacing: 0,
     marginTop: 4,
   },
   subtitle: {
-    color: '#A8B2C0',
+    color: '#667085',
     fontSize: 14,
     fontWeight: '700',
     marginTop: 6,
@@ -148,22 +148,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.09)',
+    borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 22,
-    backgroundColor: '#121214',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#1D0A0D',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.06,
+    shadowRadius: 18,
+    elevation: 3,
   },
   loadingText: {
-    color: '#D7DEE8',
+    color: '#5B6472',
     fontSize: 14,
     fontWeight: '700',
   },
   chartCard: {
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.09)',
+    borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 24,
-    backgroundColor: '#121214',
+    backgroundColor: '#FFFFFF',
     padding: 18,
     marginBottom: 14,
+    shadowColor: '#1D0A0D',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.06,
+    shadowRadius: 18,
+    elevation: 3,
   },
   chart: {
     height: 274,
@@ -179,7 +189,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   countText: {
-    color: '#D7DEE8',
+    color: '#4B5563',
     fontSize: 12,
     fontWeight: '900',
   },
@@ -190,14 +200,14 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     overflow: 'hidden',
     borderRadius: 999,
-    backgroundColor: '#080809',
+    backgroundColor: '#F3E2E5',
   },
   barFill: {
     width: '100%',
     borderRadius: 999,
   },
   timeLabel: {
-    color: '#A8B2C0',
+    color: '#667085',
     fontSize: 11,
     fontWeight: '900',
   },
@@ -205,30 +215,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    borderTopColor: 'rgba(177, 18, 38, 0.12)',
     marginTop: 18,
     paddingTop: 14,
   },
   legendText: {
-    color: '#D7DEE8',
+    color: '#4B5563',
     fontSize: 12,
     fontWeight: '800',
   },
   infoCard: {
     borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.26)',
+    borderColor: 'rgba(177, 18, 38, 0.16)',
     borderRadius: 22,
-    backgroundColor: 'rgba(225, 29, 46, 0.08)',
+    backgroundColor: '#FFF1F3',
     padding: 18,
   },
   infoTitle: {
-    color: '#FFFFFF',
+    color: '#181A20',
     fontSize: 16,
     fontWeight: '900',
     marginBottom: 8,
   },
   infoBody: {
-    color: '#D7DEE8',
+    color: '#4B5563',
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,

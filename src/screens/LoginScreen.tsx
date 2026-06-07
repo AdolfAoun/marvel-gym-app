@@ -185,11 +185,6 @@ export default function LoginScreen() {
     }
   };
 
-  const handleGuestAccess = () => {
-    closeContactHub();
-    router.replace('/(tabs)');
-  };
-
   const handleContactOption = async (url: string) => {
     setContactHubOpen(false);
 
@@ -481,28 +476,15 @@ export default function LoginScreen() {
               closeContactHub();
             }}
             style={styles.bottomActions}>
+            <Text style={styles.accountPromptText}>Don't have an account?</Text>
+
             <Pressable
               onPress={(event) => {
                 event.stopPropagation();
                 closeContactHub();
                 showFeedback('Registration coming soon');
-              }}>
+            }}>
               <Text style={styles.bottomActionText}>Create Account</Text>
-            </Pressable>
-
-            <Image
-              accessible={false}
-              source={require('@/assets/images/marvel-x-red-separator.png')}
-              style={styles.footerDivider}
-              resizeMode="contain"
-            />
-
-            <Pressable
-              onPress={(event) => {
-                event.stopPropagation();
-                handleGuestAccess();
-              }}>
-              <Text style={styles.bottomActionText}>Continue as Guest</Text>
             </Pressable>
           </Pressable>
             </Pressable>
@@ -964,15 +946,14 @@ callRay: {
     gap: 16,
     marginTop: 22,
   },
+  accountPromptText: {
+    color: '#A8B2C0',
+    fontSize: 14,
+    fontWeight: '800',
+  },
   bottomActionText: {
     color: '#f8fafc',
     fontSize: 14,
     fontWeight: '900',
-  },
-  footerDivider: {
-    width: 12,
-    height: 18,
-    tintColor: accentColor,
-    opacity: 0.62,
   },
 });
