@@ -91,10 +91,10 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="activity"
+        name="journey"
         options={{
-          title: 'Activity',
-          tabBarIcon: ({ color }) => <TabIcon color={color} label="A" />,
+          title: 'Journey',
+          tabBarIcon: ({ color }) => <TabIcon color={color} label="J" />,
         }}
       />
     </Tabs>

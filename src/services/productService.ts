@@ -1,8 +1,17 @@
 import { paymentHistory, products } from '../mock';
-import type { Payment, PaymentMethod, Product } from '../types';
+import type {
+  Payment,
+  PaymentMethod,
+  Product,
+  ProductCategory,
+} from '../types';
 
 export const getProducts = async (): Promise<Product[]> => {
   return products;
+};
+
+export const getProductCategories = async (): Promise<ProductCategory[]> => {
+  return ['Gym Equipment', 'Beverages', 'Snacks'];
 };
 
 export const buyProduct = async (
@@ -29,5 +38,6 @@ export const buyProduct = async (
 
 export const productService = {
   getProducts,
+  getProductCategories,
   buyProduct,
 };
