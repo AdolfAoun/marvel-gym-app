@@ -388,14 +388,25 @@ export const vouchers: Voucher[] = [
     type: 'Shop Reservation',
     amount: 2.75,
     currency: 'USD',
-    status: 'Redeemed',
+    status: 'Confirmed',
     description: 'Protein Bar reservation',
+  },
+  {
+    id: 'voucher-003',
+    date: '2026-05-21T12:10:00.000Z',
+    type: 'Shop Reservation',
+    amount: 3.5,
+    currency: 'USD',
+    status: 'Canceled',
+    description: 'Energy Drink reservation',
   },
 ];
 
 export const journeyProfile: JourneyProfile = {
   biography:
     'Training for strength, energy, and consistency. Focused on showing up four times a week.',
+  gymPlan:
+    'Monday: Push - Bench Press, Shoulder Press, Triceps Pushdown.\nWednesday: Pull - Lat Pulldown, Cable Row, Dumbbell Curl.\nFriday: Legs - Leg Press, Romanian Deadlift, Calf Raises.',
 };
 
 export const attendanceDays: AttendanceDay[] = [
@@ -420,6 +431,7 @@ export const journeyStats: JourneyStats = {
   visitsThisMonth: 10,
   visitsThisYear: 84,
   consecutiveStreak: 3,
+  estimatedCaloriesBurned: 620,
 };
 
 export const achievements: Achievement[] = [
@@ -453,6 +465,8 @@ export const machineGuides: MachineGuide[] = [
   {
     id: 'machine-001',
     name: 'Chest Press',
+    muscleGroup: 'Chest',
+    target: 'Mid chest',
     description: 'Targets chest, shoulders, and triceps with guided pressing.',
     imageLabel: 'CP',
     instructions: [
@@ -464,6 +478,8 @@ export const machineGuides: MachineGuide[] = [
   {
     id: 'machine-002',
     name: 'Leg Press',
+    muscleGroup: 'Legs',
+    target: 'Quads, glutes',
     description: 'Builds quads, glutes, and hamstrings with stable support.',
     imageLabel: 'LP',
     instructions: [
@@ -475,6 +491,8 @@ export const machineGuides: MachineGuide[] = [
   {
     id: 'machine-003',
     name: 'Cable Machine',
+    muscleGroup: 'Arms',
+    target: 'Biceps, triceps, forearms',
     description: 'Versatile station for rows, presses, curls, and core work.',
     imageLabel: 'CB',
     instructions: [
@@ -486,6 +504,8 @@ export const machineGuides: MachineGuide[] = [
   {
     id: 'machine-004',
     name: 'Lat Pulldown',
+    muscleGroup: 'Back',
+    target: 'Lats, upper back',
     description: 'Trains the upper back and lats with vertical pulling.',
     imageLabel: 'LD',
     instructions: [
@@ -497,12 +517,118 @@ export const machineGuides: MachineGuide[] = [
   {
     id: 'machine-005',
     name: 'Treadmill',
+    muscleGroup: 'Core',
+    target: 'Conditioning',
     description: 'Cardio station for walking, intervals, and endurance runs.',
     imageLabel: 'TM',
     instructions: [
       'Start with feet on the side rails.',
       'Increase speed gradually after stepping on.',
       'Use incline for intensity before sprinting.',
+    ],
+  },
+  {
+    id: 'machine-006',
+    name: 'Incline Press',
+    muscleGroup: 'Chest',
+    target: 'Upper chest',
+    description: 'Guided press angle that emphasizes the upper chest.',
+    imageLabel: 'IP',
+    instructions: [
+      'Set the seat so handles start near upper chest.',
+      'Press up and forward without shrugging.',
+      'Lower slowly until elbows are just behind the body.',
+    ],
+  },
+  {
+    id: 'machine-007',
+    name: 'Seated Row',
+    muscleGroup: 'Back',
+    target: 'Upper back',
+    description: 'Horizontal pulling station for mid-back strength.',
+    imageLabel: 'SR',
+    instructions: [
+      'Sit tall with chest against the pad if available.',
+      'Pull elbows back while keeping ribs down.',
+      'Pause briefly, then return with control.',
+    ],
+  },
+  {
+    id: 'machine-008',
+    name: 'Lateral Raise Machine',
+    muscleGroup: 'Shoulders',
+    target: 'Lateral delts',
+    description: 'Isolates side delts with a stable arm path.',
+    imageLabel: 'LR',
+    instructions: [
+      'Set pads just above the elbows.',
+      'Raise arms to shoulder height.',
+      'Lower slowly and keep the neck relaxed.',
+    ],
+  },
+  {
+    id: 'machine-009',
+    name: 'Rear Delt Fly',
+    muscleGroup: 'Shoulders',
+    target: 'Rear delts',
+    description: 'Targets rear shoulders and upper-back posture muscles.',
+    imageLabel: 'RD',
+    instructions: [
+      'Face the machine with chest supported.',
+      'Open arms out wide with soft elbows.',
+      'Squeeze shoulder blades gently, then return.',
+    ],
+  },
+  {
+    id: 'machine-010',
+    name: 'Leg Curl',
+    muscleGroup: 'Legs',
+    target: 'Hamstrings',
+    description: 'Isolates hamstrings through knee flexion.',
+    imageLabel: 'LC',
+    instructions: [
+      'Line knees with the machine pivot.',
+      'Curl the pad toward the back of your legs.',
+      'Return slowly without lifting your hips.',
+    ],
+  },
+  {
+    id: 'machine-011',
+    name: 'Calf Raise',
+    muscleGroup: 'Legs',
+    target: 'Calves',
+    description: 'Controlled calf training through full ankle range.',
+    imageLabel: 'CR',
+    instructions: [
+      'Place balls of feet on the platform edge.',
+      'Rise as high as comfortable.',
+      'Lower until calves stretch gently.',
+    ],
+  },
+  {
+    id: 'machine-012',
+    name: 'Triceps Pushdown',
+    muscleGroup: 'Arms',
+    target: 'Triceps',
+    description: 'Cable station movement for direct triceps work.',
+    imageLabel: 'TP',
+    instructions: [
+      'Keep elbows close to your sides.',
+      'Press the attachment down until arms extend.',
+      'Return slowly without moving shoulders.',
+    ],
+  },
+  {
+    id: 'machine-013',
+    name: 'Cable Curl',
+    muscleGroup: 'Arms',
+    target: 'Biceps',
+    description: 'Cable curl variation with steady resistance.',
+    imageLabel: 'CC',
+    instructions: [
+      'Stand tall and keep elbows near ribs.',
+      'Curl handles toward shoulders.',
+      'Lower with control and avoid swinging.',
     ],
   },
 ];

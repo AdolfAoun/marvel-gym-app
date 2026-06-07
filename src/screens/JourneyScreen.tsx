@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -11,17 +12,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import {
-  journeyService,
-  machineGuideService,
-  memberService,
-} from '@/services';
+import { journeyService, memberService } from '@/services';
 import type {
   Achievement,
   AttendanceDay,
   JourneyProfile,
   JourneyStats,
-  MachineGuide,
   Member,
 } from '@/types';
 
@@ -32,21 +28,46 @@ const surfaceColor = '#FFFFFF';
 const textColor = '#181A20';
 const mutedColor = '#667085';
 
-function formatAttendanceDay(value: string) {
+type TimerState = 'idle' | 'running' | 'paused';
+
+function formatDay(value: string) {
   return new Intl.DateTimeFormat('en', {
     day: '2-digit',
   }).format(new Date(value));
 }
 
+function formatMonth(value: string) {
+  return new Intl.DateTimeFormat('en', {
+    month: 'long',
+  }).format(new Date(value));
+}
+
+function formatDuration(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  return `${minutes.toString().padStart(2, '0')}:${remainingSeconds
+    .toString()
+    .padStart(2, '0')}`;
+}
+
+function estimateCalories(durationSeconds: number) {
+  return Math.max(0, Math.round((durationSeconds / 60) * 8));
+}
+
 export default function JourneyScreen() {
+  const router = useRouter();
   const [member, setMember] = useState<Member>();
   const [profile, setProfile] = useState<JourneyProfile>();
   const [biographyDraft, setBiographyDraft] = useState('');
   const [attendanceDays, setAttendanceDays] = useState<AttendanceDay[]>([]);
   const [stats, setStats] = useState<JourneyStats>();
   const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [machineGuides, setMachineGuides] = useState<MachineGuide[]>([]);
   const [isEditingBio, setIsEditingBio] = useState(false);
+  const [selectedMonthIndex, setSelectedMonthIndex] = useState(new Date().getMonth());
+  const [timerState, setTimerState] = useState<TimerState>('idle');
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [lastCalories, setLastCalories] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -57,14 +78,12 @@ export default function JourneyScreen() {
         attendance,
         journeyStats,
         nextAchievements,
-        guides,
       ] = await Promise.all([
         memberService.getCurrentMember(),
         journeyService.getJourneyProfile(),
         journeyService.getAttendanceDays(),
         journeyService.getJourneyStats(),
         journeyService.getAchievements(),
-        machineGuideService.getMachineGuides(),
       ]);
 
       setMember(currentMember);
@@ -73,17 +92,57 @@ export default function JourneyScreen() {
       setAttendanceDays(attendance);
       setStats(journeyStats);
       setAchievements(nextAchievements);
-      setMachineGuides(guides);
       setIsLoading(false);
     };
 
     loadJourney();
   }, []);
 
+  useEffect(() => {
+    if (timerState !== 'running') {
+      return undefined;
+    }
+
+    const interval = setInterval(() => {
+      setElapsedSeconds((current) => current + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [timerState]);
+
   const unlockedCount = useMemo(
     () => achievements.filter((item) => item.isUnlocked).length,
     [achievements],
   );
+
+  const attendanceByMonth = useMemo(() => {
+    const groups: { month: string; days: AttendanceDay[] }[] = [];
+
+    attendanceDays.forEach((day) => {
+      const month = formatMonth(day.date);
+      const group = groups.find((item) => item.month === month);
+
+      if (group) {
+        group.days.push(day);
+        return;
+      }
+
+      groups.push({ month, days: [day] });
+    });
+
+    return groups;
+  }, [attendanceDays]);
+  const activeMonthIndex = Math.min(
+    Math.max(0, selectedMonthIndex),
+    Math.max(0, attendanceByMonth.length - 1),
+  );
+  const selectedMonth = attendanceByMonth[activeMonthIndex];
+
+  const refreshStats = async () => {
+    const nextStats = await journeyService.getJourneyStats();
+
+    setStats(nextStats);
+  };
 
   const handleSaveBiography = async () => {
     const nextProfile = await journeyService.updateJourneyProfile({
@@ -93,6 +152,36 @@ export default function JourneyScreen() {
     setProfile(nextProfile);
     setBiographyDraft(nextProfile.biography);
     setIsEditingBio(false);
+  };
+
+  const handleToggleVisit = async (date: string) => {
+    const nextAttendance = await journeyService.toggleAttendanceDay(date);
+
+    setAttendanceDays(nextAttendance);
+    await refreshStats();
+  };
+
+  const handleStartTimer = () => {
+    if (timerState === 'idle') {
+      setElapsedSeconds(0);
+      setLastCalories(0);
+    }
+
+    setTimerState('running');
+  };
+
+  const handleEndWorkout = async () => {
+    if (elapsedSeconds <= 0) {
+      setTimerState('idle');
+      return;
+    }
+
+    const session = await journeyService.completeWorkoutSession(elapsedSeconds);
+
+    setLastCalories(session.estimatedCaloriesBurned);
+    setTimerState('idle');
+    setElapsedSeconds(0);
+    await refreshStats();
   };
 
   if (isLoading || !profile || !stats) {
@@ -121,8 +210,7 @@ export default function JourneyScreen() {
             {member?.firstName ?? 'Member'}'s fitness dashboard
           </Text>
           <Text style={styles.heroBody}>
-            Attendance, progress, achievements, and machine guidance in one
-            personal space.
+            Track visits, measure consistency, and time lightweight workouts.
           </Text>
           <View style={styles.heroStatsRow}>
             <View style={styles.heroStatPill}>
@@ -136,68 +224,56 @@ export default function JourneyScreen() {
           </View>
         </View>
 
-        <View style={styles.card}>
+        <View style={styles.timerCard}>
           <View style={styles.sectionHeaderRow}>
             <View>
-              <Text style={styles.cardLabel}>About Me</Text>
-              <Text style={styles.sectionTitle}>Training note</Text>
+              <Text style={styles.cardLabel}>Workout Timer</Text>
+              <Text style={styles.sectionTitle}>Session clock</Text>
             </View>
+            <Text style={styles.sectionHint}>Calories are estimated</Text>
+          </View>
+
+          <View style={styles.timerFace}>
+            <Text style={styles.timerValue}>{formatDuration(elapsedSeconds)}</Text>
+            <Text style={styles.timerCaption}>
+              Live calories: {estimateCalories(elapsedSeconds)}
+            </Text>
+          </View>
+
+          <View style={styles.timerButtons}>
             <Pressable
-              onPress={() =>
-                isEditingBio ? handleSaveBiography() : setIsEditingBio(true)
-              }
+              onPress={handleStartTimer}
               style={({ pressed }) => [
-                styles.smallButton,
+                styles.primaryButton,
                 pressed && styles.buttonPressed,
               ]}>
-              <Text style={styles.smallButtonText}>
-                {isEditingBio ? 'Save' : 'Edit'}
-              </Text>
+              <Text style={styles.primaryButtonText}>Start Timer</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setTimerState('paused')}
+              disabled={timerState !== 'running'}
+              style={({ pressed }) => [
+                styles.secondaryButton,
+                timerState !== 'running' && styles.disabledButton,
+                pressed && styles.buttonPressed,
+              ]}>
+              <Text style={styles.secondaryButtonText}>Pause</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleEndWorkout}
+              style={({ pressed }) => [
+                styles.secondaryButton,
+                pressed && styles.buttonPressed,
+              ]}>
+              <Text style={styles.secondaryButtonText}>Stop / End Workout</Text>
             </Pressable>
           </View>
 
-          {isEditingBio ? (
-            <TextInput
-              multiline
-              value={biographyDraft}
-              onChangeText={setBiographyDraft}
-              placeholder="Write a short training biography"
-              placeholderTextColor="#9AA3AF"
-              selectionColor={accentColor}
-              style={styles.bioInput}
-            />
-          ) : (
-            <Text style={styles.bodyText}>{profile.biography}</Text>
+          {lastCalories > 0 && (
+            <Text style={styles.estimateText}>
+              Last workout estimate: {lastCalories} calories burned.
+            </Text>
           )}
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.sectionHeaderRow}>
-            <View>
-              <Text style={styles.cardLabel}>Attendance Calendar</Text>
-              <Text style={styles.sectionTitle}>Recent visits</Text>
-            </View>
-            <Text style={styles.sectionHint}>June</Text>
-          </View>
-
-          <View style={styles.calendarGrid}>
-            {attendanceDays.map((day) => (
-              <View
-                key={day.id}
-                style={[
-                  styles.calendarDay,
-                  day.hasVisit && styles.calendarDayActive,
-                ]}>
-                <Text
-                  style={[
-                    styles.calendarDayText,
-                    day.hasVisit && styles.calendarDayTextActive,
-                  ]}>
-                  {formatAttendanceDay(day.date)}
-                </Text>
-              </View>
-            ))}
-          </View>
         </View>
 
         <View style={styles.statsGrid}>
@@ -214,9 +290,71 @@ export default function JourneyScreen() {
             <Text style={styles.statLabel}>Visits this year</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{stats.consecutiveStreak}</Text>
-            <Text style={styles.statLabel}>Day streak</Text>
+            <Text style={styles.statValue}>{stats.estimatedCaloriesBurned}</Text>
+            <Text style={styles.statLabel}>Avg calories burned</Text>
           </View>
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.sectionHeaderRow}>
+            <View>
+              <Text style={styles.cardLabel}>Attendance Calendar</Text>
+              <Text style={styles.sectionTitle}>2026 visits</Text>
+            </View>
+            <Text style={styles.sectionHint}>Tap to toggle</Text>
+          </View>
+
+          {selectedMonth ? (
+            <View style={styles.monthBlock}>
+              <View style={styles.monthSwitcher}>
+                <Pressable
+                  disabled={activeMonthIndex === 0}
+                  onPress={() =>
+                    setSelectedMonthIndex((value) => Math.max(0, value - 1))
+                  }
+                  style={[
+                    styles.monthArrowButton,
+                    activeMonthIndex === 0 && styles.monthArrowButtonDisabled,
+                  ]}>
+                  <Text style={styles.monthArrowText}>{'<'}</Text>
+                </Pressable>
+                <Text style={styles.monthTitle}>{selectedMonth.month}</Text>
+                <Pressable
+                  disabled={activeMonthIndex === attendanceByMonth.length - 1}
+                  onPress={() =>
+                    setSelectedMonthIndex((value) =>
+                      Math.min(attendanceByMonth.length - 1, value + 1),
+                    )
+                  }
+                  style={[
+                    styles.monthArrowButton,
+                    activeMonthIndex === attendanceByMonth.length - 1 &&
+                      styles.monthArrowButtonDisabled,
+                  ]}>
+                  <Text style={styles.monthArrowText}>{'>'}</Text>
+                </Pressable>
+              </View>
+              <View style={styles.calendarGrid}>
+                {selectedMonth.days.map((day) => (
+                  <Pressable
+                    key={day.id}
+                    onPress={() => handleToggleVisit(day.date)}
+                    style={[
+                      styles.calendarDay,
+                      day.hasVisit && styles.calendarDayActive,
+                    ]}>
+                    <Text
+                      style={[
+                        styles.calendarDayText,
+                        day.hasVisit && styles.calendarDayTextActive,
+                      ]}>
+                      {formatDay(day.date)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.card}>
@@ -260,41 +398,55 @@ export default function JourneyScreen() {
           </View>
         </View>
 
+        <Pressable
+          onPress={() => router.push('/machine-guide')}
+          style={({ pressed }) => [
+            styles.machineGuideButton,
+            pressed && styles.buttonPressed,
+          ]}>
+          <View>
+            <Text style={styles.cardLabel}>How It Works</Text>
+            <Text style={styles.machineGuideTitle}>Open Machine Guide</Text>
+            <Text style={styles.machineGuideBody}>
+              Equipment setup by muscle target. AI Coach Coming Soon.
+            </Text>
+          </View>
+          <Text style={styles.machineGuideArrow}>Go</Text>
+        </Pressable>
+
         <View style={styles.card}>
           <View style={styles.sectionHeaderRow}>
             <View>
-              <Text style={styles.cardLabel}>How It Works</Text>
-              <Text style={styles.sectionTitle}>Machine guide</Text>
+              <Text style={styles.cardLabel}>About Me</Text>
+              <Text style={styles.sectionTitle}>Training note</Text>
             </View>
-            <View style={styles.aiPill}>
-              <Text style={styles.aiPillText}>AI Coach Coming Soon</Text>
-            </View>
+            <Pressable
+              onPress={() =>
+                isEditingBio ? handleSaveBiography() : setIsEditingBio(true)
+              }
+              style={({ pressed }) => [
+                styles.smallButton,
+                pressed && styles.buttonPressed,
+              ]}>
+              <Text style={styles.smallButtonText}>
+                {isEditingBio ? 'Save' : 'Edit'}
+              </Text>
+            </Pressable>
           </View>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.machineList}>
-            {machineGuides.map((machine) => (
-              <View key={machine.id} style={styles.machineCard}>
-                <View style={styles.machineImage}>
-                  <Text style={styles.machineImageText}>{machine.imageLabel}</Text>
-                </View>
-                <Text style={styles.machineName}>{machine.name}</Text>
-                <Text style={styles.machineDescription}>
-                  {machine.description}
-                </Text>
-                <View style={styles.instructionList}>
-                  {machine.instructions.map((instruction) => (
-                    <View key={instruction} style={styles.instructionRow}>
-                      <View style={styles.instructionDot} />
-                      <Text style={styles.instructionText}>{instruction}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            ))}
-          </ScrollView>
+          {isEditingBio ? (
+            <TextInput
+              multiline
+              value={biographyDraft}
+              onChangeText={setBiographyDraft}
+              placeholder="Write a short training biography"
+              placeholderTextColor="#9AA3AF"
+              selectionColor={accentColor}
+              style={styles.planInput}
+            />
+          ) : (
+            <Text style={styles.bodyText}>{profile.biography}</Text>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -404,6 +556,19 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     elevation: 4,
   },
+  timerCard: {
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.12)',
+    borderRadius: 28,
+    backgroundColor: surfaceColor,
+    padding: 18,
+    marginBottom: 16,
+    shadowColor: '#1D0A0D',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.06,
+    shadowRadius: 18,
+    elevation: 4,
+  },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -431,66 +596,65 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'right',
   },
-  smallButton: {
-    minHeight: 36,
+  timerFace: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.18)',
-    borderRadius: 999,
-    backgroundColor: '#FFF1F3',
-    paddingHorizontal: 16,
-  },
-  smallButtonText: {
-    color: wineColor,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  bodyText: {
-    color: '#4B5563',
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 21,
-  },
-  bioInput: {
-    minHeight: 104,
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.18)',
-    borderRadius: 18,
+    borderRadius: 26,
     backgroundColor: '#FFF8F7',
+    paddingVertical: 22,
+  },
+  timerValue: {
     color: textColor,
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 21,
-    padding: 14,
-    textAlignVertical: 'top',
+    fontSize: 54,
+    fontWeight: '900',
+    letterSpacing: 0,
   },
-  calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  timerCaption: {
+    color: mutedColor,
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 4,
   },
-  calendarDay: {
-    width: 38,
-    height: 38,
+  timerButtons: {
+    gap: 10,
+    marginTop: 14,
+  },
+  primaryButton: {
+    minHeight: 52,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.1)',
-    borderRadius: 14,
-    backgroundColor: '#FFF8F7',
-  },
-  calendarDayActive: {
-    borderColor: accentColor,
+    borderRadius: 16,
     backgroundColor: accentColor,
   },
-  calendarDayText: {
-    color: '#8E6670',
-    fontSize: 12,
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '900',
   },
-  calendarDayTextActive: {
-    color: '#FFFFFF',
+  secondaryButton: {
+    minHeight: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.18)',
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  secondaryButtonText: {
+    color: wineColor,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  disabledButton: {
+    opacity: 0.48,
+  },
+  estimateText: {
+    color: wineColor,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
+    marginTop: 12,
+    textAlign: 'center',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -524,6 +688,103 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     lineHeight: 17,
+  },
+  smallButton: {
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.18)',
+    borderRadius: 999,
+    backgroundColor: '#FFF1F3',
+    paddingHorizontal: 16,
+  },
+  smallButtonText: {
+    color: wineColor,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  bodyText: {
+    color: '#4B5563',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+  },
+  planInput: {
+    minHeight: 136,
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.18)',
+    borderRadius: 18,
+    backgroundColor: '#FFF8F7',
+    color: textColor,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+    padding: 14,
+    textAlignVertical: 'top',
+  },
+  monthBlock: {
+    marginBottom: 4,
+  },
+  monthSwitcher: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.1)',
+    borderRadius: 999,
+    backgroundColor: '#FFF8F7',
+    marginBottom: 12,
+    paddingHorizontal: 8,
+  },
+  monthArrowButton: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 17,
+    backgroundColor: '#FFFFFF',
+  },
+  monthArrowButtonDisabled: {
+    opacity: 0.36,
+  },
+  monthArrowText: {
+    color: wineColor,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  monthTitle: {
+    color: textColor,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  calendarDay: {
+    width: 35,
+    height: 35,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.1)',
+    borderRadius: 13,
+    backgroundColor: '#FFF8F7',
+  },
+  calendarDayActive: {
+    borderColor: accentColor,
+    backgroundColor: accentColor,
+  },
+  calendarDayText: {
+    color: '#8E6670',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  calendarDayTextActive: {
+    color: '#FFFFFF',
   },
   achievementList: {
     gap: 10,
@@ -576,78 +837,46 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginTop: 3,
   },
-  aiPill: {
+  machineGuideButton: {
+    minHeight: 124,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 999,
-    backgroundColor: '#FFF1F3',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  aiPillText: {
-    color: wineColor,
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  machineList: {
-    gap: 12,
-    paddingRight: 4,
-  },
-  machineCard: {
-    width: 246,
+    justifyContent: 'space-between',
+    gap: 18,
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.12)',
-    borderRadius: 22,
-    backgroundColor: '#FFF8F7',
-    padding: 14,
+    borderRadius: 26,
+    backgroundColor: surfaceColor,
+    padding: 18,
+    marginBottom: 16,
+    shadowColor: '#1D0A0D',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.06,
+    shadowRadius: 18,
+    elevation: 4,
   },
-  machineImage: {
-    height: 112,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
-    backgroundColor: accentColor,
-    marginBottom: 12,
-  },
-  machineImageText: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '900',
-  },
-  machineName: {
+  machineGuideTitle: {
     color: textColor,
-    fontSize: 16,
+    fontSize: 19,
     fontWeight: '900',
   },
-  machineDescription: {
+  machineGuideBody: {
     color: mutedColor,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
-    lineHeight: 17,
-    marginTop: 5,
-  },
-  instructionList: {
-    gap: 8,
-    marginTop: 12,
-  },
-  instructionRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  instructionDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: accentColor,
+    lineHeight: 19,
     marginTop: 6,
+    maxWidth: 250,
   },
-  instructionText: {
-    flex: 1,
-    color: '#4B5563',
+  machineGuideArrow: {
+    overflow: 'hidden',
+    borderRadius: 999,
+    backgroundColor: accentColor,
+    color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 17,
+    fontWeight: '900',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   buttonPressed: {
     opacity: 0.76,

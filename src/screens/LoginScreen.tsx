@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { authService } from '@/services';
 
-const accentColor = '#E11D2E';
+const accentColor = '#B11226';
 
 function formatLebanesePhone(value: string) {
   const digits = value.replace(/\D/g, '').slice(0, 8);
@@ -238,52 +238,10 @@ export default function LoginScreen() {
           <View style={styles.prototypeAtmosphereLowerFade} />
         </View>
         <View pointerEvents="none" style={styles.glowSmall} />
+        <View pointerEvents="none" style={styles.glowLarge} />
+        <View pointerEvents="none" style={styles.futuristicBlade} />
 
         <SafeAreaView style={styles.contentSafeArea}>
-          <View pointerEvents="box-none" style={styles.contactHubLayer}>
-            <View pointerEvents="none" style={styles.contactHubGlow} />
-
-            <Animated.View
-              pointerEvents={isContactOpen ? 'auto' : 'none'}
-              style={[styles.contactRay, styles.whatsappRay, whatsappRayStyle]}>
-              <Pressable
-                hitSlop={10}
-                onPress={() => handleContactOption('https://wa.me/96179197997')}
-                style={({ pressed }) => [
-                  styles.contactRayButton,
-                  pressed && styles.contactPressed,
-                ]}>
-                <Text style={styles.contactRayText}>WhatsApp</Text>
-              </Pressable>
-            </Animated.View>
-
-            <Animated.View
-              pointerEvents={isContactOpen ? 'auto' : 'none'}
-              style={[styles.contactRay, styles.callRay, callRayStyle]}>
-              <Pressable
-                hitSlop={10}
-                onPress={() => handleContactOption('tel:+96179197997')}
-                style={({ pressed }) => [
-                  styles.contactRayButton,
-                  styles.callRayButton,
-                  pressed && styles.contactPressed,
-                ]}>
-                <Text style={styles.contactRayText}>Call</Text>
-              </Pressable>
-            </Animated.View>
-
-            <Pressable
-              hitSlop={12}
-              onPress={handleContactHubPress}
-              style={({ pressed }) => [
-                styles.contactHub,
-                isContactOpen && styles.contactHubOpen,
-                pressed && styles.contactPressed,
-              ]}>
-              <Text style={styles.contactHubText}>Contact Us</Text>
-            </Pressable>
-          </View>
-
           <Animated.View
             style={[
               styles.keyboardLiftLayer,
@@ -299,12 +257,14 @@ export default function LoginScreen() {
               style={styles.fixedContent}>
           <View style={styles.brandingSection}>
             <View style={styles.brandBlock}>
-              <View style={styles.logoGlow} />
-              <Image
-                source={require('@/assets/images/marvel-logo-transparent.png')}
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
+              <View style={styles.miniSignRow}>
+                <Text style={styles.miniSign}>•</Text>
+                <Text style={styles.miniSign}>X</Text>
+                <Text style={styles.miniSign}>/</Text>
+                <Text style={styles.miniSign}>÷</Text>
+              </View>
+              <Text style={styles.miniLogoText}>MARVEL</Text>
+              <Text style={styles.miniLogoSubtext}>fitness and health</Text>
             </View>
 
             <View style={styles.heroBlock}>
@@ -507,7 +467,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: Platform.OS === 'web' ? 414 : undefined,
     overflow: 'hidden',
-    backgroundColor: '#000000',
+    backgroundColor: '#050506',
     borderColor: Platform.OS === 'web' ? '#1d2733' : 'transparent',
     borderRadius: Platform.OS === 'web' ? 34 : 0,
     borderWidth: Platform.OS === 'web' ? 1 : 0,
@@ -523,13 +483,35 @@ const styles = StyleSheet.create({
   glowSmall: {
     position: 'absolute',
     zIndex: 1,
-    bottom: 88,
-    left: -96,
-    width: 190,
-    height: 190,
-    borderRadius: 95,
+    bottom: 80,
+    left: -120,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
     backgroundColor: accentColor,
-    opacity: 0.1,
+    opacity: 0.12,
+  },
+  glowLarge: {
+    position: 'absolute',
+    zIndex: 1,
+    top: -110,
+    right: -120,
+    width: 310,
+    height: 310,
+    borderRadius: 155,
+    backgroundColor: '#3A050C',
+    opacity: 0.74,
+  },
+  futuristicBlade: {
+    position: 'absolute',
+    zIndex: 1,
+    top: 64,
+    right: -70,
+    width: 102,
+    height: 520,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    transform: [{ rotate: '24deg' }],
   },
   prototypeAtmosphereLayer: {
     position: 'absolute',
@@ -547,7 +529,7 @@ const styles = StyleSheet.create({
     left: -308,
     right: 12,
     height: 680,
-    opacity: 0.45,//0.12
+    opacity: 0.28,
     
   },
   prototypeAtmosphereVeil: {
@@ -556,7 +538,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.22)',
+    backgroundColor: 'rgba(0, 0, 0, 0.52)',
   },
   prototypeAtmosphereLowerFade: {
     position: 'absolute',
@@ -564,7 +546,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: 120,
-    backgroundColor: 'rgba(0, 0, 0, 0.66)',
+    backgroundColor: 'rgba(0, 0, 0, 0.86)',
   },
   contactHubLayer: {
   position: 'absolute',
@@ -675,50 +657,62 @@ callRay: {
     zIndex: 2,
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'web' ? 52 : 38,
+    paddingTop: Platform.OS === 'web' ? 52 : 42,
     paddingBottom: 24,
-    transform: [{ translateY: 30 }],//Move whole content up or down
+    transform: [{ translateY: 16 }],
   },
   brandingSection: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flexShrink: 0,
   },
   brandBlock: {
-    alignItems: 'center',
-    marginBottom: 18,
+    alignItems: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    marginBottom: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     position: 'relative',
-    transform: [{ translateY: 28 }],
+    transform: [{ translateY: 10 }],
   },
-  logoGlow: {
-    position: 'absolute',
-    top: 0,
-    width: 158,
-    height: 158,
-    borderRadius: 79,
-    backgroundColor: accentColor,
-    opacity: 0.18,
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.62,
-    shadowRadius: 36,
+  miniSignRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 2,
   },
-  logoImage: {
-    width: 150,
-    height: 150,
-    transform: [{ translateY: 6 }, { translateX: 0.3 }],
+  miniSign: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 17,
+  },
+  miniLogoText: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 4,
+    lineHeight: 27,
+  },
+  miniLogoSubtext: {
+    color: '#F7D6DC',
+    fontSize: 8,
+    fontWeight: '600',
+    letterSpacing: 2,
   },
   heroBlock: {
-    alignItems: 'center',
-    marginTop: 30,
-    marginBottom: 22,
-    paddingHorizontal: 10,
-    transform: [{ translateY: 5 }],
+    alignItems: 'flex-start',
+    marginTop: 18,
+    marginBottom: 20,
+    paddingHorizontal: 0,
+    transform: [{ translateY: 0 }],
   },
   subtitlePill: {
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     borderRadius: 22,
-    backgroundColor: 'rgba(18, 18, 20, 0.62)',
+    backgroundColor: 'rgba(18, 18, 20, 0.48)',
     paddingHorizontal: 18,
     paddingVertical: 10,
     shadowColor: accentColor,
@@ -727,30 +721,30 @@ callRay: {
     shadowRadius: 20,
   },
   heroSubtitle: {
-    color: '#d5d9df',
+    color: '#E5E7EB',
     fontSize: 11,
     lineHeight: 18,
     maxWidth: 300,
-    textAlign: 'center',
+    textAlign: 'left',
     transform: [{ translateY: 0}],
   },
   loginCard: {
     position: 'relative',
-    gap: 8,
+    gap: 10,
     flexShrink: 0,
-    minHeight: 320,
+    minHeight: 326,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.11)',
-    borderRadius: 30,
-    backgroundColor: 'rgba(18, 18, 20, 0.86)',
-    paddingHorizontal: 22,
-    paddingVertical: 18,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 28,
+    backgroundColor: 'rgba(13, 14, 17, 0.88)',
+    paddingHorizontal: 21,
+    paddingVertical: 20,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.35,
-    shadowRadius: 28,
-    elevation: 7,
+    shadowOffset: { width: 0, height: 24 },
+    shadowOpacity: 0.46,
+    shadowRadius: 32,
+    elevation: 10,
   },
   cardGloss: {
     position: 'absolute',
@@ -815,7 +809,7 @@ callRay: {
     borderWidth: 1,
     borderColor: '#30272b',
     borderRadius: 16,
-    backgroundColor: '#080809',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     color: '#f8fafc',
     fontSize: 16,
     paddingHorizontal: 16,
@@ -857,7 +851,7 @@ callRay: {
     borderWidth: 1,
     borderColor: '#30272b',
     borderRadius: 16,
-    backgroundColor: '#111113',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     paddingHorizontal: 14,
   },
   countryCodeText: {
@@ -872,7 +866,7 @@ callRay: {
     borderWidth: 1,
     borderColor: '#30272b',
     borderRadius: 16,
-    backgroundColor: '#080809',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     color: '#f8fafc',
     fontSize: 16,
     paddingHorizontal: 16,
@@ -884,7 +878,7 @@ callRay: {
     borderWidth: 1,
     borderColor: '#30272b',
     borderRadius: 16,
-    backgroundColor: '#080809',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
   passwordInput: {
     flex: 1,

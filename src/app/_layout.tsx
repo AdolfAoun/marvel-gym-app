@@ -24,6 +24,22 @@ export default function RootLayout() {
           title: 'Profile',
         }}
       />
+      <Stack.Screen
+        name="machine-guide"
+        options={{
+          headerBackTitle: '',
+          headerShown: true,
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: '#FFF8F7' },
+          headerTintColor: accentColor,
+          headerTitleStyle: {
+            color: '#181A20',
+            fontSize: 18,
+            fontWeight: '900',
+          },
+          title: 'Machine Guide',
+        }}
+      />
     </Stack>
   );
 }

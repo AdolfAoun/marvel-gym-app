@@ -10,6 +10,7 @@ type CreateVoucherInput = {
 };
 
 let voucherRecords: Voucher[] = [...vouchers];
+const shopVoucherPin = '00';
 
 function createVoucherId() {
   return `voucher-${Date.now().toString(36)}`;
@@ -24,6 +25,16 @@ export const getVouchers = async (): Promise<Voucher[]> => {
 
 export const getPendingVouchers = async (): Promise<Voucher[]> => {
   return voucherRecords.filter((voucher) => voucher.status === 'Pending');
+};
+
+export const getVouchersByStatus = async (
+  status: VoucherStatus,
+): Promise<Voucher[]> => {
+  return voucherRecords.filter((voucher) => voucher.status === status);
+};
+
+export const getShopVouchers = async (): Promise<Voucher[]> => {
+  return voucherRecords.filter((voucher) => voucher.type === 'Shop Reservation');
 };
 
 export const createVoucher = async ({
@@ -56,7 +67,7 @@ export const createMembershipRenewalVoucher = async (
   return createVoucher({
     type: 'Membership Renewal',
     amount,
-    status: paymentMode === 'Pay at Counter' ? 'Pending' : 'Paid',
+    status: 'Pending',
     description: `${months} Month${months > 1 ? 's' : ''} Membership - ${paymentMode}`,
   });
 };
@@ -69,7 +80,7 @@ export const createMembershipFreezeVoucher = async (
   return createVoucher({
     type: 'Membership Freeze',
     amount,
-    status: paymentMode === 'Pay at Counter' ? 'Pending' : 'Paid',
+    status: 'Pending',
     description: `${weeks} Week${weeks > 1 ? 's' : ''} Freeze - ${paymentMode}`,
   });
 };
@@ -82,16 +93,63 @@ export const createShopVoucher = async (
   return createVoucher({
     type: 'Shop Reservation',
     amount,
-    status: paymentMode === 'Pay at Counter' ? 'Pending' : 'Paid',
+    status: paymentMode === 'Pay at Counter' ? 'Pending' : 'Confirmed',
     description: `${productName} reservation - ${paymentMode}`,
   });
+};
+
+export const confirmShopVoucher = async (
+  voucherId: string,
+  pin: string,
+): Promise<Voucher | undefined> => {
+  const voucher = voucherRecords.find((item) => item.id === voucherId);
+
+  if (!voucher || voucher.type !== 'Shop Reservation' || pin !== shopVoucherPin) {
+    return undefined;
+  }
+
+  const confirmedVoucher: Voucher = {
+    ...voucher,
+    status: 'Confirmed',
+  };
+
+  voucherRecords = voucherRecords.map((item) =>
+    item.id === voucherId ? confirmedVoucher : item,
+  );
+
+  return confirmedVoucher;
+};
+
+export const cancelVoucher = async (
+  voucherId: string,
+): Promise<Voucher | undefined> => {
+  const voucher = voucherRecords.find((item) => item.id === voucherId);
+
+  if (!voucher) {
+    return undefined;
+  }
+
+  const canceledVoucher: Voucher = {
+    ...voucher,
+    status: 'Canceled',
+  };
+
+  voucherRecords = voucherRecords.map((item) =>
+    item.id === voucherId ? canceledVoucher : item,
+  );
+
+  return canceledVoucher;
 };
 
 export const voucherService = {
   getVouchers,
   getPendingVouchers,
+  getVouchersByStatus,
+  getShopVouchers,
   createVoucher,
   createMembershipRenewalVoucher,
   createMembershipFreezeVoucher,
   createShopVoucher,
+  confirmShopVoucher,
+  cancelVoucher,
 };

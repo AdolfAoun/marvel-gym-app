@@ -115,11 +115,13 @@ export type AppNotification = {
   createdAt: string;
 };
 
+export type GymActivityIntensity = 'Low' | 'Medium' | 'High';
+
 export type GymActivityLevel = {
   id: string;
   label: string;
   count: number;
-  intensity: 'Low' | 'Medium' | 'High';
+  intensity: GymActivityIntensity;
 };
 
 export type GymActivityDay = {
@@ -129,7 +131,7 @@ export type GymActivityDay = {
   levels: GymActivityLevel[];
 };
 
-export type VoucherStatus = 'Pending' | 'Paid' | 'Redeemed';
+export type VoucherStatus = 'Pending' | 'Confirmed' | 'Canceled';
 
 export type VoucherType =
   | 'Membership Renewal'
@@ -148,6 +150,7 @@ export type Voucher = {
 
 export type JourneyProfile = {
   biography: string;
+  gymPlan: string;
 };
 
 export type AttendanceDay = {
@@ -161,6 +164,15 @@ export type JourneyStats = {
   visitsThisMonth: number;
   visitsThisYear: number;
   consecutiveStreak: number;
+  estimatedCaloriesBurned: number;
+};
+
+export type WorkoutSession = {
+  id: string;
+  startedAt: string;
+  endedAt: string;
+  durationSeconds: number;
+  estimatedCaloriesBurned: number;
 };
 
 export type Achievement = {
@@ -173,6 +185,8 @@ export type Achievement = {
 export type MachineGuide = {
   id: string;
   name: string;
+  muscleGroup: 'Chest' | 'Back' | 'Shoulders' | 'Arms' | 'Legs' | 'Core';
+  target: string;
   description: string;
   imageLabel: string;
   instructions: string[];

@@ -1,33 +1,91 @@
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+
+const signs = ['•', 'X', '/', '÷'];
+const signDelay = 210;
+const jumpDuration = 340;
+const cycleDuration = signs.length * signDelay + jumpDuration;
+const splashDuration = cycleDuration * 2;
 
 export default function IndexRoute() {
   const router = useRouter();
+  const jumps = useRef(signs.map(() => new Animated.Value(0))).current;
 
   useEffect(() => {
+    const animations = signs.flatMap((_, cycleIndex) =>
+      signs.map((__, signIndex) =>
+        Animated.sequence([
+          Animated.delay(cycleIndex * cycleDuration + signIndex * signDelay),
+          Animated.timing(jumps[signIndex], {
+            toValue: 1,
+            duration: jumpDuration / 2,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(jumps[signIndex], {
+            toValue: 0,
+            duration: jumpDuration / 2,
+            easing: Easing.in(Easing.quad),
+            useNativeDriver: true,
+          }),
+        ]),
+      ),
+    );
+
+    Animated.parallel(animations).start();
+
     const timeout = setTimeout(() => {
       router.replace('/welcome');
-    }, 1000);
+    }, splashDuration + 120);
 
     return () => clearTimeout(timeout);
-  }, [router]);
+  }, [jumps, router]);
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <View pointerEvents="none" style={styles.deepRedLayer} />
-      <View pointerEvents="none" style={styles.energyGlowTop} />
-      <View pointerEvents="none" style={styles.energyGlowBottom} />
-      <View pointerEvents="none" style={styles.slashOne} />
-      <View pointerEvents="none" style={styles.slashTwo} />
-      <View style={styles.logoCrop}>
-        <Image
-          source={require('@/assets/images/marvel-logo-transparent.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
+      <View pointerEvents="none" style={styles.redGlowOne} />
+      <View pointerEvents="none" style={styles.redGlowTwo} />
+      <View pointerEvents="none" style={styles.darkBladeOne} />
+      <View pointerEvents="none" style={styles.darkBladeTwo} />
+
+      <View style={styles.logoBlock}>
+        <View style={styles.signRow}>
+          {signs.map((sign, index) => (
+            <Animated.Text
+              key={sign}
+              style={[
+                styles.signText,
+                {
+                  opacity: jumps[index].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.72, 1],
+                  }),
+                  transform: [
+                    {
+                      translateY: jumps[index].interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, -14],
+                      }),
+                    },
+                    {
+                      scale: jumps[index].interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 1.08],
+                      }),
+                    },
+                  ],
+                },
+              ]}>
+              {sign}
+            </Animated.Text>
+          ))}
+        </View>
+
+        <Text style={styles.marvelText}>MARVEL</Text>
+        <Text style={styles.brandSubtext}>fitness and health</Text>
       </View>
     </View>
   );
@@ -39,65 +97,89 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    backgroundColor: '#6F0715',
+    backgroundColor: '#070708',
   },
-  deepRedLayer: {
+  redGlowOne: {
     position: 'absolute',
-    top: -120,
-    left: -120,
+    top: -110,
     right: -120,
-    bottom: -120,
-    backgroundColor: '#B11226',
-  },
-  energyGlowTop: {
-    position: 'absolute',
-    top: -140,
-    left: -60,
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    backgroundColor: '#F43F5E',
-    opacity: 0.42,
-  },
-  energyGlowBottom: {
-    position: 'absolute',
-    right: -120,
-    bottom: -110,
     width: 340,
     height: 340,
     borderRadius: 170,
-    backgroundColor: '#3B040B',
-    opacity: 0.58,
+    backgroundColor: '#B11226',
+    opacity: 0.62,
   },
-  slashOne: {
+  redGlowTwo: {
     position: 'absolute',
-    top: 94,
-    right: -82,
-    width: 190,
-    height: 520,
-    borderRadius: 44,
+    left: -150,
+    bottom: -130,
+    width: 380,
+    height: 380,
+    borderRadius: 190,
+    backgroundColor: '#7F0A19',
+    opacity: 0.72,
+  },
+  darkBladeOne: {
+    position: 'absolute',
+    top: 40,
+    right: -72,
+    width: 118,
+    height: 540,
+    borderRadius: 34,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     transform: [{ rotate: '24deg' }],
   },
-  slashTwo: {
+  darkBladeTwo: {
     position: 'absolute',
-    left: -104,
-    bottom: 60,
-    width: 150,
-    height: 420,
-    borderRadius: 38,
-    backgroundColor: 'rgba(75, 4, 13, 0.2)',
+    left: -90,
+    bottom: 40,
+    width: 94,
+    height: 440,
+    borderRadius: 32,
+    backgroundColor: 'rgba(177, 18, 38, 0.24)',
     transform: [{ rotate: '24deg' }],
   },
-  logoCrop: {
-    width: 220,
-    height: 136,
+  logoBlock: {
     alignItems: 'center',
-    overflow: 'hidden',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 28,
+    backgroundColor: 'rgba(10, 10, 12, 0.38)',
+    paddingHorizontal: 34,
+    paddingVertical: 28,
+    shadowColor: '#B11226',
+    shadowOffset: { width: 0, height: 22 },
+    shadowOpacity: 0.28,
+    shadowRadius: 30,
+    elevation: 10,
   },
-  logo: {
-    width: 220,
-    height: 220,
-    tintColor: '#FFFFFF',
+  signRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    minHeight: 34,
+    marginBottom: 7,
+  },
+  signText: {
+    color: '#FFFFFF',
+    fontSize: 27,
+    fontWeight: '900',
+    lineHeight: 32,
+  },
+  marvelText: {
+    color: '#FFFFFF',
+    fontSize: 48,
+    fontWeight: '900',
+    letterSpacing: 8,
+    lineHeight: 56,
+  },
+  brandSubtext: {
+    color: '#F7D6DC',
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: 4,
+    marginTop: 4,
   },
 });

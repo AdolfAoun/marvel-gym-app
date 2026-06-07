@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   activityService,
+  journeyService,
   memberService,
   membershipService,
   notificationService,
@@ -22,12 +23,12 @@ import {
 import type {
   AppNotification,
   GymActivityDay,
-  GymActivityLevel,
   Member,
   Membership,
   MembershipPlan,
   MembershipStatus,
   Voucher,
+  VoucherStatus,
 } from '@/types';
 
 const accentColor = '#B11226';
@@ -36,9 +37,10 @@ const backgroundColor = '#FFF8F7';
 const surfaceColor = '#FFFFFF';
 const textColor = '#181A20';
 const mutedColor = '#667085';
-const freezeOptions = [1, 2, 3, 4];
-const renewOptions = [1, 3, 6, 12];
+const voucherStatuses: VoucherStatus[] = ['Pending', 'Confirmed', 'Canceled'];
 const weeklyFreezePrice = 10;
+const maxRenewMonths = 12;
+const minRenewMonths = 1;
 
 type MembershipModal = 'freeze' | 'renew';
 type PaymentMode = 'Pay at Counter' | 'Pay with Card';
@@ -56,6 +58,19 @@ function calculateDaysRemaining(endDate?: string) {
   }
 
   return Math.max(0, Math.ceil((endTime - now) / 86400000));
+}
+
+function calculateMembershipDuration(membership?: Membership, plan?: MembershipPlan) {
+  if (membership?.startDate && membership.endDate) {
+    const startTime = new Date(membership.startDate).getTime();
+    const endTime = new Date(membership.endDate).getTime();
+
+    if (!Number.isNaN(startTime) && !Number.isNaN(endTime)) {
+      return Math.max(1, Math.ceil((endTime - startTime) / 86400000));
+    }
+  }
+
+  return Math.max(1, plan?.durationInDays ?? 30);
 }
 
 function getCountdownColor(daysRemaining: number, status?: MembershipStatus) {
@@ -86,16 +101,32 @@ function getStatusTone(status?: MembershipStatus) {
   return '#EF4444';
 }
 
-function getActivityColor(intensity: GymActivityLevel['intensity']) {
-  if (intensity === 'High') {
+function getActivityColor(count: number) {
+  if (count >= 95) {
     return accentColor;
   }
 
-  if (intensity === 'Medium') {
+  if (count >= 70) {
+    return '#DC2626';
+  }
+
+  if (count >= 40) {
     return '#F59E0B';
   }
 
   return '#22C55E';
+}
+
+function getVoucherStatusColor(status: VoucherStatus) {
+  if (status === 'Confirmed') {
+    return '#22C55E';
+  }
+
+  if (status === 'Canceled') {
+    return '#8B95A5';
+  }
+
+  return '#F59E0B';
 }
 
 function formatDate(value?: string) {
@@ -117,16 +148,17 @@ function formatVoucherDate(value: string) {
   }).format(new Date(value));
 }
 
-function getVoucherStatusColor(status: Voucher['status']) {
-  if (status === 'Paid') {
-    return '#22C55E';
+function getRenewalAmount(months: number, plans: MembershipPlan[]) {
+  const exactPlan = plans.find((plan) => plan.durationInMonths === months);
+
+  if (exactPlan) {
+    return exactPlan.price;
   }
 
-  if (status === 'Redeemed') {
-    return '#8B95A5';
-  }
+  const monthlyPlan = plans.find((plan) => plan.durationInMonths === 1);
+  const monthlyRate = monthlyPlan?.price ?? 49;
 
-  return '#F59E0B';
+  return monthlyRate * months;
 }
 
 export default function HomeScreen() {
@@ -137,10 +169,15 @@ export default function HomeScreen() {
   const [notification, setNotification] = useState<AppNotification>();
   const [activitySchedule, setActivitySchedule] = useState<GymActivityDay[]>([]);
   const [selectedActivityDayId, setSelectedActivityDayId] = useState('');
-  const [pendingVouchers, setPendingVouchers] = useState<Voucher[]>([]);
+  const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [selectedVoucherStatus, setSelectedVoucherStatus] =
+    useState<VoucherStatus>('Pending');
   const [membershipModal, setMembershipModal] = useState<MembershipModal>();
   const [selectedFreezeWeeks, setSelectedFreezeWeeks] = useState(1);
   const [selectedRenewMonths, setSelectedRenewMonths] = useState(1);
+  const [qrCodeValue, setQrCodeValue] = useState('');
+  const [isQrModalVisible, setIsQrModalVisible] = useState(false);
+  const [isVisitPromptVisible, setIsVisitPromptVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingVoucher, setIsCreatingVoucher] = useState(false);
   const [feedback, setFeedback] = useState('Ready when you are.');
@@ -155,7 +192,7 @@ export default function HomeScreen() {
         membershipPlans,
         notifications,
         activityDays,
-        vouchers,
+        currentVouchers,
       ] = await Promise.all([
         memberService.getCurrentMember(),
         membershipService.getCurrentMembership(),
@@ -163,7 +200,7 @@ export default function HomeScreen() {
         membershipService.getMembershipPlans(),
         notificationService.getNotifications(),
         activityService.getGymActivitySchedule(),
-        voucherService.getPendingVouchers(),
+        voucherService.getVouchers(),
       ]);
 
       setMember(currentMember);
@@ -173,7 +210,7 @@ export default function HomeScreen() {
       setNotification(notifications.find((item) => !item.isRead) ?? notifications[0]);
       setActivitySchedule(activityDays);
       setSelectedActivityDayId(activityDays[0]?.id ?? '');
-      setPendingVouchers(vouchers);
+      setVouchers(currentVouchers);
       setIsLoading(false);
     };
 
@@ -201,6 +238,15 @@ export default function HomeScreen() {
   const countdownColor = getCountdownColor(daysRemaining, status);
   const statusTone = getStatusTone(status);
   const plan = plans.find((item) => item.id === membership?.planId);
+  const membershipDurationDays = calculateMembershipDuration(membership, plan);
+  const membershipProgress = Math.min(
+    1,
+    Math.max(0, daysRemaining / membershipDurationDays),
+  );
+  const progressSegmentCount = 36;
+  const activeProgressSegments = Math.round(
+    progressSegmentCount * membershipProgress,
+  );
   const isFrozen = status === 'Frozen';
   const canShowQr = status === 'Active';
   const expiryDate = formatDate(membership?.endDate);
@@ -210,24 +256,19 @@ export default function HomeScreen() {
   const selectedActivityDay =
     activitySchedule.find((item) => item.id === selectedActivityDayId) ??
     activitySchedule[0];
-  const maxActivityCount = Math.max(
-    ...(selectedActivityDay?.levels.map((item) => item.count) ?? [1]),
-    1,
-  );
-  const selectedRenewPlan =
-    plans.find((item) => item.durationInMonths === selectedRenewMonths) ??
-    plans[0];
-  const selectedRenewAmount =
-    selectedRenewPlan?.price ?? selectedRenewMonths * 49;
+  const selectedRenewAmount = getRenewalAmount(selectedRenewMonths, plans);
   const selectedFreezeAmount = selectedFreezeWeeks * weeklyFreezePrice;
+  const visibleVouchers = vouchers.filter(
+    (voucher) => voucher.status === selectedVoucherStatus,
+  );
 
-  const refreshPendingVouchers = async () => {
-    const vouchers = await voucherService.getPendingVouchers();
+  const refreshVouchers = async () => {
+    const currentVouchers = await voucherService.getVouchers();
 
-    setPendingVouchers(vouchers);
+    setVouchers(currentVouchers);
   };
 
-  const closeModal = () => {
+  const closeMembershipModal = () => {
     Animated.timing(modalProgress, {
       toValue: 0,
       duration: 160,
@@ -243,9 +284,25 @@ export default function HomeScreen() {
 
     const qrCode = await membershipService.showQRCode();
 
-    setFeedback(
-      qrCode ? `QR ready: ${qrCode}` : 'QR is available only for active memberships.',
-    );
+    if (!qrCode) {
+      setFeedback('QR is available only for active memberships.');
+      return;
+    }
+
+    setQrCodeValue(qrCode);
+    setIsQrModalVisible(true);
+    setFeedback('QR ready for entry scan.');
+  };
+
+  const handleCloseQr = () => {
+    setIsQrModalVisible(false);
+    setIsVisitPromptVisible(true);
+  };
+
+  const handleAddTodayVisit = async () => {
+    await journeyService.markAttendanceDay(new Date().toISOString(), true);
+    setIsVisitPromptVisible(false);
+    setFeedback('Today was added as a gym visit.');
   };
 
   const handleCreateFreezeVoucher = async (paymentMode: PaymentMode) => {
@@ -258,20 +315,11 @@ export default function HomeScreen() {
         paymentMode,
       );
 
-      if (paymentMode === 'Pay with Card') {
-        const updatedMembership = await membershipService.freezeMembership();
-
-        setMembership(updatedMembership);
-        setStatus(updatedMembership.status);
-      }
-
-      await refreshPendingVouchers();
+      await refreshVouchers();
       setFeedback(
-        paymentMode === 'Pay at Counter'
-          ? `Pending voucher created: ${voucher.id}.`
-          : `Card payment placeholder completed: ${voucher.id}.`,
+        `${voucher.id} created. Freeze confirmation remains controlled by Gmind/admin.`,
       );
-      closeModal();
+      closeMembershipModal();
     } finally {
       setIsCreatingVoucher(false);
     }
@@ -295,22 +343,11 @@ export default function HomeScreen() {
         paymentMode,
       );
 
-      if (paymentMode === 'Pay with Card' && selectedRenewPlan) {
-        const updatedMembership = await membershipService.activateMembership(
-          selectedRenewPlan.id,
-        );
-
-        setMembership(updatedMembership);
-        setStatus(updatedMembership.status);
-      }
-
-      await refreshPendingVouchers();
+      await refreshVouchers();
       setFeedback(
-        paymentMode === 'Pay at Counter'
-          ? `Pending renewal voucher created: ${voucher.id}.`
-          : `Card payment placeholder completed: ${voucher.id}.`,
+        `${voucher.id} created. Membership activation waits for Gmind/admin confirmation.`,
       );
-      closeModal();
+      closeMembershipModal();
     } finally {
       setIsCreatingVoucher(false);
     }
@@ -345,9 +382,7 @@ export default function HomeScreen() {
             <View style={styles.heroTextBlock}>
               <Text style={styles.kicker}>Welcome back</Text>
               <Text style={styles.title}>{member?.firstName ?? 'Member'}</Text>
-              <Text style={styles.subtitle}>
-                Premium access for today's training.
-              </Text>
+              <Text style={styles.subtitle}>Scan, train, and stay consistent.</Text>
             </View>
             <View style={styles.avatarBadge}>
               <Text style={styles.avatarText}>{memberInitials}</Text>
@@ -368,8 +403,8 @@ export default function HomeScreen() {
         <View style={styles.progressCard}>
           <View style={styles.cardHeaderRow}>
             <View>
-              <Text style={styles.cardLabel}>Membership progress</Text>
-              <Text style={styles.cardTitle}>Access window</Text>
+              <Text style={styles.cardLabel}>Membership</Text>
+              <Text style={styles.cardTitle}>Days Remaining</Text>
             </View>
             <View style={styles.expiryPill}>
               <Text style={styles.expiryPillLabel}>Expires</Text>
@@ -382,52 +417,39 @@ export default function HomeScreen() {
               style={[
                 styles.progressRing,
                 {
-                  borderColor: countdownColor,
                   shadowColor: countdownColor,
                 },
               ]}>
+              {Array.from({ length: progressSegmentCount }).map((_, index) => {
+                const isActive = index < activeProgressSegments;
+                const angle =
+                  (index / progressSegmentCount) * Math.PI * 2 - Math.PI / 2;
+                const segmentRadius = 96;
+
+                return (
+                  <View
+                    key={index}
+                    style={[
+                      styles.progressSegment,
+                      {
+                        backgroundColor: isActive
+                          ? countdownColor
+                          : 'rgba(177, 18, 38, 0.12)',
+                        left: 107 + Math.cos(angle) * segmentRadius - 3,
+                        opacity: isActive ? 1 : 0.34,
+                        top: 107 + Math.sin(angle) * segmentRadius - 9,
+                        transform: [
+                          { rotate: `${(angle * 180) / Math.PI + 90}deg` },
+                        ],
+                      },
+                    ]}
+                  />
+                );
+              })}
               <View style={styles.progressInner}>
                 <Text style={styles.daysNumber}>{daysRemaining}</Text>
                 <Text style={styles.daysLabel}>Days Remaining</Text>
               </View>
-            </View>
-          </View>
-
-          <View style={styles.statusWidget}>
-            <Text style={styles.statusWidgetLabel}>Membership Status</Text>
-            <View style={styles.statusWidgetRow}>
-              {(['Active', 'Frozen', 'Expired', 'Pending Approval'] as MembershipStatus[]).map(
-                (item) => {
-                  const isSelected = status === item;
-                  const tone = getStatusTone(item);
-
-                  return (
-                    <View
-                      key={item}
-                      style={[
-                        styles.statusChip,
-                        isSelected && {
-                          borderColor: tone,
-                          backgroundColor: `${tone}18`,
-                        },
-                      ]}>
-                      <View
-                        style={[
-                          styles.statusChipDot,
-                          { backgroundColor: isSelected ? tone : '#D0D5DD' },
-                        ]}
-                      />
-                      <Text
-                        style={[
-                          styles.statusChipText,
-                          isSelected && { color: textColor },
-                        ]}>
-                        {item}
-                      </Text>
-                    </View>
-                  );
-                },
-              )}
             </View>
           </View>
         </View>
@@ -436,9 +458,8 @@ export default function HomeScreen() {
           <View style={styles.sectionHeaderRow}>
             <View>
               <Text style={styles.cardLabel}>Quick actions</Text>
-              <Text style={styles.sectionTitle}>Member tools</Text>
+              <Text style={styles.sectionTitle}>Membership tools</Text>
             </View>
-            <Text style={styles.sectionHint}>Phase 1</Text>
           </View>
 
           <View style={styles.actionGrid}>
@@ -451,16 +472,14 @@ export default function HomeScreen() {
                 pressed && styles.buttonPressed,
               ]}>
               <Text style={styles.actionIcon}>QR</Text>
-              <Text style={styles.actionTitle}>Show QR</Text>
-              <Text style={styles.actionSubtitle}>
-                {canShowQr ? 'Counter access ready' : 'Requires active status'}
-              </Text>
+              <Text style={styles.actionTitle}>Open QR</Text>
             </Pressable>
 
             <Pressable
               onPress={() => {
                 if (isFrozen) {
-                  handleUnfreeze();
+                  setSelectedFreezeWeeks(1);
+                  setMembershipModal('freeze');
                   return;
                 }
 
@@ -471,13 +490,8 @@ export default function HomeScreen() {
                 styles.actionCard,
                 pressed && styles.buttonPressed,
               ]}>
-              <Text style={styles.actionIcon}>{isFrozen ? 'ON' : 'FR'}</Text>
-              <Text style={styles.actionTitle}>
-                {isFrozen ? 'Unfreeze' : 'Freeze'}
-              </Text>
-              <Text style={styles.actionSubtitle}>
-                {isFrozen ? 'Resume access flow' : '$10 per week'}
-              </Text>
+              <Text style={styles.actionIcon}>FR</Text>
+              <Text style={styles.actionTitle}>Freeze</Text>
             </Pressable>
 
             <Pressable
@@ -487,21 +501,30 @@ export default function HomeScreen() {
               }}
               style={({ pressed }) => [
                 styles.actionCard,
-                styles.actionCardPrimary,
                 pressed && styles.buttonPressed,
               ]}>
-              <Text style={styles.actionIconPrimary}>RN</Text>
-              <Text style={styles.actionTitlePrimary}>Renew</Text>
-              <Text style={styles.actionSubtitlePrimary}>Extend membership</Text>
+              <Text style={styles.actionIcon}>RN</Text>
+              <Text style={styles.actionTitle}>Renew/Extend</Text>
             </Pressable>
           </View>
+
+          {isFrozen && (
+            <Pressable
+              onPress={handleUnfreeze}
+              style={({ pressed }) => [
+                styles.unfreezeButton,
+                pressed && styles.buttonPressed,
+              ]}>
+              <Text style={styles.unfreezeButtonText}>Unfreeze Membership</Text>
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.activityCard}>
           <View style={styles.sectionHeaderRow}>
             <View>
               <Text style={styles.cardLabel}>Gym Activity</Text>
-              <Text style={styles.sectionTitle}>Plan your visit</Text>
+              <Text style={styles.sectionTitle}>Hourly intensity</Text>
             </View>
             <Text style={styles.sectionHint}>
               {selectedActivityDay?.scheduleLabel ?? 'Today'}
@@ -535,29 +558,27 @@ export default function HomeScreen() {
             })}
           </ScrollView>
 
-          <View style={styles.activityChart}>
-            {selectedActivityDay?.levels.map((item) => {
-              const barHeight = Math.max(34, (item.count / maxActivityCount) * 160);
-
-              return (
-                <View key={item.id} style={styles.activityColumn}>
-                  <Text style={styles.activityCount}>{item.count}</Text>
-                  <View style={styles.activityTrack}>
-                    <View
-                      style={[
-                        styles.activityFill,
-                        {
-                          height: barHeight,
-                          backgroundColor: getActivityColor(item.intensity),
-                        },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.activityLabel}>{item.label}</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.activityChart}>
+            {selectedActivityDay?.levels.map((item) => (
+              <View key={item.id} style={styles.activityColumn}>
+                <View style={styles.activityTrack}>
+                  <View
+                    style={[
+                      styles.activityFill,
+                      {
+                        height: `${Math.max(18, item.count)}%`,
+                        backgroundColor: getActivityColor(item.count),
+                      },
+                    ]}
+                  />
                 </View>
-              );
-            })}
-          </View>
+                <Text style={styles.activityLabel}>{item.label}</Text>
+              </View>
+            ))}
+          </ScrollView>
 
           <View style={styles.legendRow}>
             <View style={styles.legendItem}>
@@ -570,27 +591,76 @@ export default function HomeScreen() {
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: accentColor }]} />
-              <Text style={styles.legendText}>High</Text>
+              <Text style={styles.legendText}>Full / Peak</Text>
             </View>
           </View>
         </View>
 
-        {pendingVouchers.length > 0 && (
-          <View style={styles.voucherSection}>
-            <View style={styles.sectionHeaderRow}>
-              <View>
-                <Text style={styles.cardLabel}>Pending vouchers</Text>
-                <Text style={styles.sectionTitle}>Pay at counter</Text>
-              </View>
-              <Text style={styles.sectionHint}>{pendingVouchers.length} open</Text>
+        <View style={styles.voucherSection}>
+          <View style={styles.sectionHeaderRow}>
+            <View>
+              <Text style={styles.cardLabel}>Vouchers</Text>
+              <Text style={styles.sectionTitle}>Membership and shop</Text>
             </View>
+            <Text style={styles.sectionHint}>{vouchers.length} total</Text>
+          </View>
 
-            {pendingVouchers.slice(0, 2).map((voucher) => (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.voucherTabs}>
+            {voucherStatuses.map((voucherStatus) => {
+              const isSelected = selectedVoucherStatus === voucherStatus;
+              const count = vouchers.filter(
+                (voucher) => voucher.status === voucherStatus,
+              ).length;
+
+              return (
+                <Pressable
+                  key={voucherStatus}
+                  onPress={() => setSelectedVoucherStatus(voucherStatus)}
+                  style={[
+                    styles.voucherTab,
+                    isSelected && styles.voucherTabSelected,
+                  ]}>
+                  <View
+                    style={[
+                      styles.voucherTabDot,
+                      { backgroundColor: getVoucherStatusColor(voucherStatus) },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.voucherTabText,
+                      isSelected && styles.voucherTabTextSelected,
+                    ]}>
+                    {voucherStatus}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.voucherTabCount,
+                      isSelected && styles.voucherTabCountSelected,
+                    ]}>
+                    {count}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {visibleVouchers.length === 0 ? (
+            <Text style={styles.emptyVoucherText}>
+              No {selectedVoucherStatus.toLowerCase()} vouchers.
+            </Text>
+          ) : (
+            visibleVouchers.map((voucher) => (
               <View key={voucher.id} style={styles.voucherCard}>
                 <View style={styles.voucherTear} />
                 <View style={styles.voucherContent}>
                   <Text style={styles.voucherType}>{voucher.type}</Text>
-                  <Text style={styles.voucherDescription}>{voucher.description}</Text>
+                  <Text style={styles.voucherDescription}>
+                    {voucher.description}
+                  </Text>
                   <Text style={styles.voucherMeta}>
                     {formatVoucherDate(voucher.date)} - {voucher.id}
                   </Text>
@@ -608,9 +678,9 @@ export default function HomeScreen() {
                   </Text>
                 </View>
               </View>
-            ))}
-          </View>
-        )}
+            ))
+          )}
+        </View>
 
         <View style={styles.infoGrid}>
           <View style={styles.infoCard}>
@@ -632,7 +702,7 @@ export default function HomeScreen() {
 
       <Modal transparent visible={Boolean(membershipModal)} animationType="none">
         <Animated.View style={[styles.modalOverlay, { opacity: modalProgress }]}>
-          <Pressable style={styles.modalBackdrop} onPress={closeModal} />
+          <Pressable style={styles.modalBackdrop} onPress={closeMembershipModal} />
           <Animated.View
             style={[
               styles.modalCard,
@@ -640,46 +710,51 @@ export default function HomeScreen() {
                 transform: [{ scale: modalScale }],
               },
             ]}>
-            <View style={styles.modalHandle} />
+            <Pressable
+              onPress={closeMembershipModal}
+              style={styles.modalHandle}
+              accessibilityLabel="Close sheet"
+              accessibilityRole="button"
+            />
 
             {membershipModal === 'freeze' ? (
               <>
-                <Text style={styles.modalKicker}>Freeze Membership</Text>
-                <Text style={styles.modalTitle}>Pause access with a voucher.</Text>
+                <Text style={styles.modalKicker}>
+                  {isFrozen ? 'Extend Freeze' : 'Freeze Membership'}
+                </Text>
+                <Text style={styles.modalTitle}>
+                  {isFrozen ? 'Extend the current freeze.' : 'Request a membership freeze.'}
+                </Text>
                 <Text style={styles.modalBody}>
-                  Select duration. Pay at counter creates a pending voucher;
-                  card payment is a Phase 1 placeholder.
+                  Freeze pricing is $10/week. Requests are stored as pending
+                  vouchers and finalized through Gmind/admin.
                 </Text>
 
-                <View style={styles.optionGrid}>
-                  {freezeOptions.map((weeks) => {
-                    const isSelected = selectedFreezeWeeks === weeks;
-
-                    return (
-                      <Pressable
-                        key={weeks}
-                        onPress={() => setSelectedFreezeWeeks(weeks)}
-                        style={[
-                          styles.optionCard,
-                          isSelected && styles.optionCardSelected,
-                        ]}>
-                        <Text
-                          style={[
-                            styles.optionTitle,
-                            isSelected && styles.optionTitleSelected,
-                          ]}>
-                          {weeks} week{weeks > 1 ? 's' : ''}
-                        </Text>
-                        <Text style={styles.optionPrice}>
-                          ${weeks * weeklyFreezePrice}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
+                <View style={styles.stepperRow}>
+                  <Pressable
+                    onPress={() =>
+                      setSelectedFreezeWeeks((value) => Math.max(1, value - 1))
+                    }
+                    style={styles.stepperButton}>
+                    <Text style={styles.stepperButtonText}>-</Text>
+                  </Pressable>
+                  <View style={styles.stepperValueCard}>
+                    <Text style={styles.stepperValue}>{selectedFreezeWeeks}</Text>
+                    <Text style={styles.stepperLabel}>
+                      week{selectedFreezeWeeks > 1 ? 's' : ''}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() =>
+                      setSelectedFreezeWeeks((value) => Math.min(12, value + 1))
+                    }
+                    style={styles.stepperButton}>
+                    <Text style={styles.stepperButtonText}>+</Text>
+                  </Pressable>
                 </View>
 
                 <Text style={styles.modalTotal}>
-                  Total: ${selectedFreezeAmount.toFixed(2)}
+                  $10/week - Total: ${selectedFreezeAmount.toFixed(2)}
                 </Text>
 
                 <View style={styles.modalActionRow}>
@@ -705,40 +780,47 @@ export default function HomeScreen() {
               </>
             ) : (
               <>
-                <Text style={styles.modalKicker}>Renew Membership</Text>
-                <Text style={styles.modalTitle}>Choose your next access pass.</Text>
+                <Text style={styles.modalKicker}>Renew / Extend Membership</Text>
+                <Text style={styles.modalTitle}>Choose any duration.</Text>
                 <Text style={styles.modalBody}>
-                  Pay at counter creates a pending renewal voucher. Card payment
-                  remains a frontend placeholder.
+                  Select 1 to 12 months. Pricing is mocked from service-backed
+                  membership plans and will later come from Gmind.
                 </Text>
 
-                <View style={styles.optionGrid}>
-                  {renewOptions.map((months) => {
-                    const matchingPlan = plans.find(
-                      (item) => item.durationInMonths === months,
-                    );
-                    const amount = matchingPlan?.price ?? months * 49;
-                    const isSelected = selectedRenewMonths === months;
+                <View style={styles.stepperRow}>
+                  <Pressable
+                    onPress={() =>
+                      setSelectedRenewMonths((value) =>
+                        Math.max(minRenewMonths, value - 1),
+                      )
+                    }
+                    style={styles.stepperButton}>
+                    <Text style={styles.stepperButtonText}>-</Text>
+                  </Pressable>
+                  <View style={styles.stepperValueCard}>
+                    <Text style={styles.stepperValue}>{selectedRenewMonths}</Text>
+                    <Text style={styles.stepperLabel}>
+                      month{selectedRenewMonths > 1 ? 's' : ''}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() =>
+                      setSelectedRenewMonths((value) =>
+                        Math.min(maxRenewMonths, value + 1),
+                      )
+                    }
+                    style={styles.stepperButton}>
+                    <Text style={styles.stepperButtonText}>+</Text>
+                  </Pressable>
+                </View>
 
-                    return (
-                      <Pressable
-                        key={months}
-                        onPress={() => setSelectedRenewMonths(months)}
-                        style={[
-                          styles.optionCard,
-                          isSelected && styles.optionCardSelected,
-                        ]}>
-                        <Text
-                          style={[
-                            styles.optionTitle,
-                            isSelected && styles.optionTitleSelected,
-                          ]}>
-                          {months} Month{months > 1 ? 's' : ''}
-                        </Text>
-                        <Text style={styles.optionPrice}>${amount}</Text>
-                      </Pressable>
-                    );
-                  })}
+                <View style={styles.durationTrack}>
+                  <View
+                    style={[
+                      styles.durationFill,
+                      { width: `${(selectedRenewMonths / maxRenewMonths) * 100}%` },
+                    ]}
+                  />
                 </View>
 
                 <Text style={styles.modalTotal}>
@@ -769,6 +851,71 @@ export default function HomeScreen() {
             )}
           </Animated.View>
         </Animated.View>
+      </Modal>
+
+      <Modal transparent visible={isQrModalVisible} animationType="fade">
+        <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.centerModalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={handleCloseQr} />
+          <View style={styles.qrCard}>
+            <Pressable
+              onPress={handleCloseQr}
+              style={({ pressed }) => [
+                styles.qrCloseButton,
+                pressed && styles.buttonPressed,
+              ]}
+              accessibilityLabel="Close QR">
+              <Text style={styles.qrCloseText}>X</Text>
+            </Pressable>
+            <Text style={styles.modalKicker}>Scan for entry</Text>
+            <Text style={styles.modalTitle}>Marvel Gym QR</Text>
+            <View style={styles.qrBox}>
+              <Text style={styles.qrText}>QR</Text>
+              <Text style={styles.qrCodeValue}>{qrCodeValue}</Text>
+            </View>
+            <Pressable
+              onPress={handleCloseQr}
+              style={({ pressed }) => [
+                styles.qrPrimaryButton,
+                pressed && styles.buttonPressed,
+              ]}>
+              <Text style={styles.modalPrimaryText}>Close after scan</Text>
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      <Modal transparent visible={isVisitPromptVisible} animationType="fade">
+        <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.centerModalOverlay}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setIsVisitPromptVisible(false)}
+          />
+          <View style={styles.qrCard}>
+            <Text style={styles.modalKicker}>Journey</Text>
+            <Text style={styles.modalTitle}>Add today as a gym visit?</Text>
+            <Text style={styles.modalBody}>
+              This updates your Journey calendar for consistency tracking.
+            </Text>
+            <View style={styles.modalActionRow}>
+              <Pressable
+                onPress={() => setIsVisitPromptVisible(false)}
+                style={({ pressed }) => [
+                  styles.modalSecondaryButton,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.modalSecondaryText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleAddTodayVisit}
+                style={({ pressed }) => [
+                  styles.modalPrimaryButton,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.modalPrimaryText}>Add</Text>
+              </Pressable>
+            </View>
+          </View>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -965,13 +1112,21 @@ const styles = StyleSheet.create({
     height: 214,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 12,
+    position: 'relative',
+    overflow: 'visible',
+    borderWidth: 0,
     borderRadius: 107,
     backgroundColor: '#FFF3F5',
     shadowOffset: { width: 0, height: 20 },
     shadowOpacity: 0.24,
     shadowRadius: 26,
     elevation: 8,
+  },
+  progressSegment: {
+    position: 'absolute',
+    width: 6,
+    height: 18,
+    borderRadius: 999,
   },
   progressInner: {
     width: 164,
@@ -994,47 +1149,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0,
     textTransform: 'uppercase',
-  },
-  statusWidget: {
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.1)',
-    borderRadius: 22,
-    backgroundColor: '#FFF8F7',
-    padding: 14,
-    marginTop: 18,
-  },
-  statusWidgetLabel: {
-    color: '#8E6670',
-    fontSize: 11,
-    fontWeight: '900',
-    marginBottom: 10,
-    textTransform: 'uppercase',
-  },
-  statusWidgetRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  statusChip: {
-    minHeight: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.1)',
-    borderRadius: 999,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 11,
-  },
-  statusChipDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  statusChipText: {
-    color: '#8E6670',
-    fontSize: 11,
-    fontWeight: '900',
   },
   quickActionsCard: {
     borderWidth: 1,
@@ -1073,7 +1187,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   actionCard: {
-    minHeight: 122,
+    minHeight: 112,
     flex: 1,
     justifyContent: 'space-between',
     borderWidth: 1,
@@ -1138,6 +1252,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 15,
   },
+  unfreezeButton: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.24)',
+    borderRadius: 16,
+    backgroundColor: '#F0FDF4',
+    marginTop: 12,
+  },
+  unfreezeButtonText: {
+    color: '#15803D',
+    fontSize: 13,
+    fontWeight: '900',
+  },
   activityCard: {
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.12)',
@@ -1178,27 +1307,20 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   activityChart: {
-    height: 220,
-    flexDirection: 'row',
     alignItems: 'flex-end',
-    justifyContent: 'space-between',
     gap: 8,
+    minHeight: 198,
+    paddingRight: 4,
   },
   activityColumn: {
-    flex: 1,
+    width: 34,
     alignItems: 'center',
     justifyContent: 'flex-end',
     gap: 7,
   },
-  activityCount: {
-    color: mutedColor,
-    fontSize: 11,
-    fontWeight: '900',
-  },
   activityTrack: {
-    width: '100%',
-    maxWidth: 32,
-    height: 160,
+    width: 26,
+    height: 152,
     justifyContent: 'flex-end',
     overflow: 'hidden',
     borderRadius: 999,
@@ -1238,6 +1360,87 @@ const styles = StyleSheet.create({
   },
   voucherSection: {
     marginBottom: 16,
+  },
+  voucherGroup: {
+    marginBottom: 14,
+  },
+  voucherGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  voucherGroupDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  voucherGroupTitle: {
+    color: textColor,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  voucherGroupCount: {
+    overflow: 'hidden',
+    borderRadius: 999,
+    backgroundColor: '#FFF1F3',
+    color: wineColor,
+    fontSize: 11,
+    fontWeight: '900',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  emptyVoucherText: {
+    color: mutedColor,
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  voucherTabs: {
+    gap: 8,
+    paddingBottom: 12,
+  },
+  voucherTab: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.12)',
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+  },
+  voucherTabSelected: {
+    borderColor: accentColor,
+    backgroundColor: accentColor,
+  },
+  voucherTabDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  voucherTabText: {
+    color: wineColor,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  voucherTabTextSelected: {
+    color: '#FFFFFF',
+  },
+  voucherTabCount: {
+    overflow: 'hidden',
+    borderRadius: 999,
+    backgroundColor: '#FFF1F3',
+    color: wineColor,
+    fontSize: 11,
+    fontWeight: '900',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  voucherTabCountSelected: {
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    color: '#FFFFFF',
   },
   voucherCard: {
     minHeight: 104,
@@ -1332,6 +1535,13 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(24, 26, 32, 0.42)',
   },
+  centerModalOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(24, 26, 32, 0.42)',
+    padding: 20,
+  },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -1347,6 +1557,40 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 28,
     elevation: 14,
+  },
+  qrCard: {
+    position: 'relative',
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '92%',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
+    padding: 22,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.22,
+    shadowRadius: 28,
+    elevation: 14,
+  },
+  qrCloseButton: {
+    position: 'absolute',
+    right: 14,
+    top: 14,
+    zIndex: 2,
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 17,
+    backgroundColor: '#FFF1F3',
+  },
+  qrCloseText: {
+    color: wineColor,
+    fontSize: 13,
+    fontWeight: '900',
   },
   modalHandle: {
     width: 48,
@@ -1377,40 +1621,56 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 10,
   },
-  optionGrid: {
+  stepperRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+    alignItems: 'center',
+    gap: 12,
     marginTop: 18,
   },
-  optionCard: {
-    minHeight: 72,
-    flexBasis: '47%',
-    flexGrow: 1,
+  stepperButton: {
+    width: 54,
+    height: 54,
+    alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 18,
-    backgroundColor: '#FFF8F7',
-    padding: 14,
-  },
-  optionCardSelected: {
-    borderColor: accentColor,
     backgroundColor: '#FFF1F3',
   },
-  optionTitle: {
-    color: textColor,
-    fontSize: 14,
+  stepperButtonText: {
+    color: accentColor,
+    fontSize: 24,
     fontWeight: '900',
   },
-  optionTitleSelected: {
-    color: accentColor,
+  stepperValueCard: {
+    flex: 1,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.12)',
+    borderRadius: 20,
+    backgroundColor: '#FFF8F7',
+    paddingVertical: 14,
   },
-  optionPrice: {
+  stepperValue: {
+    color: textColor,
+    fontSize: 30,
+    fontWeight: '900',
+  },
+  stepperLabel: {
     color: mutedColor,
     fontSize: 12,
-    fontWeight: '800',
-    marginTop: 5,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  durationTrack: {
+    height: 8,
+    overflow: 'hidden',
+    borderRadius: 999,
+    backgroundColor: '#F3E2E5',
+    marginTop: 16,
+  },
+  durationFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: accentColor,
   },
   modalTotal: {
     color: wineColor,
@@ -1456,5 +1716,41 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '900',
+  },
+  qrPrimaryButton: {
+    minHeight: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+    backgroundColor: accentColor,
+    shadowColor: accentColor,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.24,
+    shadowRadius: 18,
+    elevation: 5,
+  },
+  qrBox: {
+    minHeight: 220,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.16)',
+    borderRadius: 24,
+    backgroundColor: '#FFF8F7',
+    marginVertical: 18,
+    padding: 18,
+  },
+  qrText: {
+    color: accentColor,
+    fontSize: 52,
+    fontWeight: '900',
+  },
+  qrCodeValue: {
+    color: mutedColor,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 18,
+    marginTop: 10,
+    textAlign: 'center',
   },
 });
