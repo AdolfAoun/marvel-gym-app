@@ -1,7 +1,12 @@
 import { StatusBar } from 'expo-status-bar';
+import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,42 +18,51 @@ import {
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
 import { memberService } from '@/services';
-import type { Member, PaymentMethod } from '@/types';
+import type { SavedPaymentMethod } from '@/services/memberService';
+import type { Member } from '@/types';
 
 const accentColor = premiumColors.red;
-const paymentMethods = ['Visa', 'Mastercard', 'Whish Money'] as const;
-
-type ProfilePaymentMethod = Extract<
-  PaymentMethod,
-  'Visa' | 'Mastercard' | 'Whish Money'
->;
 
 type ProfileForm = {
   email: string;
   location: string;
-  preferredPaymentMethod: ProfilePaymentMethod;
 };
-
-function getProfilePaymentMethod(
-  method?: PaymentMethod,
-): ProfilePaymentMethod {
-  if (
-    method === 'Visa' ||
-    method === 'Mastercard' ||
-    method === 'Whish Money'
-  ) {
-    return method;
-  }
-
-  return 'Visa';
-}
 
 function createProfileForm(member: Member): ProfileForm {
   return {
     email: member.email,
     location: member.location ?? '',
-    preferredPaymentMethod: getProfilePaymentMethod(member.preferredPaymentMethod),
   };
+}
+
+function formatCardNumber(value: string) {
+  return value
+    .replace(/\D/g, '')
+    .slice(0, 19)
+    .replace(/(.{4})/g, '$1 ')
+    .trim();
+}
+
+function formatCardExpiry(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 4);
+  const month = digits.slice(0, 2);
+  const year = digits.slice(2, 4);
+
+  return [month, year].filter(Boolean).join('/');
+}
+
+function detectCardProvider(value: string): 'Visa' | 'Mastercard' | undefined {
+  const digits = value.replace(/\D/g, '');
+
+  if (digits.startsWith('4')) {
+    return 'Visa';
+  }
+
+  if (/^(5[1-5]|2[2-7])/.test(digits)) {
+    return 'Mastercard';
+  }
+
+  return undefined;
 }
 
 function formatProfileDate(value?: string) {
@@ -73,16 +87,28 @@ export default function ProfileScreen() {
   const [member, setMember] = useState<Member>();
   const [initialForm, setInitialForm] = useState<ProfileForm>();
   const [form, setForm] = useState<ProfileForm>();
+  const [savedPayment, setSavedPayment] = useState<SavedPaymentMethod>();
+  const [paymentStep, setPaymentStep] = useState<'choice' | 'card'>();
+  const [cardName, setCardName] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
+  const [paymentError, setPaymentError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [photoTone, setPhotoTone] = useState(0);
+  const [isPhotoSheetVisible, setIsPhotoSheetVisible] = useState(false);
 
   useEffect(() => {
     const loadMember = async () => {
-      const currentMember = await memberService.getCurrentMember();
+      const [currentMember, currentPayment] = await Promise.all([
+        memberService.getCurrentMember(),
+        memberService.getSavedPaymentMethod(),
+      ]);
       const nextForm = createProfileForm(currentMember);
 
       setMember(currentMember);
+      setSavedPayment(currentPayment);
       setInitialForm(nextForm);
       setForm(nextForm);
     };
@@ -97,8 +123,7 @@ export default function ProfileScreen() {
 
     return (
       form.email.trim() !== initialForm.email.trim() ||
-      form.location.trim() !== initialForm.location.trim() ||
-      form.preferredPaymentMethod !== initialForm.preferredPaymentMethod
+      form.location.trim() !== initialForm.location.trim()
     );
   }, [form, initialForm]);
 
@@ -127,7 +152,6 @@ export default function ProfileScreen() {
       const updatedMember = await memberService.updateProfile({
         email: form.email.trim(),
         location: form.location.trim(),
-        preferredPaymentMethod: form.preferredPaymentMethod,
       });
       const nextForm = createProfileForm(updatedMember);
 
@@ -141,7 +165,108 @@ export default function ProfileScreen() {
   };
 
   const handleChangePhoto = () => {
+    setIsPhotoSheetVisible(true);
+  };
+
+  const updateProfilePhoto = async (uri: string) => {
+    const updatedMember = await memberService.updateProfileImage(uri);
+
+    setMember(updatedMember);
+  };
+
+  const handleChooseProfilePhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      setIsPhotoSheetVisible(false);
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.82,
+    });
+
+    if (!result.canceled) {
+      await updateProfilePhoto(result.assets[0].uri);
+    }
+
+    setIsPhotoSheetVisible(false);
+  };
+
+  const handleTakeProfilePhoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (!permission.granted) {
+      setIsPhotoSheetVisible(false);
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.82,
+    });
+
+    if (!result.canceled) {
+      await updateProfilePhoto(result.assets[0].uri);
+    }
+
     setPhotoTone((value) => (value + 1) % 3);
+    setIsPhotoSheetVisible(false);
+  };
+
+  const closePaymentModal = () => {
+    setPaymentStep(undefined);
+    setPaymentError('');
+    setCardName('');
+    setCardNumber('');
+    setCardExpiry('');
+    setCardCvv('');
+  };
+
+  const handleAddWhishMoney = async () => {
+    const payment = await memberService.addWhishMoneyPaymentMethod();
+
+    setSavedPayment(payment);
+    closePaymentModal();
+  };
+
+  const handleAddCard = async () => {
+    const digits = cardNumber.replace(/\D/g, '');
+    const provider = detectCardProvider(cardNumber);
+    const expiryDigits = cardExpiry.replace(/\D/g, '');
+
+    if (!cardName.trim()) {
+      setPaymentError('Enter the cardholder name.');
+      return;
+    }
+
+    if (!provider || digits.length < 13) {
+      setPaymentError('Enter a valid Visa or Mastercard number.');
+      return;
+    }
+
+    if (expiryDigits.length !== 4) {
+      setPaymentError('Enter expiry as MM/YY.');
+      return;
+    }
+
+    if (cardCvv.replace(/\D/g, '').length < 3) {
+      setPaymentError('Enter a valid CVV.');
+      return;
+    }
+
+    const payment = await memberService.addCreditCardPaymentMethod({
+      provider,
+      last4: digits.slice(-4),
+    });
+
+    setSavedPayment(payment);
+    closePaymentModal();
   };
 
   if (!member || !form) {
@@ -174,10 +299,18 @@ export default function ProfileScreen() {
               photoTone === 2 && styles.avatarAltTwo,
               pressed && styles.buttonPressed,
             ]}>
-            <Text style={styles.avatarText}>
-              {member.firstName.slice(0, 1)}
-              {member.lastName.slice(0, 1)}
-            </Text>
+            {member.profileImageUri ? (
+              <Image
+                source={{ uri: member.profileImageUri }}
+                style={styles.avatarImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.avatarText}>
+                {member.firstName.slice(0, 1)}
+                {member.lastName.slice(0, 1)}
+              </Text>
+            )}
           </Pressable>
           <Pressable
             onPress={handleChangePhoto}
@@ -259,35 +392,25 @@ export default function ProfileScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Payment method</Text>
-            <View style={styles.paymentGrid}>
-              {paymentMethods.map((method) => {
-                const isSelected = form.preferredPaymentMethod === method;
-
-                return (
-                  <Pressable
-                    key={method}
-                    disabled={!isEditing}
-                    onPress={() =>
-                      updateForm({
-                        preferredPaymentMethod: method,
-                      })
-                    }
-                    style={({ pressed }) => [
-                      styles.paymentOption,
-                      isSelected && styles.paymentOptionSelected,
-                      !isEditing && styles.paymentOptionReadOnly,
-                      pressed && styles.buttonPressed,
-                    ]}>
-                    <Text
-                      style={[
-                        styles.paymentOptionText,
-                        isSelected && styles.paymentOptionTextSelected,
-                      ]}>
-                      {method}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+            <View style={styles.savedPaymentCard}>
+              <View>
+                <Text style={styles.savedPaymentTitle}>
+                  {savedPayment?.displayLabel ?? 'No payment method saved'}
+                </Text>
+                <Text style={styles.savedPaymentBody}>
+                  Full card details are never shown after saving.
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setPaymentStep('choice')}
+                style={({ pressed }) => [
+                  styles.addPaymentButton,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.addPaymentButtonText}>
+                  {savedPayment ? 'Change' : 'Add'}
+                </Text>
+              </Pressable>
             </View>
           </View>
         </View>
@@ -327,6 +450,161 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      <Modal transparent visible={Boolean(paymentStep)} animationType="fade">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={-58}
+          style={styles.modalKeyboardLayer}>
+          <View
+            style={[
+              styles.modalOverlay,
+              paymentStep === 'card' && styles.modalOverlayCentered,
+            ]}>
+            <Pressable style={styles.modalBackdrop} onPress={closePaymentModal} />
+            <View
+              style={[
+                styles.paymentSheet,
+                paymentStep === 'card' && styles.paymentSheetCentered,
+              ]}>
+            <Pressable
+              onPress={closePaymentModal}
+              style={({ pressed }) => [
+                styles.sheetCloseButton,
+                pressed && styles.buttonPressed,
+              ]}
+              accessibilityLabel="Close payment method sheet">
+              <Text style={styles.sheetCloseText}>X</Text>
+            </Pressable>
+            {paymentStep === 'choice' ? (
+              <>
+                <Text style={styles.sheetKicker}>Payment method</Text>
+                <Text style={styles.sheetTitle}>Choose a method</Text>
+                <Text style={styles.sheetBody}>
+                  Add a preferred payment method for faster checkout later.
+                </Text>
+                <View style={styles.paymentChoiceGrid}>
+                  <Pressable
+                    onPress={() => setPaymentStep('card')}
+                    style={({ pressed }) => [
+                      styles.paymentChoice,
+                      pressed && styles.buttonPressed,
+                    ]}>
+                    <Text style={styles.paymentChoiceTitle}>Credit Card</Text>
+                    <Text style={styles.paymentChoiceBody}>Visa or Mastercard</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={handleAddWhishMoney}
+                    style={({ pressed }) => [
+                      styles.paymentChoice,
+                      pressed && styles.buttonPressed,
+                    ]}>
+                    <Text style={styles.paymentChoiceTitle}>Whish Money</Text>
+                    <Text style={styles.paymentChoiceBody}>Save as preferred method</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={styles.sheetKicker}>Credit Card</Text>
+                <Text style={styles.sheetTitle}>Add card details</Text>
+                <Text style={styles.sheetBody}>
+                  Visa and Mastercard are accepted.
+                </Text>
+                <TextInput
+                  value={cardName}
+                  onChangeText={setCardName}
+                  placeholder="Cardholder name"
+                  placeholderTextColor="#667282"
+                  selectionColor={accentColor}
+                  style={styles.sheetInput}
+                />
+                <TextInput
+                  value={formatCardNumber(cardNumber)}
+                  onChangeText={setCardNumber}
+                  placeholder="4111 1111 1111 1234"
+                  placeholderTextColor="#667282"
+                  keyboardType="number-pad"
+                  selectionColor={accentColor}
+                  style={styles.sheetInput}
+                />
+                <View style={styles.sheetInputRow}>
+                  <TextInput
+                    value={cardExpiry}
+                    onChangeText={(value) => setCardExpiry(formatCardExpiry(value))}
+                    placeholder="MM/YY"
+                    placeholderTextColor="#667282"
+                    keyboardType="number-pad"
+                    selectionColor={accentColor}
+                    style={[styles.sheetInput, styles.sheetHalfInput]}
+                  />
+                  <TextInput
+                    value={cardCvv}
+                    onChangeText={(value) => setCardCvv(value.replace(/\D/g, '').slice(0, 4))}
+                    placeholder="CVV"
+                    placeholderTextColor="#667282"
+                    keyboardType="number-pad"
+                    secureTextEntry
+                    selectionColor={accentColor}
+                    style={[styles.sheetInput, styles.sheetHalfInput]}
+                  />
+                </View>
+                {paymentError ? (
+                  <Text style={styles.paymentErrorText}>{paymentError}</Text>
+                ) : null}
+                <Pressable
+                  onPress={handleAddCard}
+                  style={({ pressed }) => [
+                    styles.sheetPrimaryButton,
+                    pressed && styles.buttonPressed,
+                  ]}>
+                  <Text style={styles.sheetPrimaryText}>Save payment method</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal transparent visible={isPhotoSheetVisible} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setIsPhotoSheetVisible(false)}
+          />
+          <View style={styles.photoSheet}>
+            <Text style={styles.sheetKicker}>Profile picture</Text>
+            <Text style={styles.sheetTitle}>Update photo</Text>
+            <View style={styles.photoChoiceStack}>
+              <Pressable
+                onPress={handleChooseProfilePhoto}
+                style={({ pressed }) => [
+                  styles.photoChoiceButton,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.photoChoiceText}>Choose from Gallery</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleTakeProfilePhoto}
+                style={({ pressed }) => [
+                  styles.photoChoiceButton,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.photoChoiceText}>Take Photo</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setIsPhotoSheetVisible(false)}
+                style={({ pressed }) => [
+                  styles.photoCancelButton,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.photoCancelText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </PremiumScreenBackground>
   );
 }
@@ -338,8 +616,8 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 22,
-    paddingTop: 20,
-    paddingBottom: 42,
+    paddingTop: 72,
+    paddingBottom: 72,
   },
   loadingState: {
     flex: 1,
@@ -366,6 +644,11 @@ const styles = StyleSheet.create({
     borderRadius: 54,
     backgroundColor: premiumColors.surface,
     ...premiumShadow,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarAltOne: {
     backgroundColor: premiumColors.surfaceAlt,
@@ -513,32 +796,216 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.045)',
     color: premiumColors.textMuted,
   },
-  paymentGrid: {
+  savedPaymentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.12)',
+    borderRadius: 18,
+    backgroundColor: premiumColors.surfaceSoft,
+    padding: 14,
+  },
+  savedPaymentTitle: {
+    color: premiumColors.text,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  savedPaymentBody: {
+    color: premiumColors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+    marginTop: 4,
+    maxWidth: 210,
+  },
+  addPaymentButton: {
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 999,
+    backgroundColor: accentColor,
+    marginRight: 6,
+    paddingHorizontal: 16,
+  },
+  addPaymentButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.58)',
+  },
+  modalKeyboardLayer: {
+    flex: 1,
+  },
+  modalOverlayCentered: {
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  paymentSheet: {
+    position: 'relative',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    backgroundColor: premiumColors.surface,
+    paddingHorizontal: 22,
+    paddingTop: 14,
+    paddingBottom: 30,
+    ...premiumShadow,
+  },
+  paymentSheetCentered: {
+    width: '100%',
+    maxWidth: 430,
+    alignSelf: 'center',
+    borderRadius: 30,
+    paddingBottom: 24,
+    transform: [{ translateY: 22 }],
+  },
+  sheetCloseButton: {
+    position: 'absolute',
+    right: 18,
+    top: 14,
+    zIndex: 2,
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 17,
+    backgroundColor: premiumColors.surfaceSoft,
+  },
+  sheetCloseText: {
+    color: premiumColors.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  sheetKicker: {
+    color: premiumColors.redBright,
+    fontSize: 12,
+    fontWeight: '900',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  sheetTitle: {
+    color: premiumColors.text,
+    fontSize: 24,
+    fontWeight: '900',
+    lineHeight: 29,
+  },
+  sheetBody: {
+    color: premiumColors.textMuted,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+    marginTop: 8,
+  },
+  paymentChoiceGrid: {
+    gap: 10,
+    marginTop: 18,
+  },
+  paymentChoice: {
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 20,
+    backgroundColor: premiumColors.surfaceSoft,
+    padding: 16,
+  },
+  paymentChoiceTitle: {
+    color: premiumColors.text,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  paymentChoiceBody: {
+    color: premiumColors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 5,
+  },
+  sheetInput: {
+    minHeight: 54,
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 16,
+    backgroundColor: premiumColors.surfaceSoft,
+    color: premiumColors.text,
+    fontSize: 15,
+    fontWeight: '800',
+    marginTop: 12,
+    paddingHorizontal: 14,
+  },
+  sheetInputRow: {
+    flexDirection: 'row',
     gap: 10,
   },
-  paymentOption: {
-    minHeight: 48,
+  sheetHalfInput: {
+    flex: 1,
+  },
+  paymentErrorText: {
+    color: '#F2B8BF',
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 10,
+  },
+  sheetPrimaryButton: {
+    minHeight: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+    backgroundColor: accentColor,
+    marginTop: 16,
+  },
+  sheetPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  photoSheet: {
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    backgroundColor: premiumColors.surface,
+    paddingHorizontal: 22,
+    paddingTop: 18,
+    paddingBottom: 30,
+    ...premiumShadow,
+  },
+  photoChoiceStack: {
+    gap: 10,
+    marginTop: 18,
+  },
+  photoChoiceButton: {
+    minHeight: 54,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
-    borderRadius: 16,
+    borderColor: 'rgba(177, 18, 38, 0.22)',
+    borderRadius: 18,
     backgroundColor: premiumColors.surfaceSoft,
   },
-  paymentOptionSelected: {
-    borderColor: 'rgba(177, 18, 38, 0.48)',
-    backgroundColor: 'rgba(177, 18, 38, 0.18)',
-  },
-  paymentOptionReadOnly: {
-    opacity: 0.72,
-  },
-  paymentOptionText: {
-    color: premiumColors.textMuted,
+  photoChoiceText: {
+    color: premiumColors.text,
     fontSize: 14,
     fontWeight: '900',
   },
-  paymentOptionTextSelected: {
-    color: accentColor,
+  photoCancelButton: {
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+    backgroundColor: accentColor,
+  },
+  photoCancelText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
   },
   buttonPressed: {
     opacity: 0.78,

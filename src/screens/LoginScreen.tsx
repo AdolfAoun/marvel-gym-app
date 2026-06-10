@@ -262,28 +262,6 @@ export default function LoginScreen() {
                 clearInputFocus();
               }}
               style={styles.fixedContent}>
-          <View style={styles.brandingSection}>
-            <View style={styles.brandBlock}>
-              <Image
-                source={require('@/assets/images/marvel-logo-transparent.png')}
-                style={styles.brandLogo}
-                resizeMode="contain"
-              />
-              <View style={styles.brandCopy}>
-                <Text style={styles.miniLogoText}>MARVEL GYM</Text>
-                <Text style={styles.miniLogoSubtext}>fitness and health</Text>
-              </View>
-            </View>
-
-            <View style={styles.heroBlock}>
-              <View style={styles.subtitlePill}>
-                <Text style={styles.heroSubtitle}>
-                  Member access for training, products, and membership tools.
-                </Text>
-              </View>
-            </View>
-          </View>
-
           <View style={styles.loginCard}>
             <View style={styles.cardGloss} />
             <View style={styles.loginCardHeader}>
@@ -666,81 +644,11 @@ callRay: {
   fixedContent: {
     zIndex: 2,
     flex: 1,
+    justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'web' ? 48 : 38,
+    paddingTop: Platform.OS === 'web' ? 36 : 26,
     paddingBottom: 24,
-    transform: [{ translateY: 10 }],
-  },
-  brandingSection: {
-    alignItems: 'flex-start',
-    flexShrink: 0,
-  },
-  brandBlock: {
-    zIndex: 3,
-    minHeight: 86,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    marginBottom: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    position: 'relative',
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.16,
-    shadowRadius: 24,
-  },
-  brandLogo: {
-    width: 98,
-    height: 76,
-  },
-  brandCopy: {
-    flex: 1,
-  },
-  miniLogoText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '900',
-    letterSpacing: 2,
-    lineHeight: 25,
-  },
-  miniLogoSubtext: {
-    color: '#F7D6DC',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-  },
-  heroBlock: {
-    alignItems: 'flex-start',
-    marginTop: 12,
-    marginBottom: 16,
-    paddingHorizontal: 0,
-    transform: [{ translateY: 0 }],
-  },
-  subtitlePill: {
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 22,
-    backgroundColor: 'rgba(18, 18, 20, 0.58)',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.13,
-    shadowRadius: 20,
-  },
-  heroSubtitle: {
-    color: '#E9EEF6',
-    fontSize: 11,
-    lineHeight: 18,
-    maxWidth: 300,
-    textAlign: 'left',
-    transform: [{ translateY: 0 }],
+    transform: [{ translateY: Platform.OS === 'web' ? 22 : 30 }],
   },
   loginCard: {
     position: 'relative',

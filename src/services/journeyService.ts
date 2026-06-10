@@ -7,12 +7,14 @@ import type {
   Achievement,
   AttendanceDay,
   JourneyProfile,
+  JourneyStatKey,
   JourneyStats,
   WorkoutSession,
 } from '../types';
 
 let profileRecord: JourneyProfile = { ...journeyProfile };
 let attendanceRecords: AttendanceDay[] = createYearAttendanceDays(2026);
+let resetStats = new Set<JourneyStatKey>();
 let workoutSessions: WorkoutSession[] = [
   {
     id: 'workout-001',
@@ -114,6 +116,8 @@ export const toggleAttendanceDay = async (
       ? { ...day, hasVisit: !day.hasVisit }
       : day,
   );
+  resetStats.delete('visitsThisMonth');
+  resetStats.delete('visitsThisYear');
 
   return attendanceRecords;
 };
@@ -127,6 +131,8 @@ export const markAttendanceDay = async (
   attendanceRecords = attendanceRecords.map((day) =>
     day.date.slice(0, 10) === dateKey ? { ...day, hasVisit } : day,
   );
+  resetStats.delete('visitsThisMonth');
+  resetStats.delete('visitsThisYear');
 
   return attendanceRecords;
 };
@@ -149,13 +155,24 @@ export const completeWorkoutSession = async (
   };
 
   workoutSessions = [session, ...workoutSessions];
+  resetStats.delete('averageWorkoutDuration');
+  resetStats.delete('estimatedCaloriesBurned');
 
   return session;
 };
 
+export const resetJourneyStat = async (
+  statKey: JourneyStatKey,
+): Promise<JourneyStats> => {
+  resetStats.add(statKey);
+
+  return getJourneyStats();
+};
+
 export const getJourneyStats = async (): Promise<JourneyStats> => {
+  const currentMonthKey = new Date().toISOString().slice(0, 7);
   const visitsThisMonth = attendanceRecords.filter(
-    (day) => day.date.startsWith('2026-06') && day.hasVisit,
+    (day) => day.date.startsWith(currentMonthKey) && day.hasVisit,
   ).length;
   const visitsThisYear = attendanceRecords.filter((day) => day.hasVisit).length;
   const totalSeconds = workoutSessions.reduce(
@@ -170,11 +187,15 @@ export const getJourneyStats = async (): Promise<JourneyStats> => {
   );
 
   return {
-    averageWorkoutDuration: formatAverageDuration(averageSeconds),
-    visitsThisMonth,
-    visitsThisYear,
+    averageWorkoutDuration: resetStats.has('averageWorkoutDuration')
+      ? '0 min'
+      : formatAverageDuration(averageSeconds),
+    visitsThisMonth: resetStats.has('visitsThisMonth') ? 0 : visitsThisMonth,
+    visitsThisYear: resetStats.has('visitsThisYear') ? 0 : visitsThisYear,
     consecutiveStreak: calculateStreak(attendanceRecords),
-    estimatedCaloriesBurned,
+    estimatedCaloriesBurned: resetStats.has('estimatedCaloriesBurned')
+      ? 0
+      : estimatedCaloriesBurned,
   };
 };
 
@@ -190,6 +211,7 @@ export const journeyService = {
   markAttendanceDay,
   getWorkoutSessions,
   completeWorkoutSession,
+  resetJourneyStat,
   getJourneyStats,
   getAchievements,
 };

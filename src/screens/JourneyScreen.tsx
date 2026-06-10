@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -17,6 +18,7 @@ import type {
   Achievement,
   AttendanceDay,
   JourneyProfile,
+  JourneyStatKey,
   JourneyStats,
   Member,
 } from '@/types';
@@ -53,6 +55,14 @@ function formatDuration(seconds: number) {
 
 function estimateCalories(durationSeconds: number) {
   return Math.max(0, Math.round((durationSeconds / 60) * 8));
+}
+
+function hasJourneyStatValue(stats: JourneyStats, statKey: JourneyStatKey) {
+  if (statKey === 'averageWorkoutDuration') {
+    return Number.parseInt(stats.averageWorkoutDuration, 10) > 0;
+  }
+
+  return stats[statKey] > 0;
 }
 
 export default function JourneyScreen() {
@@ -96,6 +106,33 @@ export default function JourneyScreen() {
 
     loadJourney();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const syncJourney = async () => {
+        const [attendance, journeyStats] = await Promise.all([
+          journeyService.getAttendanceDays(),
+          journeyService.getJourneyStats(),
+        ]);
+
+        if (!isActive) {
+          return;
+        }
+
+        setAttendanceDays(attendance);
+        setStats(journeyStats);
+        setSelectedMonthIndex(new Date().getMonth());
+      };
+
+      syncJourney();
+
+      return () => {
+        isActive = false;
+      };
+    }, []),
+  );
 
   useEffect(() => {
     if (timerState !== 'running') {
@@ -181,6 +218,12 @@ export default function JourneyScreen() {
     setTimerState('idle');
     setElapsedSeconds(0);
     await refreshStats();
+  };
+
+  const handleResetStat = async (statKey: JourneyStatKey) => {
+    const nextStats = await journeyService.resetJourneyStat(statKey);
+
+    setStats(nextStats);
   };
 
   if (isLoading || !profile || !stats) {
@@ -276,58 +319,55 @@ export default function JourneyScreen() {
         </View>
 
         <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{stats.averageWorkoutDuration}</Text>
-            <Text style={styles.statLabel}>Avg Duration</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{stats.visitsThisMonth}</Text>
-            <Text style={styles.statLabel}>Monthly visits</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{stats.estimatedCaloriesBurned}</Text>
-            <Text style={styles.statLabel}>Avg Calories Burned</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{stats.visitsThisYear}</Text>
-            <Text style={styles.statLabel}>Yearly visits</Text>
-          </View>
-        </View>
+          {[
+            {
+              key: 'averageWorkoutDuration' as const,
+              label: 'Avg Duration',
+              value: stats.averageWorkoutDuration,
+            },
+            {
+              key: 'visitsThisMonth' as const,
+              label: 'Monthly visits',
+              value: stats.visitsThisMonth,
+            },
+            {
+              key: 'estimatedCaloriesBurned' as const,
+              label: 'Calories Burned',
+              value: stats.estimatedCaloriesBurned,
+            },
+            {
+              key: 'visitsThisYear' as const,
+              label: 'Yearly visits',
+              value: stats.visitsThisYear,
+            },
+          ].map((stat) => {
+            const canReset = hasJourneyStatValue(stats, stat.key);
 
-        <View style={styles.milestoneCard}>
-          <View style={styles.sectionHeaderRow}>
-            <View>
-              <Text style={styles.cardLabel}>Achievements</Text>
-              <Text style={styles.sectionTitle}>Training milestones</Text>
-            </View>
-            <Text style={styles.sectionHint}>Motivation</Text>
-          </View>
-          <View style={styles.milestoneGrid}>
-            <View style={styles.milestoneTile}>
-              <Text style={styles.milestoneValue}>{stats.consecutiveStreak}</Text>
-              <Text style={styles.milestoneLabel}>Longest streak</Text>
-            </View>
-            <View style={styles.milestoneTile}>
-              <Text style={styles.milestoneValue}>
-                {Number.parseInt(stats.averageWorkoutDuration, 10) >= 60
-                  ? 'Done'
-                  : 'Next'}
-              </Text>
-              <Text style={styles.milestoneLabel}>1-hour workout</Text>
-            </View>
-            <View style={styles.milestoneTile}>
-              <Text style={styles.milestoneValue}>
-                {Math.min(stats.visitsThisMonth, 12)}/12
-              </Text>
-              <Text style={styles.milestoneLabel}>Monthly attendance goal</Text>
-            </View>
-            <View style={styles.milestoneTile}>
-              <Text style={styles.milestoneValue}>
-                {stats.estimatedCaloriesBurned >= 1000 ? 'On' : 'Build'}
-              </Text>
-              <Text style={styles.milestoneLabel}>Calories milestone</Text>
-            </View>
-          </View>
+            return (
+              <View key={stat.key} style={styles.statCard}>
+                <Text style={styles.statValue}>{stat.value}</Text>
+                <View style={styles.statFooterRow}>
+                  <Text style={styles.statLabel}>{stat.label}</Text>
+                  <Pressable
+                    disabled={!canReset}
+                    onPress={() => handleResetStat(stat.key)}
+                    style={({ pressed }) => [
+                      styles.statResetButton,
+                      !canReset && styles.statResetButtonDisabled,
+                      pressed && canReset && styles.buttonPressed,
+                    ]}>
+                    <Text
+                      style={[
+                        styles.statResetText,
+                        !canReset && styles.statResetTextDisabled,
+                      ]}>
+                      Reset
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            );
+          })}
         </View>
 
         <View style={styles.card}>
@@ -390,6 +430,42 @@ export default function JourneyScreen() {
               </View>
             </View>
           ) : null}
+        </View>
+
+        <View style={styles.milestoneCard}>
+          <View style={styles.sectionHeaderRow}>
+            <View>
+              <Text style={styles.cardLabel}>Achievements</Text>
+              <Text style={styles.sectionTitle}>Training milestones</Text>
+            </View>
+            <Text style={styles.sectionHint}>Motivation</Text>
+          </View>
+          <View style={styles.milestoneGrid}>
+            <View style={styles.milestoneTile}>
+              <Text style={styles.milestoneValue}>{stats.consecutiveStreak}</Text>
+              <Text style={styles.milestoneLabel}>Longest streak</Text>
+            </View>
+            <View style={styles.milestoneTile}>
+              <Text style={styles.milestoneValue}>
+                {Number.parseInt(stats.averageWorkoutDuration, 10) >= 60
+                  ? 'Done'
+                  : 'Next'}
+              </Text>
+              <Text style={styles.milestoneLabel}>1-hour workout</Text>
+            </View>
+            <View style={styles.milestoneTile}>
+              <Text style={styles.milestoneValue}>
+                {Math.min(stats.visitsThisMonth, 12)}/12
+              </Text>
+              <Text style={styles.milestoneLabel}>Monthly attendance goal</Text>
+            </View>
+            <View style={styles.milestoneTile}>
+              <Text style={styles.milestoneValue}>
+                {stats.estimatedCaloriesBurned >= 1000 ? 'On' : 'Build'}
+              </Text>
+              <Text style={styles.milestoneLabel}>Calories milestone</Text>
+            </View>
+          </View>
         </View>
 
         <View style={styles.card}>
@@ -479,8 +555,8 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 108,
+    paddingTop: 72,
+    paddingBottom: 132,
   },
   loadingState: {
     flex: 1,
@@ -691,10 +767,42 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   statLabel: {
+    flex: 1,
     color: mutedColor,
     fontSize: 12,
     fontWeight: '800',
     lineHeight: 17,
+  },
+  statFooterRow: {
+    minHeight: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  statResetButton: {
+    minHeight: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.34)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(177, 18, 38, 0.12)',
+    paddingHorizontal: 9,
+  },
+  statResetButtonDisabled: {
+    borderColor: 'rgba(177, 18, 38, 0.14)',
+    backgroundColor: 'rgba(177, 18, 38, 0.05)',
+    opacity: 0.48,
+  },
+  statResetText: {
+    color: accentColor,
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  statResetTextDisabled: {
+    color: 'rgba(177, 18, 38, 0.72)',
   },
   milestoneCard: {
     borderWidth: 1,

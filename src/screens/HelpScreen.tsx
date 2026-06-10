@@ -61,6 +61,19 @@ export default function HelpScreen() {
           </Text>
         </View>
 
+        <View style={styles.aiCard}>
+          <View style={styles.aiBadge}>
+            <Text style={styles.aiBadgeText}>Coming soon</Text>
+          </View>
+          <Text style={styles.aiTitle}>AI Assistant</Text>
+          <Text style={styles.aiBody}>
+            Ask questions about your membership, visits, classes, and gym services.
+          </Text>
+          <View style={styles.aiInputPreview}>
+            <Text style={styles.aiInputText}>Ask Marvel Gym...</Text>
+          </View>
+        </View>
+
         <View style={styles.card}>
           <Text style={styles.cardLabel}>How it works</Text>
           <Text style={styles.supportTitle}>How to use the app</Text>
@@ -125,19 +138,6 @@ export default function HelpScreen() {
           </View>
         </View>
 
-        <View style={styles.aiCard}>
-          <View style={styles.aiBadge}>
-            <Text style={styles.aiBadgeText}>Coming soon</Text>
-          </View>
-          <Text style={styles.aiTitle}>AI Assistant</Text>
-          <Text style={styles.aiBody}>
-            Ask questions about your membership, visits, classes, and gym services.
-          </Text>
-          <View style={styles.aiInputPreview}>
-            <Text style={styles.aiInputText}>Ask Marvel Gym...</Text>
-          </View>
-        </View>
-
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Contact Us</Text>
           <Text style={styles.supportTitle}>Need help from Marvel Gym?</Text>
@@ -185,8 +185,8 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 108,
+    paddingTop: 72,
+    paddingBottom: 132,
   },
   heroCard: {
     position: 'relative',

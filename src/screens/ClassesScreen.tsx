@@ -1,34 +1,92 @@
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
 import { classService } from '@/services';
 import type { GymClass } from '@/types';
 
+const categories = [
+  'Fitness Classes',
+  'Martial Arts',
+  'Extra Classes',
+  'Gymnastics',
+] as const;
+const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function getClassDay(value: string) {
+  return new Intl.DateTimeFormat('en', { weekday: 'long' }).format(new Date(value));
+}
+
 function formatClassTime(value: string) {
   return new Intl.DateTimeFormat('en', {
-    weekday: 'short',
     hour: 'numeric',
     minute: '2-digit',
   }).format(new Date(value));
 }
 
+function formatClassDuration(startTime: string, endTime: string) {
+  const duration = Math.max(
+    0,
+    Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000),
+  );
+
+  return `${duration} min`;
+}
+
 export default function ClassesScreen() {
   const [classes, setClasses] = useState<GymClass[]>([]);
+  const [selectedCategory, setSelectedCategory] =
+    useState<(typeof categories)[number]>('Fitness Classes');
+  const [selectedDay, setSelectedDay] = useState('Wednesday');
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const loadClasses = async () => {
-      const scheduledClasses = await classService.getScheduledClasses();
+  const loadClasses = useCallback(async () => {
+    const scheduledClasses = await classService.getScheduledClasses();
 
-      setClasses(scheduledClasses.filter((gymClass) => gymClass.isActive));
-      setIsLoading(false);
-    };
-
-    loadClasses();
+    setClasses(scheduledClasses.filter((gymClass) => gymClass.isActive));
+    setIsLoading(false);
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadClasses();
+    }, [loadClasses]),
+  );
+
+  const selectedClasses = useMemo(() => {
+    return classes
+      .filter(
+        (gymClass) =>
+          gymClass.location === selectedCategory &&
+          getClassDay(gymClass.startTime) === selectedDay,
+      )
+      .sort((first, second) => first.startTime.localeCompare(second.startTime));
+  }, [classes, selectedCategory, selectedDay]);
+
+  const registeredClasses = useMemo(
+    () => classes.filter((gymClass) => gymClass.isRegistered),
+    [classes],
+  );
+
+  const handleReserve = async (classId: string) => {
+    await classService.registerForClass(classId);
+    await loadClasses();
+  };
+
+  const handleCancel = async (classId: string) => {
+    await classService.cancelClassRegistration(classId);
+    await loadClasses();
+  };
 
   if (isLoading) {
     return (
@@ -49,45 +107,181 @@ export default function ClassesScreen() {
         <View style={styles.heroCard}>
           <View pointerEvents="none" style={styles.heroGlow} />
           <Text style={styles.kicker}>Classes</Text>
-          <Text style={styles.heroTitle}>Train with purpose.</Text>
+          <Text style={styles.heroTitle}>Reserve your next session.</Text>
           <Text style={styles.heroBody}>
-            Browse upcoming sessions, availability, and class pricing.
+            Browse the weekly Marvel Gym schedule by category, day, coach, and time.
           </Text>
+          <View style={styles.heroStatsRow}>
+            <View style={styles.heroStatPill}>
+              <Text style={styles.heroStatValue}>{classes.length}</Text>
+              <Text style={styles.heroStatLabel}>weekly classes</Text>
+            </View>
+            <View style={styles.heroStatPill}>
+              <Text style={styles.heroStatValue}>{registeredClasses.length}</Text>
+              <Text style={styles.heroStatLabel}>reserved</Text>
+            </View>
+          </View>
         </View>
 
-        <View style={styles.classList}>
-          {classes.map((gymClass) => (
-            <View key={gymClass.id} style={styles.classCard}>
-              <View style={styles.classTopRow}>
-                <View style={styles.classTimeTile}>
-                  <Text style={styles.classTime}>{formatClassTime(gymClass.startTime)}</Text>
-                </View>
-                <View
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryTabs}>
+          {categories.map((category) => {
+            const isSelected = selectedCategory === category;
+            const count = classes.filter(
+              (gymClass) => gymClass.location === category,
+            ).length;
+
+            return (
+              <Pressable
+                key={category}
+                onPress={() => setSelectedCategory(category)}
+                style={[
+                  styles.categoryTab,
+                  isSelected && styles.categoryTabSelected,
+                ]}>
+                <Text
                   style={[
-                    styles.availabilityPill,
-                    gymClass.status === 'Full' && styles.availabilityPillFull,
+                    styles.categoryTabText,
+                    isSelected && styles.categoryTabTextSelected,
                   ]}>
-                  <Text style={styles.availabilityText}>{gymClass.status}</Text>
-                </View>
-              </View>
-              <Text style={styles.classTitle}>{gymClass.title}</Text>
-              <Text style={styles.classBody}>{gymClass.description}</Text>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaText}>{gymClass.instructorName}</Text>
-                <Text style={styles.metaText}>{gymClass.location ?? 'Studio'}</Text>
-              </View>
-              <View style={styles.footerRow}>
-                <Text style={styles.capacityText}>
-                  {gymClass.enrolledCount}/{gymClass.capacity} booked
+                  {category}
                 </Text>
-                <Text style={styles.priceText}>
-                  {gymClass.isPaid
-                    ? `${gymClass.currency} ${gymClass.price.toFixed(2)}`
-                    : 'Free'}
+                <Text
+                  style={[
+                    styles.categoryCount,
+                    isSelected && styles.categoryCountSelected,
+                  ]}>
+                  {count}
                 </Text>
-              </View>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        <View style={styles.scheduleCard}>
+          <View style={styles.sectionHeaderRow}>
+            <View>
+              <Text style={styles.cardLabel}>{selectedCategory}</Text>
+              <Text style={styles.sectionTitle}>{selectedDay} schedule</Text>
             </View>
-          ))}
+            <Text style={styles.sectionHint}>{selectedClasses.length} classes</Text>
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.dayTabs}>
+            {days.map((day) => {
+              const isSelected = selectedDay === day;
+              const count = classes.filter(
+                (gymClass) =>
+                  gymClass.location === selectedCategory &&
+                  getClassDay(gymClass.startTime) === day,
+              ).length;
+
+              return (
+                <Pressable
+                  key={day}
+                  onPress={() => setSelectedDay(day)}
+                  style={[styles.dayTab, isSelected && styles.dayTabSelected]}>
+                  <Text
+                    style={[
+                      styles.dayTabText,
+                      isSelected && styles.dayTabTextSelected,
+                    ]}>
+                    {day.slice(0, 3)}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.dayCount,
+                      isSelected && styles.dayCountSelected,
+                    ]}>
+                    {count}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <View style={styles.classList}>
+            {selectedClasses.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>No classes scheduled</Text>
+                <Text style={styles.emptyBody}>
+                  Choose another day or category to see available sessions.
+                </Text>
+              </View>
+            ) : (
+              selectedClasses.map((gymClass) => {
+                const isReserved = Boolean(gymClass.isRegistered);
+                const isFull = gymClass.status === 'Full' && !isReserved;
+
+                return (
+                  <View key={gymClass.id} style={styles.classCard}>
+                    <View style={styles.timeRail}>
+                      <Text style={styles.classTime}>
+                        {formatClassTime(gymClass.startTime)}
+                      </Text>
+                      <View style={styles.timeDot} />
+                    </View>
+                    <View style={styles.classBodyBlock}>
+                      <View style={styles.classTopRow}>
+                        <View style={styles.classTitleBlock}>
+                          <Text style={styles.classTitle}>{gymClass.title}</Text>
+                          <Text style={styles.classCoach}>
+                            Coach {gymClass.instructorName}
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.availabilityPill,
+                            isReserved && styles.availabilityPillReserved,
+                            isFull && styles.availabilityPillFull,
+                          ]}>
+                          <Text style={styles.availabilityText}>
+                            {isReserved ? 'Reserved' : gymClass.status}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.metaRow}>
+                        <Text style={styles.metaText}>
+                          {formatClassDuration(gymClass.startTime, gymClass.endTime)}
+                        </Text>
+                        <Text style={styles.metaText}>
+                          {gymClass.enrolledCount}/{gymClass.capacity} booked
+                        </Text>
+                      </View>
+
+                      <Pressable
+                        disabled={isFull}
+                        onPress={() =>
+                          isReserved
+                            ? handleCancel(gymClass.id)
+                            : handleReserve(gymClass.id)
+                        }
+                        style={({ pressed }) => [
+                          styles.reserveButton,
+                          isReserved && styles.cancelButton,
+                          isFull && styles.disabledButton,
+                          pressed && !isFull && styles.buttonPressed,
+                        ]}>
+                        <Text
+                          style={[
+                            styles.reserveButtonText,
+                            isReserved && styles.cancelButtonText,
+                          ]}>
+                          {isReserved ? 'Cancel Reservation' : 'Reserve'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </View>
         </View>
       </ScrollView>
     </PremiumScreenBackground>
@@ -97,8 +291,8 @@ export default function ClassesScreen() {
 const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 108,
+    paddingTop: 72,
+    paddingBottom: 132,
   },
   loadingState: {
     flex: 1,
@@ -139,9 +333,9 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: premiumColors.text,
-    fontSize: 32,
+    fontSize: 31,
     fontWeight: '900',
-    lineHeight: 37,
+    lineHeight: 36,
     marginTop: 8,
   },
   heroBody: {
@@ -151,92 +345,258 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     marginTop: 10,
   },
-  classList: {
-    gap: 14,
+  heroStatsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 18,
   },
-  classCard: {
+  heroStatPill: {
+    flex: 1,
     borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 26,
-    backgroundColor: premiumColors.surface,
-    padding: 18,
-    ...premiumShadow,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 13,
   },
-  classTopRow: {
+  heroStatValue: {
+    color: premiumColors.text,
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  heroStatLabel: {
+    color: '#FCE7EA',
+    fontSize: 11,
+    fontWeight: '900',
+    marginTop: 2,
+    textTransform: 'uppercase',
+  },
+  categoryTabs: {
+    gap: 10,
+    paddingBottom: 14,
+  },
+  categoryTab: {
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 16,
-  },
-  classTimeTile: {
+    gap: 9,
     borderWidth: 1,
     borderColor: premiumColors.border,
-    borderRadius: 16,
-    backgroundColor: premiumColors.surfaceSoft,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: premiumColors.surface,
+    paddingHorizontal: 15,
   },
-  classTime: {
-    color: premiumColors.text,
+  categoryTabSelected: {
+    borderColor: premiumColors.red,
+    backgroundColor: 'rgba(177, 18, 38, 0.16)',
+  },
+  categoryTabText: {
+    color: premiumColors.textMuted,
     fontSize: 12,
     fontWeight: '900',
   },
+  categoryTabTextSelected: {
+    color: premiumColors.text,
+  },
+  categoryCount: {
+    color: premiumColors.textFaint,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  categoryCountSelected: {
+    color: premiumColors.redBright,
+  },
+  scheduleCard: {
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 28,
+    backgroundColor: premiumColors.surface,
+    padding: 16,
+    ...premiumShadow,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 14,
+  },
+  cardLabel: {
+    color: premiumColors.redBright,
+    fontSize: 11,
+    fontWeight: '900',
+    marginBottom: 5,
+    textTransform: 'uppercase',
+  },
+  sectionTitle: {
+    color: premiumColors.text,
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  sectionHint: {
+    color: premiumColors.textMuted,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  dayTabs: {
+    gap: 8,
+    paddingBottom: 16,
+  },
+  dayTab: {
+    width: 58,
+    minHeight: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 18,
+    backgroundColor: premiumColors.surfaceSoft,
+  },
+  dayTabSelected: {
+    borderColor: premiumColors.red,
+    backgroundColor: premiumColors.red,
+  },
+  dayTabText: {
+    color: premiumColors.textMuted,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  dayTabTextSelected: {
+    color: '#FFFFFF',
+  },
+  dayCount: {
+    color: premiumColors.textFaint,
+    fontSize: 11,
+    fontWeight: '900',
+    marginTop: 3,
+  },
+  dayCountSelected: {
+    color: '#FFFFFF',
+  },
+  classList: {
+    gap: 12,
+  },
+  emptyCard: {
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 22,
+    backgroundColor: premiumColors.surfaceSoft,
+    padding: 18,
+  },
+  emptyTitle: {
+    color: premiumColors.text,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  emptyBody: {
+    color: premiumColors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 6,
+  },
+  classCard: {
+    flexDirection: 'row',
+    gap: 13,
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.12)',
+    borderRadius: 24,
+    backgroundColor: premiumColors.surfaceSoft,
+    padding: 13,
+  },
+  timeRail: {
+    width: 66,
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 3,
+  },
+  classTime: {
+    color: premiumColors.redBright,
+    fontSize: 12,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  timeDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: premiumColors.red,
+  },
+  classBodyBlock: {
+    flex: 1,
+  },
+  classTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  classTitleBlock: {
+    flex: 1,
+  },
+  classTitle: {
+    color: premiumColors.text,
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  classCoach: {
+    color: premiumColors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 4,
+  },
   availabilityPill: {
+    alignSelf: 'flex-start',
     borderRadius: 999,
     backgroundColor: 'rgba(34, 197, 94, 0.18)',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  availabilityPillReserved: {
+    backgroundColor: 'rgba(177, 18, 38, 0.2)',
   },
   availabilityPillFull: {
     backgroundColor: 'rgba(245, 158, 11, 0.18)',
   },
   availabilityText: {
     color: premiumColors.text,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
     textTransform: 'uppercase',
-  },
-  classTitle: {
-    color: premiumColors.text,
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  classBody: {
-    color: premiumColors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 20,
-    marginTop: 7,
   },
   metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 10,
-    borderTopWidth: 1,
-    borderTopColor: premiumColors.border,
-    marginTop: 14,
-    paddingTop: 12,
+    marginTop: 12,
   },
   metaText: {
     color: premiumColors.textMuted,
     fontSize: 12,
     fontWeight: '800',
   },
-  footerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginTop: 12,
+  reserveButton: {
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 15,
+    backgroundColor: premiumColors.red,
+    marginTop: 14,
   },
-  capacityText: {
-    color: premiumColors.textFaint,
-    fontSize: 12,
-    fontWeight: '800',
+  cancelButton: {
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.26)',
+    backgroundColor: 'rgba(177, 18, 38, 0.08)',
   },
-  priceText: {
-    color: premiumColors.redBright,
+  disabledButton: {
+    opacity: 0.46,
+  },
+  reserveButtonText: {
+    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '900',
+  },
+  cancelButtonText: {
+    color: premiumColors.redBright,
+  },
+  buttonPressed: {
+    opacity: 0.76,
   },
 });

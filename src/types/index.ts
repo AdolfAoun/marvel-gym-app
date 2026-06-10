@@ -23,6 +23,7 @@ export type Member = {
   phone: string;
   location?: string;
   preferredPaymentMethod?: PaymentMethod;
+  profileImageUri?: string;
   dateOfBirth?: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
@@ -166,6 +167,12 @@ export type JourneyStats = {
   consecutiveStreak: number;
   estimatedCaloriesBurned: number;
 };
+
+export type JourneyStatKey =
+  | 'averageWorkoutDuration'
+  | 'visitsThisMonth'
+  | 'estimatedCaloriesBurned'
+  | 'visitsThisYear';
 
 export type WorkoutSession = {
   id: string;

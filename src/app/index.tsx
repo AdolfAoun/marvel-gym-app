@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
 
 const signs = ['•', 'X', '/', '÷'];
 const signDelay = 210;
+const displaySigns = ['.', 'X', '/', '+'];
 const jumpDuration = 340;
 const cycleDuration = signs.length * signDelay + jumpDuration;
 const splashDuration = cycleDuration * 2;
@@ -46,6 +47,12 @@ export default function IndexRoute() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
+      <Image
+        source={require('@/assets/images/prototype-three-finger-back-pose-background.png')}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      />
+      <View pointerEvents="none" style={styles.backgroundVeil} />
       <View pointerEvents="none" style={styles.redGlowOne} />
       <View pointerEvents="none" style={styles.redGlowTwo} />
       <View pointerEvents="none" style={styles.darkBladeOne} />
@@ -53,7 +60,7 @@ export default function IndexRoute() {
 
       <View style={styles.logoBlock}>
         <View style={styles.signRow}>
-          {signs.map((sign, index) => (
+          {displaySigns.map((sign, index) => (
             <Animated.Text
               key={sign}
               style={[
@@ -99,6 +106,24 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#070708',
   },
+  backgroundImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    opacity: 0.42,
+  },
+  backgroundVeil: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(4, 4, 6, 0.32)',
+  },
   redGlowOne: {
     position: 'absolute',
     top: -110,
@@ -107,7 +132,7 @@ const styles = StyleSheet.create({
     height: 340,
     borderRadius: 170,
     backgroundColor: '#B11226',
-    opacity: 0.62,
+    opacity: 0.32,
   },
   redGlowTwo: {
     position: 'absolute',
@@ -117,7 +142,7 @@ const styles = StyleSheet.create({
     height: 380,
     borderRadius: 190,
     backgroundColor: '#7F0A19',
-    opacity: 0.72,
+    opacity: 0.34,
   },
   darkBladeOne: {
     position: 'absolute',
@@ -126,7 +151,7 @@ const styles = StyleSheet.create({
     width: 118,
     height: 540,
     borderRadius: 34,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
     transform: [{ rotate: '24deg' }],
   },
   darkBladeTwo: {
@@ -136,7 +161,7 @@ const styles = StyleSheet.create({
     width: 94,
     height: 440,
     borderRadius: 32,
-    backgroundColor: 'rgba(177, 18, 38, 0.24)',
+    backgroundColor: 'rgba(177, 18, 38, 0.1)',
     transform: [{ rotate: '24deg' }],
   },
   logoBlock: {
@@ -145,7 +170,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 28,
-    backgroundColor: 'rgba(10, 10, 12, 0.38)',
+    backgroundColor: 'rgba(10, 10, 12, 0.24)',
     paddingHorizontal: 34,
     paddingVertical: 28,
     shadowColor: '#B11226',
@@ -158,15 +183,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
-    minHeight: 34,
-    marginBottom: 7,
+    gap: 18,
+    minHeight: 26,
+    marginBottom: 3,
   },
   signText: {
     color: '#FFFFFF',
-    fontSize: 27,
+    fontSize: 20,
     fontWeight: '900',
-    lineHeight: 32,
+    lineHeight: 24,
   },
   marvelText: {
     color: '#FFFFFF',

@@ -256,8 +256,8 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 108,
+    paddingTop: 72,
+    paddingBottom: 132,
   },
   loadingState: {
     flex: 1,

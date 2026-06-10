@@ -1,46 +1,83 @@
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import {
+  Image,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const accentColor = '#B11226';
+const carouselSlides = [
+  require('@/assets/images/MarvelPhoto1.jpeg'),
+  require('@/assets/images/MarvelPhoto2.png'),
+];
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const { width: windowWidth } = useWindowDimensions();
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [frameWidth, setFrameWidth] = useState(0);
+  const slideWidth =
+    frameWidth || (Platform.OS === 'web' ? Math.min(windowWidth, 414) : windowWidth);
+
+  const updateActiveSlide = (
+    event: NativeSyntheticEvent<NativeScrollEvent>,
+  ) => {
+    const viewWidth = event.nativeEvent.layoutMeasurement.width;
+    const nextIndex = Math.round(
+      event.nativeEvent.contentOffset.x / Math.max(1, viewWidth),
+    );
+
+    setActiveSlide(Math.min(carouselSlides.length - 1, Math.max(0, nextIndex)));
+  };
 
   return (
     <View style={styles.safeArea}>
       <StatusBar style="light" />
       <View style={styles.phoneFrame}>
-        <View style={styles.heroArea}>
-          <View pointerEvents="none" style={styles.heroRedField} />
-          <View pointerEvents="none" style={styles.heroGlowPrimary} />
-          <View pointerEvents="none" style={styles.heroGlowDark} />
-          <View pointerEvents="none" style={styles.heroRing} />
-          <View pointerEvents="none" style={styles.athleticSlashOne} />
-          <View pointerEvents="none" style={styles.athleticSlashTwo} />
-          <Image
-            source={require('@/assets/images/prototype-three-finger-back-pose-background.png')}
-            style={styles.heroImage}
-            resizeMode="cover"
-          />
-          <View pointerEvents="none" style={styles.imageRedWash} />
-          <View pointerEvents="none" style={styles.heroVeil} />
-          <View pointerEvents="none" style={styles.heroLowerFade} />
-          <View style={styles.logoBlock}>
-            <View style={styles.logoGlow} />
-            <Image
-              source={require('@/assets/images/marvel-logo-transparent.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </View>
-          <View style={styles.heroCopy}>
-            <Text style={styles.kicker}>Marvel Fitness and Health</Text>
-            <Text style={styles.title}>Your gym, ready when you are.</Text>
-            <Text style={styles.subtitle}>
-              Premium member access for training, shop essentials, and progress.
-            </Text>
+        <View
+          style={styles.heroArea}
+          onLayout={(event) => setFrameWidth(event.nativeEvent.layout.width)}>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            decelerationRate="fast"
+            showsHorizontalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onMomentumScrollEnd={updateActiveSlide}
+            onScroll={updateActiveSlide}
+            style={styles.heroCarousel}>
+            {carouselSlides.map((slide, index) => (
+              <View key={index} style={[styles.heroSlide, { width: slideWidth }]}>
+                <Image
+                  source={slide}
+                  style={styles.heroImage}
+                  resizeMode="stretch"
+                />
+                <View pointerEvents="none" style={styles.heroVeil} />
+                <View pointerEvents="none" style={styles.heroLowerFade} />
+              </View>
+            ))}
+          </ScrollView>
+          <View style={styles.carouselDots}>
+            {carouselSlides.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.carouselDot,
+                  activeSlide === index && styles.carouselDotActive,
+                ]}
+              />
+            ))}
           </View>
         </View>
 
@@ -87,70 +124,21 @@ const styles = StyleSheet.create({
     marginVertical: Platform.OS === 'web' ? 22 : 0,
   },
   heroArea: {
-    flex: 3,
-    justifyContent: 'flex-end',
+    flex: 1,
     overflow: 'hidden',
-    backgroundColor: '#141016',
-    paddingHorizontal: 24,
-    paddingBottom: 34,
+    backgroundColor: '#050507',
   },
-  heroRedField: {
+  heroCarousel: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#1A0B10',
   },
-  heroGlowPrimary: {
-    position: 'absolute',
-    top: -130,
-    right: -110,
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    backgroundColor: '#F43F5E',
-    opacity: 0.24,
-  },
-  heroGlowDark: {
-    position: 'absolute',
-    left: -150,
-    bottom: 36,
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    backgroundColor: '#180207',
-    opacity: 0.48,
-  },
-  heroRing: {
-    position: 'absolute',
-    right: -42,
-    bottom: 148,
-    width: 190,
-    height: 190,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    borderRadius: 95,
-  },
-  athleticSlashOne: {
-    position: 'absolute',
-    top: 44,
-    right: -84,
-    width: 132,
-    height: 540,
-    borderRadius: 36,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    transform: [{ rotate: '24deg' }],
-  },
-  athleticSlashTwo: {
-    position: 'absolute',
-    top: 120,
-    right: 66,
-    width: 38,
-    height: 260,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    transform: [{ rotate: '24deg' }],
+  heroSlide: {
+    height: '100%',
+    overflow: 'hidden',
+    backgroundColor: '#050507',
   },
   heroImage: {
     position: 'absolute',
@@ -160,16 +148,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     height: '100%',
-    opacity: 0.62,
-    transform: [{ scale: 1.06 }],
-  },
-  imageRedWash: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(177, 18, 38, 0.14)',
   },
   heroVeil: {
     position: 'absolute',
@@ -177,75 +155,48 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
   },
   heroLowerFade: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: 260,
-    backgroundColor: 'rgba(10, 7, 10, 0.78)',
+    height: 140,
+    backgroundColor: 'rgba(10, 7, 10, 0.18)',
   },
-  logoBlock: {
+  carouselDots: {
     position: 'absolute',
-    top: Platform.OS === 'web' ? 44 : 64,
-    left: 24,
-    alignItems: 'center',
+    left: 0,
+    right: 0,
+    bottom: 22,
+    flexDirection: 'row',
     justifyContent: 'center',
+    gap: 7,
   },
-  logoGlow: {
-    position: 'absolute',
-    width: 104,
-    height: 104,
-    borderRadius: 52,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.52,
-    shadowRadius: 26,
+  carouselDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
   },
-  logo: {
-    width: 92,
-    height: 92,
-  },
-  heroCopy: {
-    maxWidth: 320,
-  },
-  kicker: {
-    color: '#F7D6DC',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0,
-    marginBottom: 10,
-    textTransform: 'uppercase',
-  },
-  title: {
-    color: '#FFFFFF',
-    fontSize: 36,
-    fontWeight: '900',
-    letterSpacing: 0,
-    lineHeight: 40,
-  },
-  subtitle: {
-    color: '#E8ECF2',
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 21,
-    marginTop: 12,
+  carouselDotActive: {
+    width: 22,
+    backgroundColor: accentColor,
   },
   actionPanel: {
-    flex: 1,
+    flexShrink: 0,
     justifyContent: 'center',
-    gap: 12,
-    backgroundColor: '#FFFDFD',
+    gap: 13,
+    backgroundColor: '#090A0E',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    marginTop: -18,
     paddingHorizontal: 24,
-    paddingTop: 30,
+    paddingTop: 26,
     paddingBottom: 24,
-    shadowColor: '#1D0A0D',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: -14 },
     shadowOpacity: 0.1,
     shadowRadius: 24,
@@ -256,17 +207,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.24)',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.64)',
-    shadowColor: '#1D0A0D',
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.08,
     shadowRadius: 18,
     elevation: 3,
   },
   guestButtonText: {
-    color: '#58111B',
+    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '900',
   },

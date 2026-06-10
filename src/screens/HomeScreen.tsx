@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -18,6 +18,7 @@ import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
 import {
   activityService,
+  classService,
   journeyService,
   memberService,
   membershipService,
@@ -265,6 +266,7 @@ export default function HomeScreen() {
         notifications,
         activityDays,
         currentVouchers,
+        classUpdate,
       ] = await Promise.all([
         memberService.getCurrentMember(),
         membershipService.getCurrentMembership(),
@@ -273,13 +275,16 @@ export default function HomeScreen() {
         notificationService.getNotifications(),
         activityService.getGymActivitySchedule(),
         voucherService.getVouchers(),
+        classService.getLatestClassUpdate(),
       ]);
 
       setMember(currentMember);
       setMembership(currentMembership);
       setStatus(membershipStatus);
       setPlans(membershipPlans);
-      setNotification(notifications.find((item) => !item.isRead) ?? notifications[0]);
+      setNotification(
+        classUpdate ?? notifications.find((item) => !item.isRead) ?? notifications[0],
+      );
       setActivitySchedule(activityDays);
       setSelectedActivityDayId(activityDays[0]?.id ?? '');
       setVouchers(currentVouchers);
@@ -288,6 +293,26 @@ export default function HomeScreen() {
 
     loadDashboard();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const refreshLatestClassUpdate = async () => {
+        const classUpdate = await classService.getLatestClassUpdate();
+
+        if (isActive && classUpdate) {
+          setNotification(classUpdate);
+        }
+      };
+
+      refreshLatestClassUpdate();
+
+      return () => {
+        isActive = false;
+      };
+    }, []),
+  );
 
   useEffect(() => {
     if (!membershipModal) {
@@ -622,6 +647,22 @@ export default function HomeScreen() {
           <Text style={styles.machineGuideAction}>Go</Text>
         </Pressable>
 
+        <Pressable
+          onPress={() => router.push('/(tabs)/help')}
+          style={({ pressed }) => [
+            styles.machineGuideCard,
+            pressed && styles.buttonPressed,
+          ]}>
+          <View style={styles.machineGuideCopy}>
+            <Text style={styles.cardLabel}>Help</Text>
+            <Text style={styles.machineGuideTitle}>How to use the app</Text>
+            <Text style={styles.machineGuideBody}>
+              Open instructions, support details, and the AI assistant.
+            </Text>
+          </View>
+          <Text style={styles.machineGuideAction}>Open</Text>
+        </Pressable>
+
         <View style={styles.activityCard}>
           <View style={styles.sectionHeaderRow}>
             <View>
@@ -695,26 +736,6 @@ export default function HomeScreen() {
               <View style={[styles.legendDot, { backgroundColor: accentColor }]} />
               <Text style={styles.legendText}>Full / Peak</Text>
             </View>
-          </View>
-        </View>
-
-        <View style={styles.updatesHeader}>
-          <Text style={styles.sectionTitle}>Updates</Text>
-        </View>
-        <View style={styles.infoGrid}>
-          <View style={styles.infoCard}>
-            <Text style={styles.cardLabel}>Latest update</Text>
-            <Text style={styles.infoTitle}>
-              {notification?.title ?? 'No notifications yet'}
-            </Text>
-            <Text style={styles.infoBody}>
-              {notification?.message ?? 'Important membership updates will appear here.'}
-            </Text>
-          </View>
-
-          <View style={styles.infoCard}>
-            <Text style={styles.cardLabel}>Action status</Text>
-            <Text style={styles.infoBody}>{feedback}</Text>
           </View>
         </View>
 
@@ -818,6 +839,26 @@ export default function HomeScreen() {
               );
             })
           )}
+        </View>
+
+        <View style={styles.updatesHeader}>
+          <Text style={styles.sectionTitle}>Updates</Text>
+        </View>
+        <View style={styles.infoGrid}>
+          <View style={styles.infoCard}>
+            <Text style={styles.cardLabel}>Latest update</Text>
+            <Text style={styles.infoTitle}>
+              {notification?.title ?? 'No notifications yet'}
+            </Text>
+            <Text style={styles.infoBody}>
+              {notification?.message ?? 'Important membership updates will appear here.'}
+            </Text>
+          </View>
+
+          <View style={styles.infoCard}>
+            <Text style={styles.cardLabel}>Action status</Text>
+            <Text style={styles.infoBody}>{feedback}</Text>
+          </View>
         </View>
       </ScrollView>
 
@@ -1065,8 +1106,8 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 108,
+    paddingTop: 72,
+    paddingBottom: 132,
   },
   loadingState: {
     flex: 1,
