@@ -98,6 +98,8 @@ export default function ProfileScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [photoTone, setPhotoTone] = useState(0);
   const [isPhotoSheetVisible, setIsPhotoSheetVisible] = useState(false);
+  const [initialProfileImageUri, setInitialProfileImageUri] = useState('');
+  const [draftProfileImageUri, setDraftProfileImageUri] = useState('');
 
   useEffect(() => {
     const loadMember = async () => {
@@ -111,6 +113,8 @@ export default function ProfileScreen() {
       setSavedPayment(currentPayment);
       setInitialForm(nextForm);
       setForm(nextForm);
+      setInitialProfileImageUri(currentMember.profileImageUri ?? '');
+      setDraftProfileImageUri(currentMember.profileImageUri ?? '');
     };
 
     loadMember();
@@ -126,14 +130,16 @@ export default function ProfileScreen() {
       form.location.trim() !== initialForm.location.trim()
     );
   }, [form, initialForm]);
+  const hasPhotoChange = draftProfileImageUri !== initialProfileImageUri;
 
   const updateForm = (updates: Partial<ProfileForm>) => {
     setForm((current) => (current ? { ...current, ...updates } : current));
   };
 
   const handleEditOrCancel = () => {
-    if (isEditing) {
+    if (isEditing || hasPhotoChange) {
       setForm(initialForm);
+      setDraftProfileImageUri(initialProfileImageUri);
       setIsEditing(false);
       return;
     }
@@ -142,7 +148,7 @@ export default function ProfileScreen() {
   };
 
   const handleDone = async () => {
-    if (!form || !hasChanges || !isEditing) {
+    if (!form || (!hasChanges && !hasPhotoChange)) {
       return;
     }
 
@@ -150,14 +156,21 @@ export default function ProfileScreen() {
 
     try {
       const updatedMember = await memberService.updateProfile({
-        email: form.email.trim(),
-        location: form.location.trim(),
+        ...(isEditing
+          ? {
+              email: form.email.trim(),
+              location: form.location.trim(),
+            }
+          : {}),
+        ...(hasPhotoChange ? { profileImageUri: draftProfileImageUri } : {}),
       });
       const nextForm = createProfileForm(updatedMember);
 
       setMember(updatedMember);
       setInitialForm(nextForm);
       setForm(nextForm);
+      setInitialProfileImageUri(updatedMember.profileImageUri ?? '');
+      setDraftProfileImageUri(updatedMember.profileImageUri ?? '');
       setIsEditing(false);
     } finally {
       setIsSaving(false);
@@ -166,12 +179,6 @@ export default function ProfileScreen() {
 
   const handleChangePhoto = () => {
     setIsPhotoSheetVisible(true);
-  };
-
-  const updateProfilePhoto = async (uri: string) => {
-    const updatedMember = await memberService.updateProfileImage(uri);
-
-    setMember(updatedMember);
   };
 
   const handleChooseProfilePhoto = async () => {
@@ -190,7 +197,7 @@ export default function ProfileScreen() {
     });
 
     if (!result.canceled) {
-      await updateProfilePhoto(result.assets[0].uri);
+      setDraftProfileImageUri(result.assets[0].uri);
     }
 
     setIsPhotoSheetVisible(false);
@@ -212,7 +219,7 @@ export default function ProfileScreen() {
     });
 
     if (!result.canceled) {
-      await updateProfilePhoto(result.assets[0].uri);
+      setDraftProfileImageUri(result.assets[0].uri);
     }
 
     setPhotoTone((value) => (value + 1) % 3);
@@ -281,7 +288,7 @@ export default function ProfileScreen() {
     );
   }
 
-  const doneDisabled = !isEditing || !hasChanges || isSaving;
+  const doneDisabled = (!hasChanges && !hasPhotoChange) || isSaving;
 
   return (
     <PremiumScreenBackground>
@@ -299,9 +306,9 @@ export default function ProfileScreen() {
               photoTone === 2 && styles.avatarAltTwo,
               pressed && styles.buttonPressed,
             ]}>
-            {member.profileImageUri ? (
+            {draftProfileImageUri ? (
               <Image
-                source={{ uri: member.profileImageUri }}
+                source={{ uri: draftProfileImageUri }}
                 style={styles.avatarImage}
                 resizeMode="cover"
               />
@@ -420,11 +427,11 @@ export default function ProfileScreen() {
             onPress={handleEditOrCancel}
             style={({ pressed }) => [
               styles.secondaryButton,
-              isEditing && styles.cancelButton,
+              (isEditing || hasPhotoChange) && styles.cancelButton,
               pressed && styles.buttonPressed,
             ]}>
             <Text style={styles.secondaryButtonText}>
-              {isEditing ? 'Cancel' : 'Edit Profile'}
+              {isEditing || hasPhotoChange ? 'Cancel' : 'Edit Profile'}
             </Text>
           </Pressable>
 
