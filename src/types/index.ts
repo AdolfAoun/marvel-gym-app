@@ -5,11 +5,7 @@ export type MembershipStatus =
   | 'Suspended'
   | 'Pending Approval';
 
-export type PaymentMethod =
-  | 'Visa'
-  | 'Mastercard'
-  | 'Whish Money'
-  | 'Pay at Counter';
+export type PaymentMethod = 'Cash';
 
 export type PaymentStatus = 'Pending' | 'Paid' | 'Failed' | 'Refunded';
 
@@ -22,7 +18,6 @@ export type Member = {
   email: string;
   phone: string;
   location?: string;
-  preferredPaymentMethod?: PaymentMethod;
   profileImageUri?: string;
   dateOfBirth?: string;
   emergencyContactName?: string;
@@ -163,7 +158,7 @@ export type AttendanceDay = {
 export type JourneyStats = {
   averageWorkoutDuration: string;
   visitsThisMonth: number;
-  visitsThisYear: number;
+  visitsThisWeek: number;
   consecutiveStreak: number;
   estimatedCaloriesBurned: number;
 };
@@ -172,7 +167,7 @@ export type JourneyStatKey =
   | 'averageWorkoutDuration'
   | 'visitsThisMonth'
   | 'estimatedCaloriesBurned'
-  | 'visitsThisYear';
+  | 'visitsThisWeek';
 
 export type WorkoutSession = {
   id: string;
@@ -180,6 +175,14 @@ export type WorkoutSession = {
   endedAt: string;
   durationSeconds: number;
   estimatedCaloriesBurned: number;
+};
+
+export type JourneyHistoryRecord = {
+  id: string;
+  statKey: JourneyStatKey | 'all';
+  startedAt: string;
+  endedAt: string;
+  summary: string;
 };
 
 export type Achievement = {
@@ -195,6 +198,7 @@ export type MachineGuide = {
   muscleGroup: 'Chest' | 'Back' | 'Shoulders' | 'Arms' | 'Legs' | 'Core';
   target: string;
   description: string;
+  imageUri?: string;
   imageLabel: string;
   instructions: string[];
 };

@@ -2,6 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -149,7 +150,15 @@ export default function MachineGuideScreen() {
                 pressed && styles.buttonPressed,
               ]}>
               <View style={styles.machineImage}>
-                <Text style={styles.machineImageText}>{guide.imageLabel}</Text>
+                {guide.imageUri ? (
+                  <Image
+                    source={{ uri: guide.imageUri }}
+                    style={styles.machinePhoto}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Text style={styles.machineImageText}>{guide.imageLabel}</Text>
+                )}
               </View>
               <Text style={styles.machineName}>{guide.name}</Text>
               <Text style={styles.machineTarget}>{guide.target}</Text>
@@ -179,9 +188,17 @@ export default function MachineGuideScreen() {
 
             <View style={styles.detailTopRow}>
               <View style={styles.detailImage}>
-                <Text style={styles.detailImageText}>
-                  {selectedGuide?.imageLabel}
-                </Text>
+                {selectedGuide?.imageUri ? (
+                  <Image
+                    source={{ uri: selectedGuide.imageUri }}
+                    style={styles.detailPhoto}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Text style={styles.detailImageText}>
+                    {selectedGuide?.imageLabel}
+                  </Text>
+                )}
               </View>
               <View style={styles.detailCopy}>
                 <Text style={styles.modalKicker}>
@@ -389,6 +406,10 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '900',
   },
+  machinePhoto: {
+    width: '100%',
+    height: '100%',
+  },
   machineName: {
     color: textColor,
     fontSize: 13,
@@ -462,6 +483,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 21,
     fontWeight: '900',
+  },
+  detailPhoto: {
+    width: '100%',
+    height: '100%',
   },
   detailCopy: {
     flex: 1,

@@ -18,8 +18,8 @@ import type { GymClass } from '@/types';
 const categories = [
   'Fitness Classes',
   'Martial Arts',
-  'Extra Classes',
   'Gymnastics',
+  'Extra Classes',
 ] as const;
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -105,7 +105,6 @@ export default function ClassesScreen() {
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
-          <View pointerEvents="none" style={styles.heroGlow} />
           <Text style={styles.kicker}>Classes</Text>
           <Text style={styles.heroTitle}>Reserve your next session.</Text>
           <Text style={styles.heroBody}>
@@ -153,7 +152,7 @@ export default function ClassesScreen() {
                     styles.categoryCount,
                     isSelected && styles.categoryCountSelected,
                   ]}>
-                  {count}
+                  {count} classes
                 </Text>
               </Pressable>
             );
@@ -198,7 +197,7 @@ export default function ClassesScreen() {
                       styles.dayCount,
                       isSelected && styles.dayCountSelected,
                     ]}>
-                    {count}
+                    {count} classes
                   </Text>
                 </Pressable>
               );
@@ -309,31 +308,22 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: premiumColors.borderStrong,
-    borderRadius: 30,
-    backgroundColor: premiumColors.surfaceAlt,
-    padding: 22,
-    marginBottom: 16,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 26,
+    backgroundColor: 'rgba(18, 20, 28, 0.72)',
+    padding: 20,
+    marginBottom: 18,
     ...premiumShadow,
   },
-  heroGlow: {
-    position: 'absolute',
-    right: -90,
-    top: -90,
-    width: 230,
-    height: 230,
-    borderRadius: 115,
-    backgroundColor: 'rgba(177, 18, 38, 0.26)',
-  },
   kicker: {
-    color: '#F7D6DC',
+    color: premiumColors.redBright,
     fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
   heroTitle: {
     color: premiumColors.text,
-    fontSize: 31,
+    fontSize: 30,
     fontWeight: '900',
     lineHeight: 36,
     marginTop: 8,
@@ -347,16 +337,16 @@ const styles = StyleSheet.create({
   },
   heroStatsRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 18,
+    gap: 12,
+    marginTop: 20,
   },
   heroStatPill: {
     flex: 1,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    padding: 13,
+    borderColor: 'rgba(255, 255, 255, 0.13)',
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.055)',
+    padding: 14,
   },
   heroStatValue: {
     color: premiumColors.text,
@@ -364,7 +354,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   heroStatLabel: {
-    color: '#FCE7EA',
+    color: premiumColors.textMuted,
     fontSize: 11,
     fontWeight: '900',
     marginTop: 2,
@@ -441,7 +431,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   dayTab: {
-    width: 58,
+    width: 82,
     minHeight: 58,
     alignItems: 'center',
     justifyContent: 'center',
@@ -464,9 +454,10 @@ const styles = StyleSheet.create({
   },
   dayCount: {
     color: premiumColors.textFaint,
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '900',
     marginTop: 3,
+    textAlign: 'center',
   },
   dayCountSelected: {
     color: '#FFFFFF',

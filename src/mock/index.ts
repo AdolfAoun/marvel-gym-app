@@ -23,7 +23,6 @@ export const currentMember: Member = {
   email: 'tony.stark@example.com',
   phone: '+1 212 555 0185',
   location: 'Beirut, Lebanon',
-  preferredPaymentMethod: 'Visa',
   dateOfBirth: '1985-05-29',
   emergencyContactName: 'Pepper Potts',
   emergencyContactPhone: '+1 212 555 0199',
@@ -404,7 +403,7 @@ export const vouchers: Voucher[] = [
 
 export const journeyProfile: JourneyProfile = {
   biography:
-    'Training for strength, energy, and consistency. Focused on showing up four times a week.',
+    'Example: I am 28, training four days a week to build lean strength, improve energy, and protect my lower back.',
   gymPlan:
     'Monday: Push - Bench Press, Shoulder Press, Triceps Pushdown.\nWednesday: Pull - Lat Pulldown, Cable Row, Dumbbell Curl.\nFriday: Legs - Leg Press, Romanian Deadlift, Calf Raises.',
 };
@@ -429,7 +428,7 @@ export const attendanceDays: AttendanceDay[] = [
 export const journeyStats: JourneyStats = {
   averageWorkoutDuration: '72 min',
   visitsThisMonth: 10,
-  visitsThisYear: 84,
+  visitsThisWeek: 5,
   consecutiveStreak: 3,
   estimatedCaloriesBurned: 620,
 };
@@ -640,7 +639,7 @@ export const paymentHistory: Payment[] = [
     membershipId: activeMembership.id,
     amount: 129,
     currency: 'USD',
-    method: 'Visa',
+    method: 'Cash',
     status: 'Paid',
     paidAt: '2026-05-01T10:15:00.000Z',
     createdAt: '2026-05-01T10:14:30.000Z',
@@ -652,7 +651,7 @@ export const paymentHistory: Payment[] = [
     productId: 'product-003',
     amount: 2.75,
     currency: 'USD',
-    method: 'Pay at Counter',
+    method: 'Cash',
     status: 'Paid',
     paidAt: '2026-05-18T16:45:00.000Z',
     createdAt: '2026-05-18T16:44:00.000Z',
@@ -664,7 +663,7 @@ export const paymentHistory: Payment[] = [
     classId: 'class-004',
     amount: 15,
     currency: 'USD',
-    method: 'Whish Money',
+    method: 'Cash',
     status: 'Paid',
     paidAt: '2026-05-29T19:20:00.000Z',
     createdAt: '2026-05-29T19:18:00.000Z',
@@ -685,8 +684,8 @@ export const appNotifications: AppNotification[] = [
   {
     id: 'notification-002',
     memberId: currentMember.id,
-    title: 'Payment confirmed',
-    message: 'Your payment of $129.00 was confirmed.',
+    title: 'Cash request received',
+    message: 'Your membership request was received at the counter.',
     type: 'Success',
     isRead: true,
     createdAt: '2026-05-01T10:17:00.000Z',

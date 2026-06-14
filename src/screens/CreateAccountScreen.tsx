@@ -21,13 +21,13 @@ const accentColor = '#B11226';
 const genderOptions: RegisterMemberInput['gender'][] = [
   'Male',
   'Female',
-  'Prefer not to say',
 ];
 
 type FormErrors = Partial<
   Record<
     | 'firstName'
     | 'lastName'
+    | 'email'
     | 'phone'
     | 'dateOfBirth'
     | 'gender'
@@ -127,19 +127,23 @@ export default function CreateAccountScreen() {
   const router = useRouter();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [gender, setGender] = useState<RegisterMemberInput['gender']>();
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
+  const [submitError, setSubmitError] = useState('');
 
   const validate = () => {
     const nextErrors: FormErrors = {};
     const cleanFirstName = normalizeName(firstName);
     const cleanLastName = normalizeName(lastName);
+    const cleanEmail = email.trim().toLowerCase();
     const cleanPhone = phone.replace(/\D/g, '');
     const cleanDateOfBirth = parseDateOfBirth(dateOfBirth);
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!cleanFirstName || !isValidName(cleanFirstName)) {
       nextErrors.firstName = 'Enter a valid first name using letters only.';
@@ -147,6 +151,10 @@ export default function CreateAccountScreen() {
 
     if (!cleanLastName || !isValidName(cleanLastName)) {
       nextErrors.lastName = 'Enter a valid family name using letters only.';
+    }
+
+    if (!emailPattern.test(cleanEmail)) {
+      nextErrors.email = 'Enter a valid email address.';
     }
 
     if (cleanPhone.length !== 8) {
@@ -176,6 +184,7 @@ export default function CreateAccountScreen() {
     return {
       firstName: cleanFirstName,
       lastName: cleanLastName,
+      email: cleanEmail,
       phone: `+961 ${formatLebanesePhone(cleanPhone)}`,
       dateOfBirth: cleanDateOfBirth,
       gender,
@@ -191,6 +200,7 @@ export default function CreateAccountScreen() {
     }
 
     setIsSubmitting(true);
+    setSubmitError('');
 
     try {
       await authService.registerMember(payload);
@@ -198,6 +208,12 @@ export default function CreateAccountScreen() {
         pathname: '/login',
         params: { created: '1' },
       });
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : 'Could not create the account. Please try again.',
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -232,7 +248,7 @@ export default function CreateAccountScreen() {
               />
               <View style={styles.brandCopy}>
                 <Text style={styles.brandTitle}>MARVEL GYM</Text>
-                <Text style={styles.brandSubtitle}>Create member access</Text>
+                <Text style={styles.brandSubtitle}>Create your account</Text>
               </View>
             </View>
 
@@ -272,6 +288,24 @@ export default function CreateAccountScreen() {
                     <Text style={styles.errorText}>{errors.lastName}</Text>
                   ) : null}
                 </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Email</Text>
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="member@marvelgym.com"
+                  placeholderTextColor="#667282"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                  selectionColor={accentColor}
+                  style={styles.input}
+                />
+                {errors.email ? (
+                  <Text style={styles.errorText}>{errors.email}</Text>
+                ) : null}
               </View>
 
               <View style={styles.inputGroup}>
@@ -376,6 +410,9 @@ export default function CreateAccountScreen() {
                   <Text style={styles.primaryButtonText}>Create Account</Text>
                 )}
               </Pressable>
+              {submitError ? (
+                <Text style={styles.submitErrorText}>{submitError}</Text>
+              ) : null}
             </View>
 
             <Pressable
@@ -594,16 +631,17 @@ const styles = StyleSheet.create({
   genderGrid: {
     flexDirection: 'row',
     gap: 8,
+    alignSelf: 'flex-start',
   },
   genderOption: {
     minHeight: 42,
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.13)',
     borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.075)',
+    paddingHorizontal: 18,
   },
   genderOptionSelected: {
     borderColor: 'rgba(225, 29, 46, 0.58)',
@@ -630,6 +668,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 15,
     marginTop: 7,
+  },
+  submitErrorText: {
+    color: '#F2B8BF',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+    marginTop: 10,
+    textAlign: 'center',
   },
   primaryButton: {
     minHeight: 56,

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Image,
   Modal,
   PanResponder,
   Pressable,
@@ -18,6 +19,7 @@ import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
 import {
   activityService,
+  avatarService,
   classService,
   journeyService,
   memberService,
@@ -48,7 +50,6 @@ const maxRenewMonths = 12;
 const minRenewMonths = 1;
 
 type MembershipModal = 'freeze' | 'renew';
-type PaymentMode = 'Pay at Counter' | 'Pay with Card';
 
 function calculateDaysRemaining(endDate?: string) {
   if (!endDate) {
@@ -126,19 +127,23 @@ function getStatusTone(status?: MembershipStatus) {
 }
 
 function getActivityColor(count: number) {
-  if (count >= 95) {
-    return accentColor;
+  if (count >= 85) {
+    return '#EF233C';
   }
 
   if (count >= 70) {
-    return '#DC2626';
+    return '#FF7A1A';
   }
 
-  if (count >= 40) {
-    return '#F59E0B';
+  if (count >= 55) {
+    return '#FFD166';
   }
 
-  return '#22C55E';
+  if (count >= 35) {
+    return '#8DE05F';
+  }
+
+  return '#20C997';
 }
 
 function getVoucherStatusColor(status: VoucherStatus) {
@@ -206,9 +211,14 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingVoucher, setIsCreatingVoucher] = useState(false);
   const [feedback, setFeedback] = useState('Ready when you are.');
+  const [toastMessage, setToastMessage] = useState('');
   const modalProgress = useRef(new Animated.Value(0)).current;
   const sheetPanY = useRef(new Animated.Value(0)).current;
   const qrPanY = useRef(new Animated.Value(0)).current;
+  const toastProgress = useRef(new Animated.Value(0)).current;
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   const sheetPanResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) =>
@@ -329,6 +339,14 @@ export default function HomeScreen() {
     }).start();
   }, [membershipModal, modalProgress]);
 
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const daysRemaining = useMemo(
     () => calculateDaysRemaining(membership?.endDate),
     [membership?.endDate],
@@ -344,9 +362,7 @@ export default function HomeScreen() {
   const isFrozen = status === 'Frozen';
   const canShowQr = status === 'Active';
   const expiryDate = formatDate(membership?.endDate);
-  const memberInitials = `${member?.firstName?.slice(0, 1) ?? 'M'}${
-    member?.lastName?.slice(0, 1) ?? 'G'
-  }`;
+  const memberAvatar = avatarService.getMemberAvatarDisplay(member);
   const selectedActivityDay =
     activitySchedule.find((item) => item.id === selectedActivityDayId) ??
     activitySchedule[0];
@@ -371,6 +387,28 @@ export default function HomeScreen() {
       sheetPanY.setValue(0);
       setMembershipModal(undefined);
     });
+  };
+
+  const showToast = (message: string) => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+
+    setToastMessage(message);
+    toastProgress.setValue(0);
+    Animated.spring(toastProgress, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 90,
+    }).start();
+    toastTimeoutRef.current = setTimeout(() => {
+      Animated.timing(toastProgress, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }).start(() => setToastMessage(''));
+    }, 2200);
   };
 
   const handleShowQr = async () => {
@@ -404,20 +442,20 @@ export default function HomeScreen() {
     setFeedback('Today was added as a gym visit.');
   };
 
-  const handleCreateFreezeVoucher = async (paymentMode: PaymentMode) => {
+  const handleCreateFreezeVoucher = async () => {
     setIsCreatingVoucher(true);
 
     try {
       const voucher = await voucherService.createMembershipFreezeVoucher(
         selectedFreezeWeeks,
         selectedFreezeAmount,
-        paymentMode,
       );
 
       await refreshVouchers();
       setFeedback(
-        `${voucher.id} created. Freeze confirmation remains controlled by Gmind/admin.`,
+        `${voucher.id} created. Complete the counter confirmation at the gym.`,
       );
+      showToast('Voucher created');
       closeMembershipModal();
     } finally {
       setIsCreatingVoucher(false);
@@ -432,20 +470,20 @@ export default function HomeScreen() {
     setFeedback('Membership is marked active again.');
   };
 
-  const handleCreateRenewVoucher = async (paymentMode: PaymentMode) => {
+  const handleCreateRenewVoucher = async () => {
     setIsCreatingVoucher(true);
 
     try {
       const voucher = await voucherService.createMembershipRenewalVoucher(
         selectedRenewMonths,
         selectedRenewAmount,
-        paymentMode,
       );
 
       await refreshVouchers();
       setFeedback(
-        `${voucher.id} created. Membership activation waits for Gmind/admin confirmation.`,
+        `${voucher.id} created. Complete the counter confirmation at the gym.`,
       );
+      showToast('Voucher created');
       closeMembershipModal();
     } finally {
       setIsCreatingVoucher(false);
@@ -481,6 +519,10 @@ export default function HomeScreen() {
     inputRange: [0, 1],
     outputRange: [0.94, 1],
   });
+  const toastTranslateY = toastProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [22, 0],
+  });
 
   return (
     <PremiumScreenBackground>
@@ -489,9 +531,6 @@ export default function HomeScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
-          <View pointerEvents="none" style={styles.heroGlow} />
-          <View pointerEvents="none" style={styles.heroBlade} />
-          <View pointerEvents="none" style={styles.heroRing} />
           <View style={styles.heroTopRow}>
             <View style={styles.heroTextBlock}>
               <Text style={styles.kicker}>Welcome back</Text>
@@ -499,7 +538,15 @@ export default function HomeScreen() {
               <Text style={styles.subtitle}>Consistency is key.</Text>
             </View>
             <View style={styles.avatarBadge}>
-              <Text style={styles.avatarText}>{memberInitials}</Text>
+              {memberAvatar.imageUri ? (
+                <Image
+                  source={{ uri: memberAvatar.imageUri }}
+                  style={styles.avatarImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text style={styles.avatarText}>{memberAvatar.fallbackLabel}</Text>
+              )}
             </View>
           </View>
 
@@ -644,7 +691,7 @@ export default function HomeScreen() {
               Choose a muscle group and open setup cues for each machine.
             </Text>
           </View>
-          <Text style={styles.machineGuideAction}>Go</Text>
+          <Text style={styles.machineGuideAction}>Open</Text>
         </Pressable>
 
         <Pressable
@@ -707,6 +754,7 @@ export default function HomeScreen() {
             contentContainerStyle={styles.activityChart}>
             {selectedActivityDay?.levels.map((item) => (
               <View key={item.id} style={styles.activityColumn}>
+                <Text style={styles.activityValue}>{item.count}%</Text>
                 <View style={styles.activityTrack}>
                   <View
                     style={[
@@ -723,20 +771,6 @@ export default function HomeScreen() {
             ))}
           </ScrollView>
 
-          <View style={styles.legendRow}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#22C55E' }]} />
-              <Text style={styles.legendText}>Low</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
-              <Text style={styles.legendText}>Medium</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: accentColor }]} />
-              <Text style={styles.legendText}>Full / Peak</Text>
-            </View>
-          </View>
         </View>
 
         <View style={styles.voucherSection}>
@@ -851,16 +885,25 @@ export default function HomeScreen() {
               {notification?.title ?? 'No notifications yet'}
             </Text>
             <Text style={styles.infoBody}>
-              {notification?.message ?? 'Important membership updates will appear here.'}
+              {feedback || notification?.message || 'Important membership updates will appear here.'}
             </Text>
-          </View>
-
-          <View style={styles.infoCard}>
-            <Text style={styles.cardLabel}>Action status</Text>
-            <Text style={styles.infoBody}>{feedback}</Text>
           </View>
         </View>
       </ScrollView>
+
+      {toastMessage ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.toast,
+            {
+              opacity: toastProgress,
+              transform: [{ translateY: toastTranslateY }],
+            },
+          ]}>
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </Animated.View>
+      ) : null}
 
       <Modal transparent visible={Boolean(membershipModal)} animationType="none">
         <Animated.View style={[styles.modalOverlay, { opacity: modalProgress }]}>
@@ -890,8 +933,8 @@ export default function HomeScreen() {
                   {isFrozen ? 'Extend the current freeze.' : 'Request a membership freeze.'}
                 </Text>
                 <Text style={styles.modalBody}>
-                  Freeze pricing is $10/week. Requests are stored as pending
-                  vouchers and finalized through Gmind/admin.
+                  Freeze pricing is $10/week. Requests are held for cash
+                  confirmation at the counter.
                 </Text>
 
                 <View style={styles.stepperRow}>
@@ -924,21 +967,21 @@ export default function HomeScreen() {
                 <View style={styles.modalActionRow}>
                   <Pressable
                     disabled={isCreatingVoucher}
-                    onPress={() => handleCreateFreezeVoucher('Pay at Counter')}
+                    onPress={() => closeMembershipModal()}
                     style={({ pressed }) => [
                       styles.modalSecondaryButton,
                       pressed && styles.buttonPressed,
                     ]}>
-                    <Text style={styles.modalSecondaryText}>Pay at Counter</Text>
+                    <Text style={styles.modalSecondaryText}>Cancel</Text>
                   </Pressable>
                   <Pressable
                     disabled={isCreatingVoucher}
-                    onPress={() => handleCreateFreezeVoucher('Pay with Card')}
+                    onPress={handleCreateFreezeVoucher}
                     style={({ pressed }) => [
                       styles.modalPrimaryButton,
                       pressed && styles.buttonPressed,
                     ]}>
-                    <Text style={styles.modalPrimaryText}>Pay with Card</Text>
+                    <Text style={styles.modalPrimaryText}>Create voucher</Text>
                   </Pressable>
                 </View>
               </>
@@ -994,21 +1037,21 @@ export default function HomeScreen() {
                 <View style={styles.modalActionRow}>
                   <Pressable
                     disabled={isCreatingVoucher}
-                    onPress={() => handleCreateRenewVoucher('Pay at Counter')}
+                    onPress={() => closeMembershipModal()}
                     style={({ pressed }) => [
                       styles.modalSecondaryButton,
                       pressed && styles.buttonPressed,
                     ]}>
-                    <Text style={styles.modalSecondaryText}>Pay at Counter</Text>
+                    <Text style={styles.modalSecondaryText}>Cancel</Text>
                   </Pressable>
                   <Pressable
                     disabled={isCreatingVoucher}
-                    onPress={() => handleCreateRenewVoucher('Pay with Card')}
+                    onPress={handleCreateRenewVoucher}
                     style={({ pressed }) => [
                       styles.modalPrimaryButton,
                       pressed && styles.buttonPressed,
                     ]}>
-                    <Text style={styles.modalPrimaryText}>Pay with Card</Text>
+                    <Text style={styles.modalPrimaryText}>Create voucher</Text>
                   </Pressable>
                 </View>
               </>
@@ -1124,41 +1167,12 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: premiumColors.borderStrong,
-    borderRadius: 28,
-    backgroundColor: premiumColors.surfaceAlt,
-    padding: 22,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 24,
+    backgroundColor: 'rgba(18, 20, 28, 0.72)',
+    padding: 20,
     marginBottom: 16,
     ...premiumShadow,
-  },
-  heroGlow: {
-    position: 'absolute',
-    right: -86,
-    top: -88,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: 'rgba(225, 29, 46, 0.28)',
-  },
-  heroBlade: {
-    position: 'absolute',
-    right: 40,
-    top: -46,
-    width: 54,
-    height: 212,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    transform: [{ rotate: '26deg' }],
-  },
-  heroRing: {
-    position: 'absolute',
-    right: -28,
-    bottom: -50,
-    width: 150,
-    height: 150,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-    borderRadius: 75,
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -1170,7 +1184,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   kicker: {
-    color: '#F7D6DC',
+    color: premiumColors.redBright,
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0,
@@ -1184,7 +1198,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   subtitle: {
-    color: '#FCE7EA',
+    color: mutedColor,
     fontSize: 15,
     fontWeight: '800',
     lineHeight: 20,
@@ -1196,9 +1210,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.28)',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
     borderRadius: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     color: '#FFFFFF',
@@ -1212,7 +1231,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 10,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.14)',
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
     marginTop: 18,
     paddingTop: 14,
   },
@@ -1222,9 +1241,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.22)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     paddingHorizontal: 12,
   },
   statusDot: {
@@ -1239,7 +1258,7 @@ const styles = StyleSheet.create({
   },
   heroExpiryText: {
     flex: 1,
-    color: '#FCE7EA',
+    color: mutedColor,
     fontSize: 12,
     fontWeight: '800',
     textAlign: 'right',
@@ -1461,11 +1480,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   activityCard: {
+    position: 'relative',
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 28,
-    backgroundColor: surfaceColor,
-    padding: 17,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 24,
+    backgroundColor: '#101116',
+    padding: 16,
     marginBottom: 16,
     ...premiumShadow,
   },
@@ -1497,65 +1518,51 @@ const styles = StyleSheet.create({
   },
   activityChart: {
     alignItems: 'flex-end',
-    gap: 10,
-    minHeight: 188,
+    gap: 16,
+    minHeight: 186,
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.08)',
-    borderRadius: 24,
-    backgroundColor: premiumColors.surfaceSoft,
-    paddingHorizontal: 12,
+    borderColor: 'rgba(255, 255, 255, 0.13)',
+    borderRadius: 18,
+    backgroundColor: 'rgba(8, 10, 16, 0.64)',
+    paddingHorizontal: 14,
     paddingTop: 16,
-    paddingBottom: 12,
-    paddingRight: 14,
+    paddingBottom: 14,
+    paddingRight: 16,
   },
   activityColumn: {
-    width: 36,
+    width: 42,
     alignItems: 'center',
     justifyContent: 'flex-end',
     gap: 8,
   },
-  activityTrack: {
-    width: 24,
-    height: 136,
-    justifyContent: 'flex-end',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.08)',
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  activityFill: {
-    width: '100%',
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
-  },
-  activityLabel: {
-    color: mutedColor,
+  activityValue: {
+    color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '900',
   },
-  legendRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(177, 18, 38, 0.1)',
-    marginTop: 16,
-    paddingTop: 13,
+  activityTrack: {
+    width: 30,
+    height: 120,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 7,
+    backgroundColor: 'rgba(255, 255, 255, 0.075)',
   },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  activityFill: {
+    width: '100%',
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
   },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendText: {
-    color: mutedColor,
-    fontSize: 12,
-    fontWeight: '800',
+  activityLabel: {
+    color: premiumColors.textMuted,
+    fontSize: 10,
+    fontWeight: '900',
   },
   voucherSection: {
     marginBottom: 16,
@@ -1712,6 +1719,26 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     opacity: 0.76,
+  },
+  toast: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 112,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 18,
+    backgroundColor: 'rgba(38, 41, 50, 0.94)',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    ...premiumShadow,
+  },
+  toastText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
   },
   modalOverlay: {
     flex: 1,

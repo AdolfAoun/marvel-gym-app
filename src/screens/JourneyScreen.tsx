@@ -1,8 +1,10 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +19,7 @@ import { journeyService, memberService } from '@/services';
 import type {
   Achievement,
   AttendanceDay,
+  JourneyHistoryRecord,
   JourneyProfile,
   JourneyStatKey,
   JourneyStats,
@@ -31,6 +34,20 @@ const textColor = premiumColors.text;
 const mutedColor = premiumColors.textMuted;
 
 type TimerState = 'idle' | 'running' | 'paused';
+
+const journeyTimerStorageKey = 'marvel-gym:journey-workout-timer';
+const journeyDashboardStatKeys: JourneyStatKey[] = [
+  'averageWorkoutDuration',
+  'visitsThisMonth',
+  'estimatedCaloriesBurned',
+  'visitsThisWeek',
+];
+
+type StoredTimerState = {
+  elapsedSeconds: number;
+  startedAt?: number;
+  state: TimerState;
+};
 
 function formatDay(value: string) {
   return new Intl.DateTimeFormat('en', {
@@ -57,6 +74,18 @@ function estimateCalories(durationSeconds: number) {
   return Math.max(0, Math.round((durationSeconds / 60) * 8));
 }
 
+function formatHistoryRange(historyRecord: JourneyHistoryRecord) {
+  const formatter = new Intl.DateTimeFormat('en', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
+  return `${formatter.format(new Date(historyRecord.startedAt))} - ${formatter.format(
+    new Date(historyRecord.endedAt),
+  )}`;
+}
+
 function hasJourneyStatValue(stats: JourneyStats, statKey: JourneyStatKey) {
   if (statKey === 'averageWorkoutDuration') {
     return Number.parseInt(stats.averageWorkoutDuration, 10) > 0;
@@ -65,11 +94,35 @@ function hasJourneyStatValue(stats: JourneyStats, statKey: JourneyStatKey) {
   return stats[statKey] > 0;
 }
 
+async function saveStoredTimerState(timer: StoredTimerState) {
+  await AsyncStorage.setItem(journeyTimerStorageKey, JSON.stringify(timer));
+}
+
+async function clearStoredTimerState() {
+  await AsyncStorage.removeItem(journeyTimerStorageKey);
+}
+
+async function getStoredTimerState() {
+  const storedValue = await AsyncStorage.getItem(journeyTimerStorageKey);
+
+  if (!storedValue) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(storedValue) as StoredTimerState;
+  } catch {
+    await clearStoredTimerState();
+    return undefined;
+  }
+}
+
 export default function JourneyScreen() {
   const [member, setMember] = useState<Member>();
   const [profile, setProfile] = useState<JourneyProfile>();
   const [biographyDraft, setBiographyDraft] = useState('');
   const [attendanceDays, setAttendanceDays] = useState<AttendanceDay[]>([]);
+  const [historyRecords, setHistoryRecords] = useState<JourneyHistoryRecord[]>([]);
   const [stats, setStats] = useState<JourneyStats>();
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [isEditingBio, setIsEditingBio] = useState(false);
@@ -77,7 +130,17 @@ export default function JourneyScreen() {
   const [timerState, setTimerState] = useState<TimerState>('idle');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [lastCalories, setLastCalories] = useState(0);
+  const [pendingVisitDate, setPendingVisitDate] = useState('');
+  const [pendingResetKey, setPendingResetKey] = useState<JourneyStatKey>();
+  const [isPendingResetAll, setIsPendingResetAll] = useState(false);
+  const [undoableResetKeys, setUndoableResetKeys] = useState<JourneyStatKey[]>([]);
+  const [isAllResetUndoable, setIsAllResetUndoable] = useState(false);
+  const [pendingTimerSeconds, setPendingTimerSeconds] = useState(0);
+  const [isHistoryVisible, setIsHistoryVisible] = useState(false);
+  const [isAssistantChatStarted, setIsAssistantChatStarted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const timerStartedAtRef = useRef<number | undefined>(undefined);
+  const pausedElapsedRef = useRef(0);
 
   useEffect(() => {
     const loadJourney = async () => {
@@ -85,22 +148,42 @@ export default function JourneyScreen() {
         currentMember,
         journeyProfile,
         attendance,
+        history,
         journeyStats,
         nextAchievements,
+        storedTimer,
       ] = await Promise.all([
         memberService.getCurrentMember(),
         journeyService.getJourneyProfile(),
         journeyService.getAttendanceDays(),
+        journeyService.getJourneyHistory(),
         journeyService.getJourneyStats(),
         journeyService.getAchievements(),
+        getStoredTimerState(),
       ]);
 
       setMember(currentMember);
       setProfile(journeyProfile);
       setBiographyDraft(journeyProfile.biography);
       setAttendanceDays(attendance);
+      setHistoryRecords(history);
       setStats(journeyStats);
       setAchievements(nextAchievements);
+
+      if (storedTimer?.state === 'running' && storedTimer.startedAt) {
+        timerStartedAtRef.current = storedTimer.startedAt;
+        pausedElapsedRef.current = storedTimer.elapsedSeconds;
+        setElapsedSeconds(
+          storedTimer.elapsedSeconds +
+            Math.max(0, Math.floor((Date.now() - storedTimer.startedAt) / 1000)),
+        );
+        setTimerState('running');
+      } else if (storedTimer?.state === 'paused') {
+        pausedElapsedRef.current = storedTimer.elapsedSeconds;
+        setElapsedSeconds(storedTimer.elapsedSeconds);
+        setTimerState('paused');
+      }
+
       setIsLoading(false);
     };
 
@@ -112,8 +195,9 @@ export default function JourneyScreen() {
       let isActive = true;
 
       const syncJourney = async () => {
-        const [attendance, journeyStats] = await Promise.all([
+        const [attendance, history, journeyStats] = await Promise.all([
           journeyService.getAttendanceDays(),
+          journeyService.getJourneyHistory(),
           journeyService.getJourneyStats(),
         ]);
 
@@ -122,6 +206,7 @@ export default function JourneyScreen() {
         }
 
         setAttendanceDays(attendance);
+        setHistoryRecords(history);
         setStats(journeyStats);
         setSelectedMonthIndex(new Date().getMonth());
       };
@@ -140,8 +225,16 @@ export default function JourneyScreen() {
     }
 
     const interval = setInterval(() => {
-      setElapsedSeconds((current) => current + 1);
-    }, 1000);
+      if (!timerStartedAtRef.current) {
+        return;
+      }
+
+      const liveSeconds = Math.floor(
+        (Date.now() - timerStartedAtRef.current) / 1000,
+      );
+
+      setElapsedSeconds(pausedElapsedRef.current + liveSeconds);
+    }, 250);
 
     return () => clearInterval(interval);
   }, [timerState]);
@@ -180,6 +273,12 @@ export default function JourneyScreen() {
     setStats(nextStats);
   };
 
+  const refreshJourneyHistory = async () => {
+    const nextHistory = await journeyService.getJourneyHistory();
+
+    setHistoryRecords(nextHistory);
+  };
+
   const handleSaveBiography = async () => {
     const nextProfile = await journeyService.updateJourneyProfile({
       biography: biographyDraft.trim(),
@@ -190,40 +289,158 @@ export default function JourneyScreen() {
     setIsEditingBio(false);
   };
 
-  const handleToggleVisit = async (date: string) => {
-    const nextAttendance = await journeyService.toggleAttendanceDay(date);
+  const confirmToggleVisit = async () => {
+    if (!pendingVisitDate) {
+      return;
+    }
+
+    const nextAttendance = await journeyService.toggleAttendanceDay(pendingVisitDate);
 
     setAttendanceDays(nextAttendance);
+    setPendingVisitDate('');
     await refreshStats();
   };
 
   const handleStartTimer = () => {
-    if (timerState === 'idle') {
-      setElapsedSeconds(0);
-      setLastCalories(0);
-    }
-
-    setTimerState('running');
-  };
-
-  const handleEndWorkout = async () => {
-    if (elapsedSeconds <= 0) {
-      setTimerState('idle');
+    if (timerState === 'running') {
       return;
     }
 
-    const session = await journeyService.completeWorkoutSession(elapsedSeconds);
+    const startedAt = Date.now();
+
+    if (timerState === 'idle') {
+      setElapsedSeconds(0);
+      setLastCalories(0);
+      pausedElapsedRef.current = 0;
+    }
+
+    timerStartedAtRef.current = startedAt;
+    setTimerState('running');
+    saveStoredTimerState({
+      elapsedSeconds: pausedElapsedRef.current,
+      startedAt,
+      state: 'running',
+    });
+  };
+
+  const handleEndWorkout = async () => {
+    const liveElapsedSeconds = timerStartedAtRef.current
+      ? pausedElapsedRef.current +
+        Math.max(0, Math.round((Date.now() - timerStartedAtRef.current) / 1000))
+      : elapsedSeconds;
+
+    if (liveElapsedSeconds <= 0) {
+      setTimerState('idle');
+      timerStartedAtRef.current = undefined;
+      pausedElapsedRef.current = 0;
+      clearStoredTimerState();
+      return;
+    }
+
+    setElapsedSeconds(liveElapsedSeconds);
+    setPendingTimerSeconds(liveElapsedSeconds);
+    setTimerState('paused');
+    timerStartedAtRef.current = undefined;
+    pausedElapsedRef.current = liveElapsedSeconds;
+    saveStoredTimerState({
+      elapsedSeconds: liveElapsedSeconds,
+      state: 'paused',
+    });
+  };
+
+  const confirmSaveWorkout = async () => {
+    const session = await journeyService.completeWorkoutSession(pendingTimerSeconds);
 
     setLastCalories(session.estimatedCaloriesBurned);
     setTimerState('idle');
     setElapsedSeconds(0);
+    setPendingTimerSeconds(0);
+    timerStartedAtRef.current = undefined;
+    pausedElapsedRef.current = 0;
+    await clearStoredTimerState();
     await refreshStats();
   };
 
-  const handleResetStat = async (statKey: JourneyStatKey) => {
-    const nextStats = await journeyService.resetJourneyStat(statKey);
+  const discardWorkoutTime = () => {
+    setTimerState('idle');
+    setElapsedSeconds(0);
+    setPendingTimerSeconds(0);
+    timerStartedAtRef.current = undefined;
+    pausedElapsedRef.current = 0;
+    clearStoredTimerState();
+  };
+
+  const handlePauseTimer = () => {
+    if (!timerStartedAtRef.current) {
+      return;
+    }
+
+    const liveSeconds = Math.floor(
+      (Date.now() - timerStartedAtRef.current) / 1000,
+    );
+
+    pausedElapsedRef.current += liveSeconds;
+    setElapsedSeconds(pausedElapsedRef.current);
+    timerStartedAtRef.current = undefined;
+    setTimerState('paused');
+    saveStoredTimerState({
+      elapsedSeconds: pausedElapsedRef.current,
+      state: 'paused',
+    });
+  };
+
+  const confirmResetStat = async () => {
+    if (!pendingResetKey && !isPendingResetAll) {
+      return;
+    }
+
+    const nextStats = isPendingResetAll
+      ? await journeyService.resetAllJourneyStats()
+      : await journeyService.resetJourneyStat(pendingResetKey as JourneyStatKey);
 
     setStats(nextStats);
+    if (isPendingResetAll) {
+      setIsAllResetUndoable(true);
+      setUndoableResetKeys([]);
+    } else if (pendingResetKey) {
+      setIsAllResetUndoable(false);
+      setUndoableResetKeys((current) => [
+        pendingResetKey,
+        ...current.filter((key) => key !== pendingResetKey),
+      ]);
+    }
+    setPendingResetKey(undefined);
+    setIsPendingResetAll(false);
+  };
+
+  const handleUndoReset = async (statKey: JourneyStatKey) => {
+    const nextStats = await journeyService.undoResetJourneyStat(statKey);
+
+    setStats(nextStats);
+    setUndoableResetKeys((current) => current.filter((key) => key !== statKey));
+    await refreshJourneyHistory();
+  };
+
+  const handleUndoResetAll = async () => {
+    const nextStats = await journeyService.undoResetAllJourneyStats();
+
+    setStats(nextStats);
+    setIsAllResetUndoable(false);
+    await refreshJourneyHistory();
+  };
+
+  const handleSaveReset = async (statKey: JourneyStatKey) => {
+    const nextHistory = await journeyService.saveJourneyReset(statKey);
+
+    setHistoryRecords(nextHistory);
+    setUndoableResetKeys((current) => current.filter((key) => key !== statKey));
+  };
+
+  const handleSaveResetAll = async () => {
+    const nextHistory = await journeyService.saveAllJourneyReset();
+
+    setHistoryRecords(nextHistory);
+    setIsAllResetUndoable(false);
   };
 
   if (isLoading || !profile || !stats) {
@@ -238,6 +455,10 @@ export default function JourneyScreen() {
     );
   }
 
+  const canResetAll = journeyDashboardStatKeys.some((statKey) =>
+    hasJourneyStatValue(stats, statKey),
+  );
+
   return (
     <PremiumScreenBackground>
       <StatusBar style="light" />
@@ -246,7 +467,6 @@ export default function JourneyScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
-          <View pointerEvents="none" style={styles.heroGlow} />
           <Text style={styles.kicker}>Journey</Text>
           <Text style={styles.heroTitle}>
             {member?.firstName ?? 'Member'}'s fitness dashboard
@@ -264,6 +484,37 @@ export default function JourneyScreen() {
               <Text style={styles.heroStatLabel}>badges</Text>
             </View>
           </View>
+        </View>
+
+        <View style={styles.aiAssistantCard}>
+          <View style={styles.sectionHeaderRow}>
+            <View>
+              <Text style={styles.cardLabel}>AI Assistant</Text>
+              <Text style={styles.sectionTitle}>Tailored training plan help</Text>
+            </View>
+          </View>
+          <Text style={styles.aiAssistantBody}>
+            Your About Me and Training Note help tailor guidance around body type,
+            age, height, weight, gender, goals, ambitions, injuries, limitations,
+            and training preferences.
+          </Text>
+          <Pressable
+            onPress={() => setIsAssistantChatStarted(true)}
+            style={({ pressed }) => [
+              styles.aiChatButton,
+              pressed && styles.buttonPressed,
+            ]}>
+            <Text style={styles.aiChatButtonText}>
+              {isAssistantChatStarted ? 'Continue Chat' : 'Start Chat'}
+            </Text>
+          </Pressable>
+          {isAssistantChatStarted ? (
+            <View style={styles.aiChatPreview}>
+              <Text style={styles.aiChatPreviewText}>
+                Training chat is ready. Use About Me below to keep your guidance personal.
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.timerCard}>
@@ -292,7 +543,7 @@ export default function JourneyScreen() {
               <Text style={styles.primaryButtonText}>Start Timer</Text>
             </Pressable>
             <Pressable
-              onPress={() => setTimerState('paused')}
+              onPress={handlePauseTimer}
               disabled={timerState !== 'running'}
               style={({ pressed }) => [
                 styles.secondaryButton,
@@ -313,9 +564,66 @@ export default function JourneyScreen() {
 
           {lastCalories > 0 && (
             <Text style={styles.estimateText}>
-              Last workout estimate: {lastCalories} calories burned.
+              {lastCalories} Calories Burned
             </Text>
           )}
+        </View>
+
+        <View style={styles.statsHeaderRow}>
+          <View style={styles.dashboardTitleBlock}>
+            <Text style={styles.cardLabel}>Dashboard</Text>
+            <Text style={styles.sectionTitle}>Current training period</Text>
+            <View style={styles.resetAllStack}>
+              {isAllResetUndoable ? (
+                <>
+                  <Pressable
+                    onPress={handleSaveResetAll}
+                    style={({ pressed }) => [
+                      styles.resetAllSaveButton,
+                      pressed && styles.buttonPressed,
+                    ]}>
+                    <Text style={styles.statSaveText}>Save</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={handleUndoResetAll}
+                    style={({ pressed }) => [
+                      styles.resetAllButton,
+                      styles.statResetButtonUndo,
+                      pressed && styles.buttonPressed,
+                    ]}>
+                    <Text style={[styles.resetAllButtonText, styles.statResetTextUndo]}>
+                      Undo Reset
+                    </Text>
+                  </Pressable>
+                </>
+              ) : (
+                <Pressable
+                  disabled={!canResetAll}
+                  onPress={() => setIsPendingResetAll(true)}
+                  style={({ pressed }) => [
+                    styles.resetAllButton,
+                    !canResetAll && styles.statResetButtonDisabled,
+                    pressed && canResetAll && styles.buttonPressed,
+                  ]}>
+                  <Text
+                    style={[
+                      styles.resetAllButtonText,
+                      !canResetAll && styles.statResetTextDisabled,
+                    ]}>
+                    Reset All
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+          <Pressable
+            onPress={() => setIsHistoryVisible(true)}
+            style={({ pressed }) => [
+              styles.historyButton,
+              pressed && styles.buttonPressed,
+            ]}>
+            <Text style={styles.historyButtonText}>History</Text>
+          </Pressable>
         </View>
 
         <View style={styles.statsGrid}>
@@ -336,34 +644,53 @@ export default function JourneyScreen() {
               value: stats.estimatedCaloriesBurned,
             },
             {
-              key: 'visitsThisYear' as const,
-              label: 'Yearly visits',
-              value: stats.visitsThisYear,
+              key: 'visitsThisWeek' as const,
+              label: 'Weekly visits',
+              value: stats.visitsThisWeek,
             },
           ].map((stat) => {
             const canReset = hasJourneyStatValue(stats, stat.key);
+            const canUndoReset = undoableResetKeys.includes(stat.key);
 
             return (
               <View key={stat.key} style={styles.statCard}>
                 <Text style={styles.statValue}>{stat.value}</Text>
                 <View style={styles.statFooterRow}>
                   <Text style={styles.statLabel}>{stat.label}</Text>
-                  <Pressable
-                    disabled={!canReset}
-                    onPress={() => handleResetStat(stat.key)}
-                    style={({ pressed }) => [
-                      styles.statResetButton,
-                      !canReset && styles.statResetButtonDisabled,
-                      pressed && canReset && styles.buttonPressed,
-                    ]}>
-                    <Text
-                      style={[
-                        styles.statResetText,
-                        !canReset && styles.statResetTextDisabled,
+                  <View style={styles.statActionStack}>
+                    <Pressable
+                      disabled={!canReset && !canUndoReset}
+                      onPress={() =>
+                        canUndoReset
+                          ? handleUndoReset(stat.key)
+                          : setPendingResetKey(stat.key)
+                      }
+                      style={({ pressed }) => [
+                        styles.statResetButton,
+                        canUndoReset && styles.statResetButtonUndo,
+                        !canReset && !canUndoReset && styles.statResetButtonDisabled,
+                        pressed && (canReset || canUndoReset) && styles.buttonPressed,
                       ]}>
-                      Reset
-                    </Text>
-                  </Pressable>
+                      <Text
+                        style={[
+                          styles.statResetText,
+                          canUndoReset && styles.statResetTextUndo,
+                          !canReset && !canUndoReset && styles.statResetTextDisabled,
+                        ]}>
+                        {canUndoReset ? 'Undo Reset' : 'Reset'}
+                      </Text>
+                    </Pressable>
+                    {canUndoReset ? (
+                      <Pressable
+                        onPress={() => handleSaveReset(stat.key)}
+                        style={({ pressed }) => [
+                          styles.statSaveButton,
+                          pressed && styles.buttonPressed,
+                        ]}>
+                        <Text style={styles.statSaveText}>Save</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
                 </View>
               </View>
             );
@@ -413,7 +740,7 @@ export default function JourneyScreen() {
                 {selectedMonth.days.map((day) => (
                   <Pressable
                     key={day.id}
-                    onPress={() => handleToggleVisit(day.date)}
+                    onPress={() => setPendingVisitDate(day.date)}
                     style={[
                       styles.calendarDay,
                       day.hasVisit && styles.calendarDayActive,
@@ -514,6 +841,9 @@ export default function JourneyScreen() {
             <View>
               <Text style={styles.cardLabel}>About Me</Text>
               <Text style={styles.sectionTitle}>Training note</Text>
+              <Text style={styles.trainingNoteSubtitle}>
+                Edit About Me below to improve your tailored plan.
+              </Text>
             </View>
             <Pressable
               onPress={() =>
@@ -534,7 +864,7 @@ export default function JourneyScreen() {
               multiline
               value={biographyDraft}
               onChangeText={setBiographyDraft}
-              placeholder="Write a short training biography"
+              placeholder="Example: 28 years old, building lean strength, training 4 days weekly, protecting my lower back."
               placeholderTextColor="#9AA3AF"
               selectionColor={accentColor}
               style={styles.planInput}
@@ -544,6 +874,175 @@ export default function JourneyScreen() {
           )}
         </View>
       </ScrollView>
+
+      <Modal transparent visible={Boolean(pendingVisitDate)} animationType="fade">
+        <View style={styles.centerModalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setPendingVisitDate('')} />
+          <View style={styles.confirmCard}>
+            <Text style={styles.modalKicker}>Attendance</Text>
+            <Text style={styles.confirmTitle}>Update this day?</Text>
+            <Text style={styles.confirmBody}>
+              This will toggle the selected day in your attendance calendar.
+            </Text>
+            <View style={styles.confirmRow}>
+              <Pressable
+                onPress={() => setPendingVisitDate('')}
+                style={({ pressed }) => [
+                  styles.confirmSecondary,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.confirmSecondaryText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={confirmToggleVisit}
+                style={({ pressed }) => [
+                  styles.confirmPrimary,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.confirmPrimaryText}>Confirm</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        transparent
+        visible={Boolean(pendingResetKey) || isPendingResetAll}
+        animationType="fade">
+        <View style={styles.centerModalOverlay}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => {
+              setPendingResetKey(undefined);
+              setIsPendingResetAll(false);
+            }}
+          />
+          <View style={styles.confirmCard}>
+            <Text style={styles.modalKicker}>Journey</Text>
+            <Text style={styles.confirmTitle}>
+              {isPendingResetAll ? 'Reset all stats?' : 'Reset this stat?'}
+            </Text>
+            <Text style={styles.confirmBody}>
+              {isPendingResetAll
+                ? 'Older progress will stop counting in this active dashboard period.'
+                : 'Older history will stop counting in this active dashboard number.'}
+            </Text>
+            <View style={styles.confirmRow}>
+              <Pressable
+                onPress={() => {
+                  setPendingResetKey(undefined);
+                  setIsPendingResetAll(false);
+                }}
+                style={({ pressed }) => [
+                  styles.confirmSecondary,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.confirmSecondaryText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={confirmResetStat}
+                style={({ pressed }) => [
+                  styles.confirmPrimary,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.confirmPrimaryText}>Reset</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal transparent visible={isHistoryVisible} animationType="fade">
+        <View style={styles.historyOverlay}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setIsHistoryVisible(false)}
+          />
+          <View style={styles.historyPanel}>
+            <View style={styles.historyTopBar}>
+              <View>
+                <Text style={styles.modalKicker}>Journey History</Text>
+                <Text style={styles.historyPanelTitle}>Recorded periods</Text>
+              </View>
+              <Pressable
+                onPress={() => setIsHistoryVisible(false)}
+                style={({ pressed }) => [
+                  styles.historyIconClose,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.historyIconCloseText}>X</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.historyTabs}>
+              <View style={[styles.historyTab, styles.historyTabActive]}>
+                <Text style={styles.historyTabTextActive}>History</Text>
+              </View>
+            </View>
+
+            <Text style={styles.historyIntro}>
+              See completed training periods and the progress saved for each one.
+            </Text>
+
+            <ScrollView
+              style={styles.historyList}
+              contentContainerStyle={styles.historyListContent}
+              showsVerticalScrollIndicator={false}>
+              {historyRecords.length === 0 ? (
+                <View style={styles.historyEmptyCard}>
+                  <Text style={styles.historyEmptyTitle}>No history yet</Text>
+                  <Text style={styles.historyEmptyBody}>
+                    Your saved training periods will appear here.
+                  </Text>
+                </View>
+              ) : (
+                historyRecords.map((record) => (
+                  <View key={record.id} style={styles.historyCard}>
+                    <View style={styles.historyCardRail} />
+                    <View style={styles.historyCardContent}>
+                      <Text style={styles.historyRange}>
+                        {formatHistoryRange(record)}
+                      </Text>
+                      <Text style={styles.historySummary}>{record.summary}</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal transparent visible={pendingTimerSeconds > 0} animationType="fade">
+        <View style={styles.centerModalOverlay}>
+          <View style={styles.confirmCard}>
+            <Text style={styles.modalKicker}>Workout Timer</Text>
+            <Text style={styles.confirmTitle}>Save this workout?</Text>
+            <Text style={styles.confirmBody}>
+              Save {formatDuration(pendingTimerSeconds)} to include it in duration and calorie calculations.
+            </Text>
+            <View style={styles.confirmRow}>
+              <Pressable
+                onPress={discardWorkoutTime}
+                style={({ pressed }) => [
+                  styles.confirmSecondary,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.confirmSecondaryText}>Do Not Save</Text>
+              </Pressable>
+              <Pressable
+                onPress={confirmSaveWorkout}
+                style={({ pressed }) => [
+                  styles.confirmPrimary,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.confirmPrimaryText}>Save</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </PremiumScreenBackground>
   );
 }
@@ -573,24 +1072,15 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: premiumColors.borderStrong,
-    borderRadius: 28,
-    backgroundColor: premiumColors.surfaceAlt,
-    padding: 20,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 26,
+    backgroundColor: 'rgba(18, 20, 28, 0.78)',
+    padding: 22,
     marginBottom: 16,
     ...premiumShadow,
   },
-  heroGlow: {
-    position: 'absolute',
-    right: -84,
-    top: -84,
-    width: 210,
-    height: 210,
-    borderRadius: 105,
-    backgroundColor: 'rgba(177, 18, 38, 0.28)',
-  },
   kicker: {
-    color: '#F7D6DC',
+    color: premiumColors.redBright,
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0,
@@ -605,7 +1095,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   heroBody: {
-    color: '#FCE7EA',
+    color: premiumColors.textMuted,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
@@ -613,16 +1103,16 @@ const styles = StyleSheet.create({
   },
   heroStatsRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 20,
+    gap: 12,
+    marginTop: 22,
   },
   heroStatPill: {
     flex: 1,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    padding: 14,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.055)',
+    padding: 15,
   },
   heroStatValue: {
     color: '#FFFFFF',
@@ -630,7 +1120,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   heroStatLabel: {
-    color: '#FCE7EA',
+    color: premiumColors.textMuted,
     fontSize: 11,
     fontWeight: '800',
     marginTop: 2,
@@ -653,6 +1143,48 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     ...premiumShadow,
+  },
+  aiAssistantCard: {
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.11)',
+    borderRadius: 26,
+    backgroundColor: 'rgba(18, 20, 28, 0.86)',
+    padding: 16,
+    marginBottom: 16,
+    ...premiumShadow,
+  },
+  aiAssistantBody: {
+    color: mutedColor,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  aiChatButton: {
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 15,
+    backgroundColor: accentColor,
+    marginTop: 14,
+  },
+  aiChatButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  aiChatPreview: {
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 16,
+    backgroundColor: premiumColors.surfaceSoft,
+    marginTop: 10,
+    padding: 12,
+  },
+  aiChatPreviewText: {
+    color: mutedColor,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -749,6 +1281,63 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 16,
   },
+  statsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 14,
+    marginBottom: 12,
+  },
+  dashboardTitleBlock: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  historyButton: {
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.2)',
+    borderRadius: 999,
+    backgroundColor: premiumColors.surfaceSoft,
+    paddingHorizontal: 16,
+  },
+  historyButtonText: {
+    color: wineColor,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  resetAllStack: {
+    minHeight: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  resetAllButton: {
+    minHeight: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.34)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(177, 18, 38, 0.12)',
+    paddingHorizontal: 12,
+  },
+  resetAllButtonText: {
+    color: accentColor,
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  resetAllSaveButton: {
+    minHeight: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 999,
+    backgroundColor: '#16A34A',
+    paddingHorizontal: 12,
+  },
   statCard: {
     minHeight: 108,
     flexBasis: '47%',
@@ -780,6 +1369,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
   },
+  statActionStack: {
+    alignItems: 'stretch',
+    gap: 7,
+  },
   statResetButton: {
     minHeight: 26,
     alignItems: 'center',
@@ -789,6 +1382,10 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: 'rgba(177, 18, 38, 0.12)',
     paddingHorizontal: 9,
+  },
+  statResetButtonUndo: {
+    borderColor: 'rgba(245, 158, 11, 0.32)',
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
   },
   statResetButtonDisabled: {
     borderColor: 'rgba(177, 18, 38, 0.14)',
@@ -801,8 +1398,25 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textTransform: 'uppercase',
   },
+  statResetTextUndo: {
+    color: '#F8C471',
+  },
   statResetTextDisabled: {
     color: 'rgba(177, 18, 38, 0.72)',
+  },
+  statSaveButton: {
+    minHeight: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 999,
+    backgroundColor: '#16A34A',
+    paddingHorizontal: 11,
+  },
+  statSaveText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
   },
   milestoneCard: {
     borderWidth: 1,
@@ -873,6 +1487,14 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     padding: 14,
     textAlignVertical: 'top',
+  },
+  trainingNoteSubtitle: {
+    color: mutedColor,
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 16,
+    marginTop: 4,
+    maxWidth: 230,
   },
   monthBlock: {
     marginBottom: 4,
@@ -990,5 +1612,211 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     opacity: 0.76,
+  },
+  centerModalOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.58)',
+    padding: 20,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 28,
+    backgroundColor: premiumColors.surface,
+    padding: 22,
+    ...premiumShadow,
+  },
+  modalKicker: {
+    color: accentColor,
+    fontSize: 12,
+    fontWeight: '900',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  confirmTitle: {
+    color: textColor,
+    fontSize: 24,
+    fontWeight: '900',
+    lineHeight: 29,
+  },
+  confirmBody: {
+    color: mutedColor,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+    marginTop: 8,
+  },
+  confirmRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 18,
+  },
+  confirmSecondary: {
+    minHeight: 52,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.24)',
+    borderRadius: 18,
+    backgroundColor: premiumColors.surfaceSoft,
+  },
+  confirmSecondaryText: {
+    color: wineColor,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  confirmPrimary: {
+    minHeight: 52,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+    backgroundColor: accentColor,
+  },
+  confirmPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  historyOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 16,
+    paddingTop: 72,
+    paddingBottom: 28,
+  },
+  historyPanel: {
+    flex: 1,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 24,
+    backgroundColor: '#101116',
+    padding: 18,
+    ...premiumShadow,
+  },
+  historyTopBar: {
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  historyPanelTitle: {
+    color: textColor,
+    fontSize: 25,
+    fontWeight: '900',
+    lineHeight: 30,
+  },
+  historyIconClose: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 18,
+    backgroundColor: premiumColors.surfaceSoft,
+  },
+  historyIconCloseText: {
+    color: mutedColor,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  historyTabs: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    marginTop: 18,
+  },
+  historyTab: {
+    minHeight: 42,
+    justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    paddingHorizontal: 4,
+    marginRight: 22,
+  },
+  historyTabActive: {
+    borderBottomColor: accentColor,
+  },
+  historyTabTextActive: {
+    color: textColor,
+    fontSize: 13,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  historyIntro: {
+    color: mutedColor,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 14,
+  },
+  historyList: {
+    flex: 1,
+    marginTop: 18,
+  },
+  historyListContent: {
+    gap: 11,
+    paddingBottom: 8,
+  },
+  historyCard: {
+    minHeight: 76,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.055)',
+  },
+  historyCardRail: {
+    width: 4,
+    backgroundColor: accentColor,
+  },
+  historyCardContent: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  historyRange: {
+    color: textColor,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  historySummary: {
+    color: mutedColor,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+    marginTop: 5,
+  },
+  historyEmptyCard: {
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 18,
+    backgroundColor: premiumColors.surfaceSoft,
+    padding: 14,
+  },
+  historyEmptyTitle: {
+    color: textColor,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  historyEmptyBody: {
+    color: mutedColor,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+    marginTop: 5,
   },
 });

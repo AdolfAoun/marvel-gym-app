@@ -1,10 +1,5 @@
 import { paymentHistory, products } from '../mock';
-import type {
-  Payment,
-  PaymentMethod,
-  Product,
-  ProductCategory,
-} from '../types';
+import type { Payment, Product, ProductCategory } from '../types';
 
 export const getProducts = async (): Promise<Product[]> => {
   return products;
@@ -16,7 +11,6 @@ export const getProductCategories = async (): Promise<ProductCategory[]> => {
 
 export const buyProduct = async (
   productId: string,
-  method: PaymentMethod = 'Pay at Counter',
 ): Promise<Payment | undefined> => {
   const product = products.find((item) => item.id === productId);
 
@@ -29,7 +23,7 @@ export const buyProduct = async (
     productId: product.id,
     amount: product.price,
     currency: product.currency,
-    method,
+    method: 'Cash',
     status: 'Paid',
     paidAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

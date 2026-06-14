@@ -95,15 +95,13 @@ export default function ShopScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
-          <View pointerEvents="none" style={styles.heroGlow} />
-          <View pointerEvents="none" style={styles.heroBlade} />
           <Text style={styles.kicker}>Gym Shop</Text>
           <Text style={styles.heroTitle}>Premium gym essentials.</Text>
           <Text style={styles.heroBody}>
             Check current availability and compare prices for Marvel Gym products.
           </Text>
           <View style={styles.heroPill}>
-            <Text style={styles.heroPillText}>Browse-only product display</Text>
+            <Text style={styles.heroPillText}>Availability and pricing</Text>
           </View>
         </View>
 
@@ -274,34 +272,15 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: premiumColors.borderStrong,
-    borderRadius: 28,
-    backgroundColor: premiumColors.surfaceAlt,
-    padding: 22,
-    marginBottom: 14,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 26,
+    backgroundColor: 'rgba(18, 20, 28, 0.72)',
+    padding: 20,
+    marginBottom: 16,
     ...premiumShadow,
   },
-  heroGlow: {
-    position: 'absolute',
-    right: -76,
-    top: -76,
-    width: 190,
-    height: 190,
-    borderRadius: 95,
-    backgroundColor: 'rgba(177, 18, 38, 0.3)',
-  },
-  heroBlade: {
-    position: 'absolute',
-    right: 46,
-    top: -48,
-    width: 48,
-    height: 210,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    transform: [{ rotate: '24deg' }],
-  },
   kicker: {
-    color: '#F7D6DC',
+    color: premiumColors.redBright,
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0,
@@ -309,13 +288,13 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: '#FFFFFF',
-    fontSize: 31,
+    fontSize: 30,
     fontWeight: '900',
-    lineHeight: 36,
+    lineHeight: 35,
     marginTop: 6,
   },
   heroBody: {
-    color: '#FCE7EA',
+    color: premiumColors.textMuted,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
@@ -324,9 +303,9 @@ const styles = StyleSheet.create({
   heroPill: {
     alignSelf: 'flex-start',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-    borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.055)',
     marginTop: 16,
     paddingHorizontal: 12,
     paddingVertical: 8,

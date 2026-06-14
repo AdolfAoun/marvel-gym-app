@@ -1,9 +1,12 @@
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs, useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import type { SFSymbol } from 'expo-symbols';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Image, Pressable, StyleSheet, Text } from 'react-native';
 
 import { premiumColors } from '@/constants/premiumTheme';
+import { avatarService, memberService } from '@/services';
+import type { Member } from '@/types';
 
 const accentColor = premiumColors.redBright;
 const inactiveColor = premiumColors.textMuted;
@@ -30,6 +33,25 @@ function TabIcon({
 
 function ProfileHeaderButton() {
   const router = useRouter();
+  const [member, setMember] = useState<Member>();
+
+  const loadMember = useCallback(async () => {
+    const currentMember = await memberService.getCurrentMember();
+
+    setMember(currentMember);
+  }, []);
+
+  useEffect(() => {
+    loadMember();
+  }, [loadMember]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadMember();
+    }, [loadMember]),
+  );
+
+  const avatar = avatarService.getMemberAvatarDisplay(member);
 
   return (
     <Pressable
@@ -40,7 +62,15 @@ function ProfileHeaderButton() {
         styles.profileButton,
         pressed && styles.profileButtonPressed,
       ]}>
-      <Text style={styles.profileButtonText}>P</Text>
+      {avatar.imageUri ? (
+        <Image
+          source={{ uri: avatar.imageUri }}
+          style={styles.profileButtonImage}
+          resizeMode="cover"
+        />
+      ) : (
+        <Text style={styles.profileButtonText}>{avatar.fallbackLabel}</Text>
+      )}
     </Pressable>
   );
 }
@@ -165,6 +195,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 4,
+    overflow: 'hidden',
+  },
+  profileButtonImage: {
+    width: '100%',
+    height: '100%',
   },
   profileButtonPressed: {
     opacity: 0.75,

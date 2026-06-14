@@ -12,7 +12,6 @@ import {
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
-import { authService } from '@/services';
 
 const accentColor = premiumColors.red;
 const wineColor = premiumColors.redBright;
@@ -22,28 +21,12 @@ const textColor = premiumColors.text;
 const mutedColor = premiumColors.textMuted;
 
 export default function HelpScreen() {
-  const router = useRouter();
-
   const handleContact = async (url: string) => {
     try {
       await Linking.openURL(url);
     } catch {
       Alert.alert('Contact unavailable', 'This contact option could not be opened.');
     }
-  };
-
-  const handleSignOut = () => {
-    Alert.alert('Sign out?', 'You will return to the welcome screen.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign Out',
-        style: 'destructive',
-        onPress: async () => {
-          await authService.logoutMember();
-          router.replace('/welcome');
-        },
-      },
-    ]);
   };
 
   return (
@@ -53,7 +36,6 @@ export default function HelpScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
-          <View pointerEvents="none" style={styles.heroGlow} />
           <Text style={styles.kicker}>Help</Text>
           <Text style={styles.heroTitle}>Support Hub</Text>
           <Text style={styles.heroBody}>
@@ -95,7 +77,7 @@ export default function HelpScreen() {
               <View style={styles.stepCopy}>
                 <Text style={styles.stepTitle}>Freeze, renew, or extend</Text>
                 <Text style={styles.stepBody}>
-                  Request membership changes from Home and choose Pay at Counter or card payment.
+                  Request membership changes from Home and complete cash confirmation at the counter.
                 </Text>
               </View>
             </View>
@@ -104,7 +86,7 @@ export default function HelpScreen() {
               <View style={styles.stepCopy}>
                 <Text style={styles.stepTitle}>Vouchers</Text>
                 <Text style={styles.stepBody}>
-                  Track pending, confirmed, and canceled payment requests in the Vouchers section.
+                  Track pending, confirmed, and canceled cash requests in the Vouchers section.
                 </Text>
               </View>
             </View>
@@ -164,15 +146,6 @@ export default function HelpScreen() {
             </Pressable>
           </View>
         </View>
-
-        <Pressable
-          onPress={handleSignOut}
-          style={({ pressed }) => [
-            styles.signOutButton,
-            pressed && styles.buttonPressed,
-          ]}>
-          <Text style={styles.signOutText}>Sign Out</Text>
-        </Pressable>
       </ScrollView>
     </PremiumScreenBackground>
   );
@@ -192,24 +165,15 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: premiumColors.borderStrong,
-    borderRadius: 28,
-    backgroundColor: premiumColors.surfaceAlt,
-    padding: 22,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 26,
+    backgroundColor: 'rgba(18, 20, 28, 0.72)',
+    padding: 20,
     marginBottom: 16,
     ...premiumShadow,
   },
-  heroGlow: {
-    position: 'absolute',
-    right: -84,
-    top: -84,
-    width: 214,
-    height: 214,
-    borderRadius: 107,
-    backgroundColor: 'rgba(225, 29, 46, 0.24)',
-  },
   kicker: {
-    color: '#F7D6DC',
+    color: premiumColors.redBright,
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0,
@@ -223,7 +187,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   heroBody: {
-    color: '#FCE7EA',
+    color: premiumColors.textMuted,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
@@ -378,20 +342,6 @@ const styles = StyleSheet.create({
     color: '#9AA3AF',
     fontSize: 13,
     fontWeight: '800',
-  },
-  signOutButton: {
-    minHeight: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.2)',
-    borderRadius: 18,
-    backgroundColor: premiumColors.surfaceSoft,
-  },
-  signOutText: {
-    color: wineColor,
-    fontSize: 14,
-    fontWeight: '900',
   },
   buttonPressed: {
     opacity: 0.76,

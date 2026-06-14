@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Image,
   NativeScrollEvent,
@@ -15,15 +15,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { entryContentService } from '@/services';
+import type { EntrySlide } from '@/services/entryContentService';
+
 const accentColor = '#B11226';
-const carouselSlides = [
-  require('@/assets/images/MarvelPhoto1.jpeg'),
-  require('@/assets/images/MarvelPhoto2.png'),
-];
 
 export default function WelcomeScreen() {
   const router = useRouter();
   const { width: windowWidth } = useWindowDimensions();
+  const [carouselSlides, setCarouselSlides] = useState<EntrySlide[]>([]);
   const [activeSlide, setActiveSlide] = useState(0);
   const [frameWidth, setFrameWidth] = useState(0);
   const slideWidth =
@@ -39,6 +39,16 @@ export default function WelcomeScreen() {
 
     setActiveSlide(Math.min(carouselSlides.length - 1, Math.max(0, nextIndex)));
   };
+
+  useEffect(() => {
+    const loadSlides = async () => {
+      const slides = await entryContentService.getEntrySlides();
+
+      setCarouselSlides(slides);
+    };
+
+    loadSlides();
+  }, []);
 
   return (
     <View style={styles.safeArea}>
@@ -57,14 +67,13 @@ export default function WelcomeScreen() {
             onScroll={updateActiveSlide}
             style={styles.heroCarousel}>
             {carouselSlides.map((slide, index) => (
-              <View key={index} style={[styles.heroSlide, { width: slideWidth }]}>
+              <View key={slide.id} style={[styles.heroSlide, { width: slideWidth }]}>
                 <Image
-                  source={slide}
+                  source={slide.image}
                   style={styles.heroImage}
-                  resizeMode="stretch"
+                  resizeMode="cover"
                 />
                 <View pointerEvents="none" style={styles.heroVeil} />
-                <View pointerEvents="none" style={styles.heroLowerFade} />
               </View>
             ))}
           </ScrollView>
@@ -124,7 +133,7 @@ const styles = StyleSheet.create({
     marginVertical: Platform.OS === 'web' ? 22 : 0,
   },
   heroArea: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
     backgroundColor: '#050507',
   },
@@ -155,21 +164,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.06)',
-  },
-  heroLowerFade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 140,
-    backgroundColor: 'rgba(10, 7, 10, 0.18)',
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
   },
   carouselDots: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 22,
+    bottom: 202,
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 7,
@@ -185,36 +186,27 @@ const styles = StyleSheet.create({
     backgroundColor: accentColor,
   },
   actionPanel: {
+    position: 'absolute',
+    left: 22,
+    right: 22,
+    bottom: 20,
     flexShrink: 0,
     justifyContent: 'center',
-    gap: 13,
-    backgroundColor: '#090A0E',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 24,
-    paddingTop: 26,
-    paddingBottom: 24,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: -14 },
-    shadowOpacity: 0.1,
-    shadowRadius: 24,
-    elevation: 10,
+    gap: 12,
   },
   guestButton: {
-    minHeight: 58,
+    minHeight: 54,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
     shadowRadius: 18,
-    elevation: 3,
+    elevation: 2,
   },
   guestButtonText: {
     color: '#FFFFFF',
@@ -222,10 +214,10 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   signInButton: {
-    minHeight: 58,
+    minHeight: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 18,
+    borderRadius: 16,
     backgroundColor: accentColor,
     shadowColor: accentColor,
     shadowOffset: { width: 0, height: 14 },

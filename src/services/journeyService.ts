@@ -6,6 +6,7 @@ import {
 import type {
   Achievement,
   AttendanceDay,
+  JourneyHistoryRecord,
   JourneyProfile,
   JourneyStatKey,
   JourneyStats,
@@ -14,7 +15,19 @@ import type {
 
 let profileRecord: JourneyProfile = { ...journeyProfile };
 let attendanceRecords: AttendanceDay[] = createYearAttendanceDays(2026);
-let resetStats = new Set<JourneyStatKey>();
+const initialPeriodStart = '2026-06-01T00:00:00.000Z';
+let activePeriodStarts: Record<JourneyStatKey, string> = {
+  averageWorkoutDuration: initialPeriodStart,
+  estimatedCaloriesBurned: initialPeriodStart,
+  visitsThisMonth: initialPeriodStart,
+  visitsThisWeek: initialPeriodStart,
+};
+let historyRecords: JourneyHistoryRecord[] = [];
+let resetSnapshots: {
+  historyRecord: JourneyHistoryRecord;
+  previousStarts: Partial<Record<JourneyStatKey, string>>;
+  statKeys: JourneyStatKey[];
+}[] = [];
 let workoutSessions: WorkoutSession[] = [
   {
     id: 'workout-001',
@@ -61,6 +74,10 @@ function formatAverageDuration(seconds: number) {
     return '0 min';
   }
 
+  if (seconds < 60) {
+    return `${Math.round(seconds)} sec`;
+  }
+
   return `${Math.round(seconds / 60)} min`;
 }
 
@@ -85,6 +102,46 @@ function calculateStreak(days: AttendanceDay[]) {
 
 function estimateCalories(durationSeconds: number) {
   return Math.max(0, Math.round((durationSeconds / 60) * 8));
+}
+
+function isOnOrAfter(value: string, baseline: string) {
+  return new Date(value).getTime() >= new Date(baseline).getTime();
+}
+
+function formatPeriodDate(value: string) {
+  return new Intl.DateTimeFormat('en', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value));
+}
+
+function getPeriodSummary(stats: JourneyStats) {
+  return [
+    `Avg Duration: ${stats.averageWorkoutDuration}`,
+    `Monthly visits: ${stats.visitsThisMonth}`,
+    `Calories Burned: ${stats.estimatedCaloriesBurned}`,
+    `Weekly visits: ${stats.visitsThisWeek}`,
+  ].join('\n');
+}
+
+const journeyDashboardStatKeys: JourneyStatKey[] = [
+  'averageWorkoutDuration',
+  'visitsThisMonth',
+  'estimatedCaloriesBurned',
+  'visitsThisWeek',
+];
+
+function getCurrentWeekStart() {
+  const now = new Date();
+  const weekStart = new Date(now);
+  const dayOfWeek = weekStart.getDay();
+  const daysSinceMonday = (dayOfWeek + 6) % 7;
+
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - daysSinceMonday);
+
+  return weekStart;
 }
 
 export const getJourneyProfile = async (): Promise<JourneyProfile> => {
@@ -116,8 +173,6 @@ export const toggleAttendanceDay = async (
       ? { ...day, hasVisit: !day.hasVisit }
       : day,
   );
-  resetStats.delete('visitsThisMonth');
-  resetStats.delete('visitsThisYear');
 
   return attendanceRecords;
 };
@@ -131,8 +186,6 @@ export const markAttendanceDay = async (
   attendanceRecords = attendanceRecords.map((day) =>
     day.date.slice(0, 10) === dateKey ? { ...day, hasVisit } : day,
   );
-  resetStats.delete('visitsThisMonth');
-  resetStats.delete('visitsThisYear');
 
   return attendanceRecords;
 };
@@ -155,48 +208,180 @@ export const completeWorkoutSession = async (
   };
 
   workoutSessions = [session, ...workoutSessions];
-  resetStats.delete('averageWorkoutDuration');
-  resetStats.delete('estimatedCaloriesBurned');
 
   return session;
 };
 
-export const resetJourneyStat = async (
-  statKey: JourneyStatKey,
+const resetJourneyStats = async (
+  statKeys: JourneyStatKey[],
 ): Promise<JourneyStats> => {
-  resetStats.add(statKey);
+  const endedAt = new Date().toISOString();
+  const previousStarts = statKeys.reduce<Partial<Record<JourneyStatKey, string>>>(
+    (starts, statKey) => ({
+      ...starts,
+      [statKey]: activePeriodStarts[statKey],
+    }),
+    {},
+  );
+  const earliestPreviousStart = statKeys
+    .map((statKey) => previousStarts[statKey])
+    .filter(Boolean)
+    .sort()[0] ?? initialPeriodStart;
+  const statsBeforeReset = await getJourneyStats();
+  const historyRecord: JourneyHistoryRecord = {
+    id: `journey-history-${Date.now().toString(36)}`,
+    statKey: statKeys.length === 1 ? statKeys[0] : 'all',
+    startedAt: earliestPreviousStart,
+    endedAt,
+    summary: getPeriodSummary(statsBeforeReset),
+  };
+
+  resetSnapshots = [
+    {
+      historyRecord,
+      previousStarts,
+      statKeys,
+    },
+    ...resetSnapshots.filter(
+      (snapshot) =>
+        !snapshot.statKeys.some((snapshotKey) => statKeys.includes(snapshotKey)),
+    ),
+  ];
+  activePeriodStarts = statKeys.reduce(
+    (starts, statKey) => ({
+      ...starts,
+      [statKey]: endedAt,
+    }),
+    activePeriodStarts,
+  );
 
   return getJourneyStats();
 };
 
+export const resetJourneyStat = async (
+  statKey: JourneyStatKey,
+): Promise<JourneyStats> => resetJourneyStats([statKey]);
+
+export const resetAllJourneyStats = async (): Promise<JourneyStats> =>
+  resetJourneyStats(journeyDashboardStatKeys);
+
+export const undoResetJourneyStat = async (
+  statKey: JourneyStatKey,
+): Promise<JourneyStats> => {
+  const snapshot = resetSnapshots.find((item) => item.statKeys.includes(statKey));
+
+  if (!snapshot) {
+    return getJourneyStats();
+  }
+
+  activePeriodStarts = {
+    ...activePeriodStarts,
+    ...snapshot.previousStarts,
+  };
+  resetSnapshots = resetSnapshots.filter((item) => item !== snapshot);
+
+  return getJourneyStats();
+};
+
+export const undoResetAllJourneyStats = async (): Promise<JourneyStats> => {
+  const snapshot = resetSnapshots.find((item) =>
+    journeyDashboardStatKeys.every((statKey) => item.statKeys.includes(statKey)),
+  );
+
+  if (!snapshot) {
+    return getJourneyStats();
+  }
+
+  activePeriodStarts = {
+    ...activePeriodStarts,
+    ...snapshot.previousStarts,
+  };
+  resetSnapshots = resetSnapshots.filter((item) => item !== snapshot);
+
+  return getJourneyStats();
+};
+
+export const saveJourneyReset = async (
+  statKey: JourneyStatKey,
+): Promise<JourneyHistoryRecord[]> => {
+  const snapshot = resetSnapshots.find((item) => item.statKeys.includes(statKey));
+
+  if (!snapshot) {
+    return historyRecords;
+  }
+
+  historyRecords = [snapshot.historyRecord, ...historyRecords];
+  resetSnapshots = resetSnapshots.filter((item) => item !== snapshot);
+
+  return historyRecords;
+};
+
+export const saveAllJourneyReset = async (): Promise<JourneyHistoryRecord[]> => {
+  const snapshot = resetSnapshots.find((item) =>
+    journeyDashboardStatKeys.every((statKey) => item.statKeys.includes(statKey)),
+  );
+
+  if (!snapshot) {
+    return historyRecords;
+  }
+
+  historyRecords = [snapshot.historyRecord, ...historyRecords];
+  resetSnapshots = resetSnapshots.filter((item) => item !== snapshot);
+
+  return historyRecords;
+};
+
+export const getJourneyHistory = async (): Promise<JourneyHistoryRecord[]> => {
+  return historyRecords;
+};
+
 export const getJourneyStats = async (): Promise<JourneyStats> => {
   const currentMonthKey = new Date().toISOString().slice(0, 7);
-  const visitsThisMonth = attendanceRecords.filter(
-    (day) => day.date.startsWith(currentMonthKey) && day.hasVisit,
-  ).length;
-  const visitsThisYear = attendanceRecords.filter((day) => day.hasVisit).length;
-  const totalSeconds = workoutSessions.reduce(
+  const currentWeekStart = getCurrentWeekStart();
+  const attendanceForMonth = attendanceRecords.filter(
+    (day) =>
+      day.date.startsWith(currentMonthKey) &&
+      day.hasVisit &&
+      isOnOrAfter(day.date, activePeriodStarts.visitsThisMonth),
+  );
+  const attendanceForWeek = attendanceRecords.filter(
+    (day) =>
+      day.hasVisit &&
+      new Date(day.date).getTime() >= currentWeekStart.getTime() &&
+      isOnOrAfter(day.date, activePeriodStarts.visitsThisWeek),
+  );
+  const durationSessions = workoutSessions.filter((session) =>
+    isOnOrAfter(session.endedAt, activePeriodStarts.averageWorkoutDuration),
+  );
+  const calorieSessions = workoutSessions.filter((session) =>
+    isOnOrAfter(session.endedAt, activePeriodStarts.estimatedCaloriesBurned),
+  );
+  const totalSeconds = durationSessions.reduce(
     (total, session) => total + session.durationSeconds,
     0,
   );
   const averageSeconds =
-    workoutSessions.length > 0 ? totalSeconds / workoutSessions.length : 0;
-  const estimatedCaloriesBurned = workoutSessions.reduce(
+    durationSessions.length > 0 ? totalSeconds / durationSessions.length : 0;
+  const estimatedCaloriesBurned = calorieSessions.reduce(
     (total, session) => total + session.estimatedCaloriesBurned,
     0,
   );
 
   return {
-    averageWorkoutDuration: resetStats.has('averageWorkoutDuration')
-      ? '0 min'
-      : formatAverageDuration(averageSeconds),
-    visitsThisMonth: resetStats.has('visitsThisMonth') ? 0 : visitsThisMonth,
-    visitsThisYear: resetStats.has('visitsThisYear') ? 0 : visitsThisYear,
+    averageWorkoutDuration: formatAverageDuration(averageSeconds),
+    visitsThisMonth: attendanceForMonth.length,
+    visitsThisWeek: attendanceForWeek.length,
     consecutiveStreak: calculateStreak(attendanceRecords),
-    estimatedCaloriesBurned: resetStats.has('estimatedCaloriesBurned')
-      ? 0
-      : estimatedCaloriesBurned,
+    estimatedCaloriesBurned,
   };
+};
+
+export const formatJourneyHistoryRange = (
+  historyRecord: JourneyHistoryRecord,
+): string => {
+  return `${formatPeriodDate(historyRecord.startedAt)} - ${formatPeriodDate(
+    historyRecord.endedAt,
+  )}`;
 };
 
 export const getAchievements = async (): Promise<Achievement[]> => {
@@ -212,6 +397,13 @@ export const journeyService = {
   getWorkoutSessions,
   completeWorkoutSession,
   resetJourneyStat,
+  resetAllJourneyStats,
+  undoResetJourneyStat,
+  undoResetAllJourneyStats,
+  saveJourneyReset,
+  saveAllJourneyReset,
+  getJourneyHistory,
+  formatJourneyHistoryRange,
   getJourneyStats,
   getAchievements,
 };

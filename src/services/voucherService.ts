@@ -62,39 +62,36 @@ export const createVoucher = async ({
 export const createMembershipRenewalVoucher = async (
   months: number,
   amount: number,
-  paymentMode: 'Pay at Counter' | 'Pay with Card',
 ): Promise<Voucher> => {
   return createVoucher({
     type: 'Membership Renewal',
     amount,
     status: 'Pending',
-    description: `${months} Month${months > 1 ? 's' : ''} Membership - ${paymentMode}`,
+    description: `${months} Month${months > 1 ? 's' : ''} Membership - Cash at counter`,
   });
 };
 
 export const createMembershipFreezeVoucher = async (
   weeks: number,
   amount: number,
-  paymentMode: 'Pay at Counter' | 'Pay with Card',
 ): Promise<Voucher> => {
   return createVoucher({
     type: 'Membership Freeze',
     amount,
     status: 'Pending',
-    description: `${weeks} Week${weeks > 1 ? 's' : ''} Freeze - ${paymentMode}`,
+    description: `${weeks} Week${weeks > 1 ? 's' : ''} Freeze - Cash at counter`,
   });
 };
 
 export const createShopVoucher = async (
   productName: string,
   amount: number,
-  paymentMode: 'Pay at Counter' | 'Pay with Card',
 ): Promise<Voucher> => {
   return createVoucher({
     type: 'Shop Reservation',
     amount,
-    status: paymentMode === 'Pay at Counter' ? 'Pending' : 'Confirmed',
-    description: `${productName} reservation - ${paymentMode}`,
+    status: 'Pending',
+    description: `${productName} reservation - Cash at counter`,
   });
 };
 

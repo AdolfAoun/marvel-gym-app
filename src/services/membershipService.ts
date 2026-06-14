@@ -8,7 +8,6 @@ import type {
   MembershipPlan,
   MembershipStatus,
   Payment,
-  PaymentMethod,
 } from '../types';
 
 export const getMembershipStatus = async (): Promise<MembershipStatus> => {
@@ -52,12 +51,10 @@ export const unfreezeMembership = async (): Promise<Membership> => {
   };
 };
 
-export const payMembership = async (
-  method: PaymentMethod = 'Pay at Counter',
-): Promise<Payment> => {
+export const payMembership = async (): Promise<Payment> => {
   return {
     ...paymentHistory[0],
-    method,
+    method: 'Cash',
     status: 'Paid',
     paidAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
