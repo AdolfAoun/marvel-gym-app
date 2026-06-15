@@ -28,9 +28,10 @@ Tech stack:
 - Do not connect to a real backend yet.
 - Gmind/backend integration will come later.
 - Gmind is the future source of truth.
-- This is a members-only app, not an admin app.
-- Do not build admin dashboards or staff tools.
-- Admin/management work is a future milestone for shared content control, not something already complete.
+- The normal member app must stay member-facing.
+- Do not place admin dashboards or staff tools inside the member tabs.
+- A separate frontend-only mock admin/testing area may exist for demo and planning.
+- Production admin permissions and shared content management are future backend milestones, not complete yet.
 - Screens must never import mock data directly.
 - Screens must call service-layer functions only.
 - Services may use mock data now, but should be backend-ready.
@@ -42,11 +43,11 @@ Tech stack:
 
 The intended data flow is:
 
-Screen → Service → Mock Data
+Screen -> Service -> Mock Data
 
 Later, after backend integration:
 
-Screen → Service → Gmind/backend
+Screen -> Service -> Gmind/backend
 
 Screens should not need major rewrites when the backend is added.
 

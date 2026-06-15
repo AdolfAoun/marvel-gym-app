@@ -35,6 +35,13 @@ function formatClassTime(value: string) {
   }).format(new Date(value));
 }
 
+function formatClassDate(value: string) {
+  return new Intl.DateTimeFormat('en', {
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date(value));
+}
+
 function formatClassDateTime(value: string) {
   return new Intl.DateTimeFormat('en', {
     day: 'numeric',
@@ -240,12 +247,6 @@ export default function ClassesScreen() {
                         {gymClass.instructorName.slice(0, 1).toUpperCase()}
                       </Text>
                     </View>
-                    <View style={styles.timeRail}>
-                      <Text style={styles.classTime}>
-                        {formatClassTime(gymClass.startTime)}
-                      </Text>
-                      <View style={styles.timeDot} />
-                    </View>
                     <View style={styles.classBodyBlock}>
                       <View style={styles.classTopRow}>
                         <View style={styles.classTitleBlock}>
@@ -266,12 +267,12 @@ export default function ClassesScreen() {
                         </View>
                       </View>
 
-                      <View style={styles.metaRow}>
-                        <Text style={styles.metaText}>
-                          {formatClassDuration(gymClass.startTime, gymClass.endTime)}
+                      <View style={styles.classTimeCard}>
+                        <Text style={styles.classTimePrimary}>
+                          {formatClassTime(gymClass.startTime)}
                         </Text>
-                        <Text style={styles.metaText}>
-                          {gymClass.enrolledCount}/{gymClass.capacity} booked
+                        <Text style={styles.classTimeSecondary}>
+                          {formatClassDate(gymClass.startTime)} · {formatClassDuration(gymClass.startTime, gymClass.endTime)}
                         </Text>
                       </View>
 
@@ -567,7 +568,8 @@ const styles = StyleSheet.create({
   },
   classCard: {
     flexDirection: 'row',
-    gap: 13,
+    alignItems: 'center',
+    gap: 15,
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 24,
@@ -575,37 +577,19 @@ const styles = StyleSheet.create({
     padding: 13,
   },
   instructorImage: {
-    width: 48,
-    height: 64,
+    width: 76,
+    height: 76,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: premiumColors.borderStrong,
-    borderRadius: 16,
+    borderRadius: 38,
     backgroundColor: premiumColors.surfaceSoft,
   },
   instructorImageText: {
     color: premiumColors.redBright,
-    fontSize: 18,
+    fontSize: 26,
     fontWeight: '900',
-  },
-  timeRail: {
-    width: 56,
-    alignItems: 'center',
-    gap: 8,
-    paddingTop: 3,
-  },
-  classTime: {
-    color: premiumColors.redBright,
-    fontSize: 12,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  timeDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: premiumColors.red,
   },
   classBodyBlock: {
     flex: 1,
@@ -648,16 +632,29 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textTransform: 'uppercase',
   },
-  metaRow: {
+  classTimeCard: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.055)',
     marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
-  metaText: {
+  classTimePrimary: {
+    color: premiumColors.redBright,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  classTimeSecondary: {
     color: premiumColors.textMuted,
     fontSize: 12,
     fontWeight: '800',
+    textAlign: 'right',
   },
   reserveButton: {
     minHeight: 42,

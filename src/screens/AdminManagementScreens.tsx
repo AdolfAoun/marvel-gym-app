@@ -20,6 +20,7 @@ import {
   classService,
   entryContentService,
   productService,
+  studentVerificationService,
   voucherService,
 } from '@/services';
 import type {
@@ -27,6 +28,7 @@ import type {
   ClassMutationInput,
   EntrySlide,
   ProductMutationInput,
+  StudentVerificationWithMember,
 } from '@/services';
 import type {
   GymClass,
@@ -34,6 +36,7 @@ import type {
   MembershipStatus,
   Product,
   ProductCategory,
+  StudentVerificationStatus,
   Voucher,
 } from '@/types';
 
@@ -53,6 +56,19 @@ const classCategories = [
 ];
 const voucherStatusOrder = ['Pending', 'Confirmed', 'Canceled'] as const;
 const defaultClassStart = '2026-06-15T18:00:00.000Z';
+const studentStatusFilters: StudentVerificationStatus[] = [
+  'Pending Verification',
+  'Confirmed',
+  'Rejected',
+];
+type ClassFilter = 'All' | 'Today' | 'Upcoming' | 'Available' | 'Full' | 'Paid' | 'Free';
+type ProductFilter =
+  | 'All'
+  | 'Available'
+  | 'Unavailable'
+  | 'Gym Equipment'
+  | 'Beverages'
+  | 'Snacks';
 
 type ConfirmAction = {
   body: string;
@@ -102,6 +118,40 @@ function formatDateTime(value: string) {
     minute: '2-digit',
     month: 'short',
   }).format(new Date(value));
+}
+
+function getStatusColor(status: string) {
+  if (status === 'Active' || status === 'Available' || status === 'Confirmed') {
+    return '#22C55E';
+  }
+
+  if (
+    status === 'Frozen' ||
+    status === 'Pending' ||
+    status === 'Pending Approval' ||
+    status === 'Pending Verification'
+  ) {
+    return '#F59E0B';
+  }
+
+  return '#EF4444';
+}
+
+function StatusChip({ label }: { label: string }) {
+  const color = getStatusColor(label);
+
+  return (
+    <View
+      style={[
+        styles.statusChip,
+        {
+          backgroundColor: `${color}1A`,
+          borderColor: `${color}55`,
+        },
+      ]}>
+      <Text style={[styles.statusChipText, { color }]}>{label}</Text>
+    </View>
+  );
 }
 
 function toClassInput(form: ClassForm): ClassMutationInput {
@@ -299,12 +349,22 @@ export function AdminMemberManagementScreen() {
       {summary ? (
         <>
           <View style={styles.card}>
+            <Text style={styles.sectionLabel}>Member Details</Text>
             <Text style={styles.cardTitle}>
               {summary.member.firstName} {summary.member.lastName}
             </Text>
             <Text style={styles.bodyText}>Phone: {summary.member.phone}</Text>
             <Text style={styles.bodyText}>Email: {summary.member.email || '-'}</Text>
-            <Text style={styles.bodyText}>Status: {summary.membership.status}</Text>
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.cardHeaderRow}>
+              <View>
+                <Text style={styles.sectionLabel}>Membership Status</Text>
+                <Text style={styles.cardTitle}>Current plan</Text>
+              </View>
+              <StatusChip label={summary.membership.status} />
+            </View>
             <Text style={styles.bodyText}>Start: {formatDate(summary.membership.startDate)}</Text>
             <Text style={styles.bodyText}>End: {formatDate(summary.membership.endDate)}</Text>
             <Text style={styles.bodyText}>Remaining: {summary.remainingDays} days</Text>
@@ -317,7 +377,32 @@ export function AdminMemberManagementScreen() {
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Membership actions</Text>
+            <View style={styles.cardHeaderRow}>
+              <View>
+                <Text style={styles.sectionLabel}>Student Verification Status</Text>
+                <Text style={styles.cardTitle}>Student pricing</Text>
+              </View>
+              <StatusChip label={summary.studentVerification?.status ?? 'Not Submitted'} />
+            </View>
+            <Text style={styles.bodyText}>
+              {summary.studentVerification?.status === 'Confirmed'
+                ? 'Student confirmed. Renewal pricing is $70/month.'
+                : summary.studentVerification?.status === 'Pending Verification'
+                  ? 'Student ID is pending admin approval.'
+                  : summary.studentVerification?.status === 'Rejected'
+                    ? 'Student proof was rejected.'
+                    : 'No student ID has been submitted.'}
+            </Text>
+            {summary.studentVerification?.submittedAt ? (
+              <Text style={styles.helperText}>
+                Submitted: {formatDate(summary.studentVerification.submittedAt)}
+              </Text>
+            ) : null}
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.sectionLabel}>Membership Actions</Text>
+            <Text style={styles.cardTitle}>Extend, freeze, or update status</Text>
             <Text style={styles.helperText}>Extend membership</Text>
             <View style={styles.pillRow}>
               {[1, 3, 6, 12].map((value) => (
@@ -432,6 +517,26 @@ export function AdminMemberManagementScreen() {
               <Text style={styles.primaryButtonText}>Apply Status</Text>
             </Pressable>
           </View>
+
+          <View style={styles.card}>
+            <Text style={styles.sectionLabel}>Vouchers</Text>
+            <Text style={styles.cardTitle}>Member voucher requests</Text>
+            {summary.vouchers.length === 0 ? (
+              <Text style={styles.helperText}>No vouchers for this member.</Text>
+            ) : (
+              summary.vouchers.map((voucher) => (
+                <View key={voucher.id} style={styles.compactVoucherRow}>
+                  <View style={styles.rowCopy}>
+                    <Text style={styles.rowTitle}>{voucher.type}</Text>
+                    <Text style={styles.helperText}>
+                      {voucher.currency} {voucher.amount.toFixed(2)} - {formatDate(voucher.date)}
+                    </Text>
+                  </View>
+                  <StatusChip label={voucher.status} />
+                </View>
+              ))
+            )}
+          </View>
         </>
       ) : null}
 
@@ -442,6 +547,8 @@ export function AdminMemberManagementScreen() {
 
 export function AdminVoucherManagementScreen() {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [selectedVoucherStatus, setSelectedVoucherStatus] =
+    useState<Voucher['status']>('Pending');
 
   const loadVouchers = useCallback(async () => {
     setVouchers(await voucherService.getAllVouchers());
@@ -453,7 +560,31 @@ export function AdminVoucherManagementScreen() {
 
   return (
     <AdminShell title="Voucher Management" subtitle="Confirm or cancel demo vouchers.">
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Status filters</Text>
+        <View style={styles.pillRow}>
+          {voucherStatusOrder.map((status) => {
+            const selected = selectedVoucherStatus === status;
+            const count = vouchers.filter((voucher) => voucher.status === status).length;
+
+            return (
+              <Pressable
+                key={status}
+                onPress={() => setSelectedVoucherStatus(status)}
+                style={[styles.pill, selected && styles.pillSelected]}>
+                <Text style={[styles.pillText, selected && styles.pillTextSelected]}>
+                  {status} ({count})
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
       {voucherStatusOrder.map((status) => {
+        if (status !== selectedVoucherStatus) {
+          return null;
+        }
+
         const statusVouchers = vouchers.filter((voucher) => voucher.status === status);
 
         return (
@@ -503,6 +634,7 @@ export function AdminVoucherManagementScreen() {
 
 export function AdminClassManagementScreen() {
   const [classes, setClasses] = useState<GymClass[]>([]);
+  const [classFilter, setClassFilter] = useState<ClassFilter>('All');
   const [editingClass, setEditingClass] = useState<GymClass>();
   const [form, setForm] = useState<ClassForm>(getClassForm());
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>();
@@ -531,8 +663,61 @@ export function AdminClassManagementScreen() {
     await loadClasses();
   };
 
+  const filteredClasses = classes.filter((gymClass) => {
+    const startDate = new Date(gymClass.startTime);
+    const today = new Date();
+    const isToday =
+      startDate.getFullYear() === today.getFullYear() &&
+      startDate.getMonth() === today.getMonth() &&
+      startDate.getDate() === today.getDate();
+
+    if (classFilter === 'Today') {
+      return isToday;
+    }
+
+    if (classFilter === 'Upcoming') {
+      return startDate.getTime() >= Date.now();
+    }
+
+    if (classFilter === 'Available' || classFilter === 'Full') {
+      return gymClass.status === classFilter;
+    }
+
+    if (classFilter === 'Paid') {
+      return gymClass.isPaid;
+    }
+
+    if (classFilter === 'Free') {
+      return !gymClass.isPaid;
+    }
+
+    return true;
+  });
+
   return (
     <AdminShell title="Class Management" subtitle="Manage mock class schedule data.">
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Class filters</Text>
+        <View style={styles.pillRow}>
+          {(['All', 'Today', 'Upcoming', 'Available', 'Full', 'Paid', 'Free'] as ClassFilter[]).map(
+            (filter) => (
+              <Pressable
+                key={filter}
+                onPress={() => setClassFilter(filter)}
+                style={[styles.pill, classFilter === filter && styles.pillSelected]}>
+                <Text
+                  style={[
+                    styles.pillText,
+                    classFilter === filter && styles.pillTextSelected,
+                  ]}>
+                  {filter}
+                </Text>
+              </Pressable>
+            ),
+          )}
+        </View>
+      </View>
+
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{editingClass ? 'Edit class' : 'Add class'}</Text>
         <TextInput
@@ -621,8 +806,14 @@ export function AdminClassManagementScreen() {
         </View>
       </View>
 
-      {classes.map((gymClass) => (
-        <View key={gymClass.id} style={styles.rowCard}>
+      {filteredClasses.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.cardTitle}>No classes found</Text>
+          <Text style={styles.helperText}>Try a different class filter.</Text>
+        </View>
+      ) : (
+        filteredClasses.map((gymClass) => (
+          <View key={gymClass.id} style={styles.rowCard}>
           <View style={styles.adminAvatar}>
             <Text style={styles.adminAvatarText}>
               {gymClass.instructorName.slice(0, 1).toUpperCase()}
@@ -631,6 +822,10 @@ export function AdminClassManagementScreen() {
           <View style={styles.rowCopy}>
             <Text style={styles.rowTitle}>{gymClass.title}</Text>
             <Text style={styles.bodyText}>Coach {gymClass.instructorName}</Text>
+            <View style={styles.pillRow}>
+              <StatusChip label={gymClass.status} />
+              <StatusChip label={gymClass.isPaid ? `Paid $${gymClass.price}` : 'Free'} />
+            </View>
             <Text style={styles.helperText}>
               {formatDateTime(gymClass.startTime)} · {gymClass.location} · {gymClass.status}
             </Text>
@@ -659,8 +854,9 @@ export function AdminClassManagementScreen() {
               <Text style={styles.tinySecondaryText}>Delete</Text>
             </Pressable>
           </View>
-        </View>
-      ))}
+          </View>
+        ))
+      )}
 
       <ConfirmModal action={confirmAction} onClose={() => setConfirmAction(undefined)} />
     </AdminShell>
@@ -669,6 +865,7 @@ export function AdminClassManagementScreen() {
 
 export function AdminProductManagementScreen() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [productFilter, setProductFilter] = useState<ProductFilter>('All');
   const [editingProduct, setEditingProduct] = useState<Product>();
   const [form, setForm] = useState<ProductForm>(getProductForm());
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>();
@@ -697,8 +894,50 @@ export function AdminProductManagementScreen() {
     await loadProducts();
   };
 
+  const filteredProducts = products.filter((product) => {
+    if (productFilter === 'Available') {
+      return product.isAvailable;
+    }
+
+    if (productFilter === 'Unavailable') {
+      return !product.isAvailable;
+    }
+
+    if (
+      productFilter === 'Gym Equipment' ||
+      productFilter === 'Beverages' ||
+      productFilter === 'Snacks'
+    ) {
+      return product.category === productFilter;
+    }
+
+    return true;
+  });
+
   return (
     <AdminShell title="Product Management" subtitle="Manage mock Gym Shop listings.">
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Inventory filters</Text>
+        <View style={styles.pillRow}>
+          {(['All', 'Available', 'Unavailable', ...productCategories] as ProductFilter[]).map(
+            (filter) => (
+              <Pressable
+                key={filter}
+                onPress={() => setProductFilter(filter)}
+                style={[styles.pill, productFilter === filter && styles.pillSelected]}>
+                <Text
+                  style={[
+                    styles.pillText,
+                    productFilter === filter && styles.pillTextSelected,
+                  ]}>
+                  {filter}
+                </Text>
+              </Pressable>
+            ),
+          )}
+        </View>
+      </View>
+
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{editingProduct ? 'Edit product' : 'Add product'}</Text>
         <TextInput
@@ -760,13 +999,23 @@ export function AdminProductManagementScreen() {
         </View>
       </View>
 
-      {products.map((product) => (
-        <View key={product.id} style={styles.rowCard}>
+      {filteredProducts.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.cardTitle}>No products found</Text>
+          <Text style={styles.helperText}>Try a different inventory filter.</Text>
+        </View>
+      ) : (
+        filteredProducts.map((product) => (
+          <View key={product.id} style={styles.rowCard}>
           <View style={styles.adminAvatar}>
             <Text style={styles.adminAvatarText}>{product.name.slice(0, 1)}</Text>
           </View>
           <View style={styles.rowCopy}>
             <Text style={styles.rowTitle}>{product.name}</Text>
+            <View style={styles.pillRow}>
+              <StatusChip label={product.isAvailable ? 'Available' : 'Unavailable'} />
+              <StatusChip label={product.category ?? 'Product'} />
+            </View>
             <Text style={styles.bodyText}>
               {product.currency} {product.price.toFixed(2)} · {product.category}
             </Text>
@@ -806,8 +1055,9 @@ export function AdminProductManagementScreen() {
               <Text style={styles.tinySecondaryText}>Delete</Text>
             </Pressable>
           </View>
-        </View>
-      ))}
+          </View>
+        ))
+      )}
 
       <ConfirmModal action={confirmAction} onClose={() => setConfirmAction(undefined)} />
     </AdminShell>
@@ -846,6 +1096,9 @@ export function AdminWelcomePhotoManagementScreen() {
     <AdminShell title="Welcome Photos" subtitle="Manage Welcome Page carousel placeholders.">
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Add placeholder</Text>
+        <Text style={styles.bodyText}>
+          Manage the Welcome Page carousel shown before sign in.
+        </Text>
         <View style={styles.inputRow}>
           <TextInput
             value={label}
@@ -868,8 +1121,9 @@ export function AdminWelcomePhotoManagementScreen() {
 
       {photos.map((photo, index) => (
         <View key={photo.id} style={styles.rowCard}>
-          <View style={styles.adminAvatar}>
-            <Text style={styles.adminAvatarText}>{index + 1}</Text>
+          <View style={styles.photoPreviewSlot}>
+            <Text style={styles.photoPositionText}>#{index + 1}</Text>
+            <Text style={styles.photoPreviewText}>Welcome</Text>
           </View>
           <View style={styles.rowCopy}>
             <Text style={styles.rowTitle}>{photo.label ?? photo.id}</Text>
@@ -907,6 +1161,107 @@ export function AdminWelcomePhotoManagementScreen() {
           </View>
         </View>
       ))}
+    </AdminShell>
+  );
+}
+
+export function AdminStudentVerificationScreen() {
+  const [requests, setRequests] = useState<StudentVerificationWithMember[]>([]);
+  const [selectedStatus, setSelectedStatus] =
+    useState<StudentVerificationStatus>('Pending Verification');
+
+  const loadRequests = useCallback(async () => {
+    setRequests(await studentVerificationService.getStudentVerificationRequests());
+  }, []);
+
+  useEffect(() => {
+    loadRequests();
+  }, [loadRequests]);
+
+  const visibleRequests = requests.filter((request) => request.status === selectedStatus);
+
+  return (
+    <AdminShell
+      title="Student Verification"
+      subtitle="Approve student ID requests for mock student renewal pricing.">
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Verification queue</Text>
+        <Text style={styles.bodyText}>
+          Pending requests keep normal $85/month pricing until approved by staff.
+        </Text>
+        <View style={styles.pillRow}>
+          {studentStatusFilters.map((status) => {
+            const selected = selectedStatus === status;
+            const count = requests.filter((request) => request.status === status).length;
+
+            return (
+              <Pressable
+                key={status}
+                onPress={() => setSelectedStatus(status)}
+                style={[styles.pill, selected && styles.pillSelected]}>
+                <Text style={[styles.pillText, selected && styles.pillTextSelected]}>
+                  {status.replace(' Verification', '')} ({count})
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {visibleRequests.length === 0 ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>No requests</Text>
+          <Text style={styles.helperText}>
+            Student ID submissions will appear here after members upload proof from Profile.
+          </Text>
+        </View>
+      ) : (
+        visibleRequests.map((request) => (
+          <View key={request.id} style={styles.rowCard}>
+            <View style={styles.adminAvatar}>
+              <Text style={styles.adminAvatarText}>
+                {(request.member?.firstName ?? 'S').slice(0, 1)}
+              </Text>
+            </View>
+            <View style={styles.rowCopy}>
+              <View style={styles.cardHeaderRow}>
+                <Text style={styles.rowTitle}>
+                  {request.member
+                    ? `${request.member.firstName} ${request.member.lastName}`
+                    : request.memberId}
+                </Text>
+                <StatusChip label={request.status} />
+              </View>
+              <Text style={styles.bodyText}>Phone: {request.member?.phone ?? '-'}</Text>
+              <Text style={styles.bodyText}>Email: {request.member?.email ?? '-'}</Text>
+              <Text style={styles.helperText}>
+                Submitted: {formatDate(request.submittedAt)} - Proof:{' '}
+                {request.proofLabel ?? 'Student ID proof'}
+              </Text>
+            </View>
+            {request.status === 'Pending Verification' ? (
+              <View style={styles.actionStack}>
+                <Pressable
+                  onPress={async () => {
+                    await studentVerificationService.approveStudentVerification(request.id);
+                    await loadRequests();
+                  }}
+                  style={styles.tinyPrimary}>
+                  <Text style={styles.tinyPrimaryText}>Approve</Text>
+                </Pressable>
+                <Pressable
+                  onPress={async () => {
+                    await studentVerificationService.rejectStudentVerification(request.id);
+                    await loadRequests();
+                  }}
+                  style={styles.tinySecondary}>
+                  <Text style={styles.tinySecondaryText}>Reject</Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        ))
+      )}
     </AdminShell>
   );
 }
@@ -973,6 +1328,31 @@ const styles = StyleSheet.create({
     color: premiumColors.text,
     fontSize: 18,
     fontWeight: '900',
+  },
+  sectionLabel: {
+    color: premiumColors.redBright,
+    fontSize: 10,
+    fontWeight: '900',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  statusChip: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  statusChipText: {
+    fontSize: 9,
+    fontWeight: '900',
+    textTransform: 'uppercase',
   },
   bodyText: {
     color: premiumColors.textMuted,
@@ -1074,6 +1454,24 @@ const styles = StyleSheet.create({
     padding: 13,
     ...premiumShadow,
   },
+  emptyCard: {
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 20,
+    backgroundColor: premiumColors.surface,
+    padding: 16,
+    ...premiumShadow,
+  },
+  compactVoucherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 16,
+    backgroundColor: premiumColors.surfaceSoft,
+    padding: 12,
+  },
   rowCopy: {
     flex: 1,
     gap: 3,
@@ -1128,6 +1526,29 @@ const styles = StyleSheet.create({
     color: premiumColors.redBright,
     fontSize: 16,
     fontWeight: '900',
+  },
+  photoPreviewSlot: {
+    width: 74,
+    height: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: premiumColors.borderStrong,
+    borderRadius: 16,
+    backgroundColor: 'rgba(177, 18, 38, 0.12)',
+  },
+  photoPositionText: {
+    color: premiumColors.redBright,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  photoPreviewText: {
+    color: premiumColors.textMuted,
+    fontSize: 10,
+    fontWeight: '900',
+    marginTop: 2,
+    textTransform: 'uppercase',
   },
   modalOverlay: {
     flex: 1,

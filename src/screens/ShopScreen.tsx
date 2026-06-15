@@ -195,20 +195,6 @@ export default function ShopScreen() {
                   </Text>
                 </View>
                 <Text style={styles.productImageText}>Photo soon</Text>
-                <View
-                  style={[
-                    styles.availabilityBadge,
-                    !product.isAvailable && styles.availabilityBadgeUnavailable,
-                  ]}>
-                  <Text
-                    style={[
-                      styles.availabilityBadgeText,
-                      !product.isAvailable &&
-                        styles.availabilityBadgeTextUnavailable,
-                    ]}>
-                    {product.isAvailable ? 'Available' : 'Out'}
-                  </Text>
-                </View>
               </View>
 
               <View style={styles.productCopy}>
@@ -221,7 +207,22 @@ export default function ShopScreen() {
               </View>
 
               <View style={styles.productFooter}>
-                <Text style={styles.productPrice}>{formatPrice(product)}</Text>
+                <View style={styles.priceStatusRow}>
+                  <Text style={styles.productPrice}>{formatPrice(product)}</Text>
+                  <View
+                    style={[
+                      styles.availabilityPill,
+                      !product.isAvailable && styles.availabilityPillUnavailable,
+                    ]}>
+                    <Text
+                      style={[
+                        styles.availabilityPillText,
+                        !product.isAvailable && styles.availabilityPillTextUnavailable,
+                      ]}>
+                      {product.isAvailable ? 'Available' : 'Out of stock'}
+                    </Text>
+                  </View>
+                </View>
                 <Text style={styles.productCategoryText}>{product.category}</Text>
               </View>
             </View>
@@ -473,26 +474,32 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '900',
   },
-  availabilityBadge: {
-    position: 'absolute',
-    right: 8,
-    top: 8,
+  priceStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  availabilityPill: {
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.16)',
     borderRadius: 999,
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: 'rgba(34, 197, 94, 0.07)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
-  availabilityBadgeUnavailable: {
-    backgroundColor: '#FEF3C7',
+  availabilityPillUnavailable: {
+    borderColor: 'rgba(245, 158, 11, 0.18)',
+    backgroundColor: 'rgba(245, 158, 11, 0.07)',
   },
-  availabilityBadgeText: {
-    color: '#15803D',
-    fontSize: 9,
-    fontWeight: '900',
+  availabilityPillText: {
+    color: '#74DFA0',
+    fontSize: 7,
+    fontWeight: '800',
     textTransform: 'uppercase',
   },
-  availabilityBadgeTextUnavailable: {
-    color: '#B45309',
+  availabilityPillTextUnavailable: {
+    color: '#EAB308',
   },
   productCopy: {
     flex: 1,

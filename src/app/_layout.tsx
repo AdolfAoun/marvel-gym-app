@@ -53,8 +53,30 @@ export default function RootLayout() {
           headerBackButtonDisplayMode: 'minimal',
           headerShown: true,
           headerTitle: '',
+          headerBackground: () => null,
+          headerTransparent: true,
           headerShadowVisible: false,
-          headerStyle: { backgroundColor: premiumColors.background },
+          headerStyle: { backgroundColor: 'transparent' },
+          headerTintColor: accentColor,
+          headerTitleStyle: {
+            color: premiumColors.text,
+            fontSize: 18,
+            fontWeight: '900',
+          },
+          title: '',
+        }}
+      />
+      <Stack.Screen
+        name="how-to-use"
+        options={{
+          headerBackTitle: '',
+          headerBackButtonDisplayMode: 'minimal',
+          headerShown: true,
+          headerTitle: '',
+          headerBackground: () => null,
+          headerTransparent: true,
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: 'transparent' },
           headerTintColor: accentColor,
           headerTitleStyle: {
             color: premiumColors.text,

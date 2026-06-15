@@ -247,7 +247,7 @@ export default function LoginScreen() {
           <Image
             source={require('@/assets/images/prototype-three-finger-back-pose-background.png')}
             style={styles.prototypeAtmosphereImage}
-            resizeMode="contain"
+            resizeMode="cover"
           />
           <View style={styles.prototypeAtmosphereVeil} />
           <View style={styles.prototypeAtmosphereLowerFade} />
@@ -516,17 +516,19 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 460,
+    bottom: 0,
     overflow: 'hidden',
     opacity: 1,
   },
   prototypeAtmosphereImage: {
     position: 'absolute',
-    top: -90,
-    left: -300,
-    right: 12,
-    height: 680,
-    opacity: 0.4,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    opacity: 0.44,
   },
   prototypeAtmosphereVeil: {
     position: 'absolute',
@@ -534,7 +536,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.48)',
+    backgroundColor: 'rgba(0, 0, 0, 0.42)',
   },
   prototypeAtmosphereLowerFade: {
     position: 'absolute',

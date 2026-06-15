@@ -16,8 +16,13 @@ import {
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
-import { authService, avatarService, memberService } from '@/services';
-import type { Member } from '@/types';
+import {
+  authService,
+  avatarService,
+  memberService,
+  studentVerificationService,
+} from '@/services';
+import type { Member, StudentVerificationRequest } from '@/types';
 
 const accentColor = premiumColors.red;
 
@@ -97,11 +102,17 @@ export default function ProfileScreen() {
   const [isSignOutVisible, setIsSignOutVisible] = useState(false);
   const [initialProfileImageUri, setInitialProfileImageUri] = useState('');
   const [draftProfileImageUri, setDraftProfileImageUri] = useState('');
+  const [studentVerification, setStudentVerification] =
+    useState<StudentVerificationRequest>();
+  const [studentVerificationMessage, setStudentVerificationMessage] = useState('');
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
     const loadMember = async () => {
       const currentMember = await memberService.getCurrentMember();
+      const [nextVerification] = await Promise.all([
+        studentVerificationService.getMemberStudentVerification(currentMember.id),
+      ]);
       const nextForm = createProfileForm(currentMember);
 
       setMember(currentMember);
@@ -109,6 +120,7 @@ export default function ProfileScreen() {
       setForm(nextForm);
       setInitialProfileImageUri(currentMember.profileImageUri ?? '');
       setDraftProfileImageUri(currentMember.profileImageUri ?? '');
+      setStudentVerification(nextVerification);
     };
 
     loadMember();
@@ -199,6 +211,7 @@ export default function ProfileScreen() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: true,
+      aspect: [1, 1],
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.82,
     });
@@ -220,6 +233,7 @@ export default function ProfileScreen() {
 
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
+      aspect: [1, 1],
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.82,
     });
@@ -229,6 +243,62 @@ export default function ProfileScreen() {
     }
 
     setIsPhotoSheetVisible(false);
+  };
+
+  const submitStudentIdProof = async (
+    asset: ImagePicker.ImagePickerAsset,
+    proofLabel: string,
+  ) => {
+    const request =
+      await studentVerificationService.submitCurrentMemberStudentVerification({
+        proofLabel: asset.fileName ?? proofLabel,
+        proofUri: asset.uri,
+      });
+
+    setStudentVerification(request);
+    setStudentVerificationMessage('Student ID submitted for admin verification.');
+  };
+
+  const handleUploadStudentId = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted || !member) {
+      setStudentVerificationMessage('Gallery permission is required to upload student ID proof.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: false,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.82,
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    await submitStudentIdProof(result.assets[0], 'Student ID proof');
+  };
+
+  const handleTakeStudentIdPicture = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (!permission.granted || !member) {
+      setStudentVerificationMessage('Camera permission is required to take a student ID picture.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: false,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.82,
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    await submitStudentIdProof(result.assets[0], 'Student ID picture');
   };
 
   const handleSignOut = async () => {
@@ -254,6 +324,7 @@ export default function ProfileScreen() {
     ...member,
     profileImageUri: draftProfileImageUri,
   });
+  const studentStatus = studentVerification?.status ?? 'Not Submitted';
 
   return (
     <PremiumScreenBackground>
@@ -401,6 +472,62 @@ export default function ProfileScreen() {
           {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
         </View>
 
+        <View style={styles.card}>
+          <View style={styles.sectionRow}>
+            <Text style={styles.sectionTitle}>Student Verification</Text>
+            <View
+              style={[
+                styles.studentStatusChip,
+                studentStatus === 'Confirmed' && styles.studentStatusConfirmed,
+                studentStatus === 'Rejected' && styles.studentStatusRejected,
+              ]}>
+              <Text style={styles.studentStatusText}>
+                {studentStatus === 'Not Submitted' ? 'Not Submitted' : studentStatus}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.studentBody}>
+            {studentStatus === 'Confirmed'
+              ? 'Student status confirmed. Membership renewal is $70/month.'
+              : studentStatus === 'Pending Verification'
+                ? 'Your student ID is pending verification. Admin approval is required before student pricing applies.'
+                : studentStatus === 'Rejected'
+                  ? 'Student ID could not be verified. Please upload a clearer proof.'
+                  : 'Upload your student ID to request student pricing.'}
+          </Text>
+          {studentVerification?.proofLabel ? (
+            <Text style={styles.studentProofText}>
+              Proof: {studentVerification.proofLabel}
+            </Text>
+          ) : null}
+          {studentVerificationMessage ? (
+            <Text style={styles.studentMessageText}>{studentVerificationMessage}</Text>
+          ) : null}
+          {studentStatus === 'Not Submitted' || studentStatus === 'Rejected' ? (
+            <View style={styles.studentUploadRow}>
+              <Pressable
+                onPress={handleUploadStudentId}
+                style={({ pressed }) => [
+                  styles.studentUploadButton,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.studentUploadText}>
+                  {studentStatus === 'Rejected' ? 'Choose Again' : 'Choose from Gallery'}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={handleTakeStudentIdPicture}
+                style={({ pressed }) => [
+                  styles.studentUploadButton,
+                  styles.studentCameraButton,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.studentUploadText}>Take Picture</Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+
         <Pressable
           onPress={() => setIsSignOutVisible(true)}
           style={({ pressed }) => [
@@ -435,7 +562,7 @@ export default function ProfileScreen() {
                 )}
               </View>
               <Text style={styles.photoPreviewHint}>
-                Preview matches the circular profile avatar.
+                Use the native crop screen, then save with Done.
               </Text>
             </View>
             <View style={styles.photoChoiceStack}>
@@ -616,6 +743,78 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginBottom: 14,
   },
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 10,
+  },
+  studentStatusChip: {
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.24)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  studentStatusConfirmed: {
+    borderColor: 'rgba(34, 197, 94, 0.24)',
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+  },
+  studentStatusRejected: {
+    borderColor: 'rgba(239, 68, 68, 0.24)',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+  },
+  studentStatusText: {
+    color: premiumColors.text,
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  studentBody: {
+    color: premiumColors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+  },
+  studentProofText: {
+    color: premiumColors.textFaint,
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 9,
+  },
+  studentMessageText: {
+    color: premiumColors.redBright,
+    fontSize: 11,
+    fontWeight: '800',
+    lineHeight: 16,
+    marginTop: 9,
+  },
+  studentUploadRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  studentUploadButton: {
+    minHeight: 48,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: accentColor,
+    paddingHorizontal: 10,
+  },
+  studentCameraButton: {
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.32)',
+    backgroundColor: premiumColors.surfaceSoft,
+  },
+  studentUploadText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+  },
   detailsGrid: {
     gap: 12,
     marginBottom: 16,
@@ -686,7 +885,8 @@ const styles = StyleSheet.create({
     backgroundColor: premiumColors.surfaceSoft,
   },
   cancelButton: {
-    borderColor: 'rgba(245, 158, 11, 0.5)',
+    borderColor: 'rgba(177, 18, 38, 0.32)',
+    backgroundColor: 'rgba(177, 18, 38, 0.08)',
   },
   secondaryButtonText: {
     color: accentColor,

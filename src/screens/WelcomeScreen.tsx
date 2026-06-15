@@ -71,7 +71,7 @@ export default function WelcomeScreen() {
                 <Image
                   source={slide.image}
                   style={styles.heroImage}
-                  resizeMode="contain"
+                  resizeMode="cover"
                 />
                 <View pointerEvents="none" style={styles.heroVeil} />
               </View>
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    backgroundColor: 'rgba(0, 0, 0, 0.18)',
   },
   carouselDots: {
     position: 'absolute',

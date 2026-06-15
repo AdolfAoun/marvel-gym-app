@@ -24,6 +24,7 @@ import type {
   JourneyStatKey,
   JourneyStats,
   Member,
+  WorkoutSession,
 } from '@/types';
 
 const accentColor = premiumColors.red;
@@ -122,6 +123,7 @@ export default function JourneyScreen() {
   const [profile, setProfile] = useState<JourneyProfile>();
   const [biographyDraft, setBiographyDraft] = useState('');
   const [attendanceDays, setAttendanceDays] = useState<AttendanceDay[]>([]);
+  const [workoutSessions, setWorkoutSessions] = useState<WorkoutSession[]>([]);
   const [historyRecords, setHistoryRecords] = useState<JourneyHistoryRecord[]>([]);
   const [stats, setStats] = useState<JourneyStats>();
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -147,6 +149,7 @@ export default function JourneyScreen() {
         currentMember,
         journeyProfile,
         attendance,
+        sessions,
         history,
         journeyStats,
         nextAchievements,
@@ -155,6 +158,7 @@ export default function JourneyScreen() {
         memberService.getCurrentMember(),
         journeyService.getJourneyProfile(),
         journeyService.getAttendanceDays(),
+        journeyService.getWorkoutSessions(),
         journeyService.getJourneyHistory(),
         journeyService.getJourneyStats(),
         journeyService.getAchievements(),
@@ -165,6 +169,7 @@ export default function JourneyScreen() {
       setProfile(journeyProfile);
       setBiographyDraft(journeyProfile.biography);
       setAttendanceDays(attendance);
+      setWorkoutSessions(sessions);
       setHistoryRecords(history);
       setStats(journeyStats);
       setAchievements(nextAchievements);
@@ -194,8 +199,9 @@ export default function JourneyScreen() {
       let isActive = true;
 
       const syncJourney = async () => {
-        const [attendance, history, journeyStats] = await Promise.all([
+        const [attendance, sessions, history, journeyStats] = await Promise.all([
           journeyService.getAttendanceDays(),
+          journeyService.getWorkoutSessions(),
           journeyService.getJourneyHistory(),
           journeyService.getJourneyStats(),
         ]);
@@ -205,6 +211,7 @@ export default function JourneyScreen() {
         }
 
         setAttendanceDays(attendance);
+        setWorkoutSessions(sessions);
         setHistoryRecords(history);
         setStats(journeyStats);
         setSelectedMonthIndex(new Date().getMonth());
@@ -265,6 +272,25 @@ export default function JourneyScreen() {
     Math.max(0, attendanceByMonth.length - 1),
   );
   const selectedMonth = attendanceByMonth[activeMonthIndex];
+  const selectedMonthKey = selectedMonth?.days[0]?.date.slice(0, 7) ?? '';
+  const selectedMonthVisitCount =
+    selectedMonth?.days.filter((day) => day.hasVisit).length ?? 0;
+  const selectedMonthSessions = useMemo(
+    () =>
+      workoutSessions.filter((session) =>
+        session.endedAt.startsWith(selectedMonthKey),
+      ),
+    [selectedMonthKey, workoutSessions],
+  );
+  const selectedMonthAverageCalories =
+    selectedMonthSessions.length > 0
+      ? Math.round(
+          selectedMonthSessions.reduce(
+            (total, session) => total + session.estimatedCaloriesBurned,
+            0,
+          ) / selectedMonthSessions.length,
+        )
+      : 0;
 
   const refreshStats = async () => {
     const nextStats = await journeyService.getJourneyStats();
@@ -351,6 +377,7 @@ export default function JourneyScreen() {
     const session = await journeyService.completeWorkoutSession(pendingTimerSeconds);
 
     setLastCalories(session.estimatedCaloriesBurned);
+    setWorkoutSessions((current) => [session, ...current]);
     setTimerState('idle');
     setElapsedSeconds(0);
     setPendingTimerSeconds(0);
@@ -475,12 +502,12 @@ export default function JourneyScreen() {
           </Text>
           <View style={styles.heroStatsRow}>
             <View style={styles.heroStatPill}>
-              <Text style={styles.heroStatValue}>{stats.visitsThisMonth}</Text>
-              <Text style={styles.heroStatLabel}>monthly visits</Text>
+              <Text style={styles.heroStatValue}>{selectedMonthVisitCount}</Text>
+              <Text style={styles.heroStatLabel}>{selectedMonth?.month ?? 'Month'} visits</Text>
             </View>
             <View style={styles.heroStatPill}>
-              <Text style={styles.heroStatValue}>{unlockedCount}</Text>
-              <Text style={styles.heroStatLabel}>badges</Text>
+              <Text style={styles.heroStatValue}>{selectedMonthAverageCalories}</Text>
+              <Text style={styles.heroStatLabel}>avg calories/session</Text>
             </View>
           </View>
         </View>
@@ -562,7 +589,7 @@ export default function JourneyScreen() {
         <View style={styles.statsHeaderRow}>
           <View style={styles.dashboardTitleBlock}>
             <Text style={styles.cardLabel}>Dashboard</Text>
-            <Text style={styles.sectionTitle}>Current training period</Text>
+            <Text style={styles.sectionTitle}>{selectedMonth?.month ?? 'Selected month'} metrics</Text>
             <View style={styles.resetAllStack}>
               {isAllResetUndoable ? (
                 <>
@@ -619,24 +646,14 @@ export default function JourneyScreen() {
         <View style={styles.statsGrid}>
           {[
             {
-              key: 'averageWorkoutDuration' as const,
-              label: 'Avg Duration',
-              value: stats.averageWorkoutDuration,
-            },
-            {
               key: 'visitsThisMonth' as const,
-              label: 'Monthly visits',
-              value: stats.visitsThisMonth,
+              label: `${selectedMonth?.month ?? 'This month'} total visits`,
+              value: selectedMonthVisitCount,
             },
             {
               key: 'estimatedCaloriesBurned' as const,
-              label: 'Calories Burned',
-              value: stats.estimatedCaloriesBurned,
-            },
-            {
-              key: 'visitsThisWeek' as const,
-              label: 'Weekly visits',
-              value: stats.visitsThisWeek,
+              label: 'Average calories burned per session this month',
+              value: selectedMonthAverageCalories,
             },
           ].map((stat) => {
             const canReset = hasJourneyStatValue(stats, stat.key);
@@ -1162,20 +1179,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
   },
-  aiChatPreview: {
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 16,
-    backgroundColor: premiumColors.surfaceSoft,
-    marginTop: 10,
-    padding: 12,
-  },
-  aiChatPreviewText: {
-    color: mutedColor,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 17,
-  },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1538,8 +1541,13 @@ const styles = StyleSheet.create({
     backgroundColor: premiumColors.surfaceSoft,
   },
   calendarDayActive: {
-    borderColor: accentColor,
-    backgroundColor: accentColor,
+    borderColor: '#FF1744',
+    backgroundColor: '#FF1744',
+    shadowColor: '#FF1744',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.26,
+    shadowRadius: 10,
+    elevation: 3,
   },
   calendarDayText: {
     color: mutedColor,

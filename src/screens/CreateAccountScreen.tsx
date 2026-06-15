@@ -227,7 +227,7 @@ export default function CreateAccountScreen() {
           <Image
             source={require('@/assets/images/prototype-three-finger-back-pose-background.png')}
             style={styles.backgroundImage}
-            resizeMode="contain"
+            resizeMode="cover"
           />
           <View style={styles.backgroundVeil} />
           <View style={styles.backgroundFade} />
@@ -453,20 +453,22 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 470,
+    bottom: 0,
     overflow: 'hidden',
   },
   backgroundImage: {
     position: 'absolute',
-    top: -96,
-    left: -300,
-    right: 12,
-    height: 690,
-    opacity: 0.38,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    opacity: 0.42,
   },
   backgroundVeil: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.48)',
+    backgroundColor: 'rgba(0, 0, 0, 0.42)',
   },
   backgroundFade: {
     position: 'absolute',

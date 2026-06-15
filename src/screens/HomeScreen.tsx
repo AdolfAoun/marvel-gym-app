@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useRouter } from 'expo-router';
+import type { Href } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -34,6 +35,7 @@ import type {
   Membership,
   MembershipPlan,
   MembershipStatus,
+  StudentVerificationStatus,
   Voucher,
   VoucherStatus,
 } from '@/types';
@@ -128,22 +130,22 @@ function getStatusTone(status?: MembershipStatus) {
 
 function getActivityColor(count: number) {
   if (count >= 85) {
-    return '#EF233C';
+    return '#FF1744';
   }
 
   if (count >= 70) {
-    return '#FF7A1A';
+    return '#FF3D00';
   }
 
   if (count >= 55) {
-    return '#FFD166';
+    return '#FFD60A';
   }
 
   if (count >= 35) {
-    return '#8DE05F';
+    return '#76FF03';
   }
 
-  return '#20C997';
+  return '#00E5FF';
 }
 
 function getVoucherStatusColor(status: VoucherStatus) {
@@ -177,25 +179,15 @@ function formatVoucherDate(value: string) {
   }).format(new Date(value));
 }
 
-function getRenewalAmount(months: number, plans: MembershipPlan[]) {
-  const exactPlan = plans.find((plan) => plan.durationInMonths === months);
-
-  if (exactPlan) {
-    return exactPlan.price;
-  }
-
-  const monthlyPlan = plans.find((plan) => plan.durationInMonths === 1);
-  const monthlyRate = monthlyPlan?.price ?? 49;
-
-  return monthlyRate * months;
-}
-
 export default function HomeScreen() {
   const router = useRouter();
   const [member, setMember] = useState<Member>();
   const [membership, setMembership] = useState<Membership>();
   const [status, setStatus] = useState<MembershipStatus>();
   const [plans, setPlans] = useState<MembershipPlan[]>([]);
+  const [monthlyRenewalPrice, setMonthlyRenewalPrice] = useState(85);
+  const [studentVerificationStatus, setStudentVerificationStatus] =
+    useState<StudentVerificationStatus>('Not Submitted');
   const [notification, setNotification] = useState<AppNotification>();
   const [activitySchedule, setActivitySchedule] = useState<GymActivityDay[]>([]);
   const [selectedActivityDayId, setSelectedActivityDayId] = useState('');
@@ -222,12 +214,14 @@ export default function HomeScreen() {
   const sheetPanResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) =>
-        Math.abs(gestureState.dy) > 8 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        gestureState.dy > 4 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+      onMoveShouldSetPanResponderCapture: (_, gestureState) =>
+        gestureState.dy > 8 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
       onPanResponderMove: (_, gestureState) => {
         sheetPanY.setValue(Math.max(0, gestureState.dy));
       },
       onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > 64 || gestureState.vy > 0.8) {
+        if (gestureState.dy > 44 || gestureState.vy > 0.45) {
           closeMembershipModal();
           return;
         }
@@ -239,6 +233,16 @@ export default function HomeScreen() {
           tension: 90,
         }).start();
       },
+      onPanResponderTerminate: () => {
+        Animated.spring(sheetPanY, {
+          toValue: 0,
+          useNativeDriver: true,
+          friction: 8,
+          tension: 90,
+        }).start();
+      },
+      onPanResponderTerminationRequest: () => true,
+      onShouldBlockNativeResponder: () => false,
     }),
   ).current;
   const qrPanResponder = useRef(
@@ -287,11 +291,16 @@ export default function HomeScreen() {
         voucherService.getVouchers(),
         classService.getLatestClassUpdate(),
       ]);
+      const renewalPricing = await membershipService.getMembershipRenewalPricing(
+        currentMember.id,
+      );
 
       setMember(currentMember);
       setMembership(currentMembership);
       setStatus(membershipStatus);
       setPlans(membershipPlans);
+      setMonthlyRenewalPrice(renewalPricing.monthlyPrice);
+      setStudentVerificationStatus(renewalPricing.studentStatus);
       setNotification(
         classUpdate ?? notifications.find((item) => !item.isRead) ?? notifications[0],
       );
@@ -366,8 +375,14 @@ export default function HomeScreen() {
   const selectedActivityDay =
     activitySchedule.find((item) => item.id === selectedActivityDayId) ??
     activitySchedule[0];
-  const selectedRenewAmount = getRenewalAmount(selectedRenewMonths, plans);
+  const selectedRenewAmount = selectedRenewMonths * monthlyRenewalPrice;
   const selectedFreezeAmount = selectedFreezeWeeks * weeklyFreezePrice;
+  const renewalPricingNote =
+    studentVerificationStatus === 'Confirmed'
+      ? 'Student pricing applied: $70/month.'
+      : studentVerificationStatus === 'Pending Verification'
+        ? 'Student verification pending. Student pricing applies after approval.'
+        : '';
   const visibleVouchers = vouchers.filter(
     (voucher) => voucher.status === selectedVoucherStatus,
   );
@@ -379,6 +394,7 @@ export default function HomeScreen() {
   };
 
   const closeMembershipModal = () => {
+    sheetPanY.stopAnimation();
     Animated.timing(modalProgress, {
       toValue: 0,
       duration: 160,
@@ -701,7 +717,7 @@ export default function HomeScreen() {
         </Pressable>
 
         <Pressable
-          onPress={() => router.push('/(tabs)/help')}
+          onPress={() => router.push('/how-to-use' as Href)}
           style={({ pressed }) => [
             styles.machineGuideCard,
             pressed && styles.buttonPressed,
@@ -926,15 +942,20 @@ export default function HomeScreen() {
               {
                 transform: [{ translateY: sheetPanY }, { scale: modalScale }],
               },
-            ]}
-            {...sheetPanResponder.panHandlers}>
-            <Pressable
-              onPress={closeMembershipModal}
-              style={styles.modalHandle}
-              accessibilityLabel="Close sheet"
-              accessibilityRole="button"
+            ]}>
+            <View
+              pointerEvents="box-only"
+              style={styles.modalTopDragHitbox}
               {...sheetPanResponder.panHandlers}
             />
+            <View style={styles.modalDragZone}>
+              <Pressable
+                onPress={closeMembershipModal}
+                style={styles.modalHandle}
+                accessibilityLabel="Close sheet"
+                accessibilityRole="button"
+              />
+            </View>
 
             {membershipModal === 'freeze' ? (
               <>
@@ -945,8 +966,7 @@ export default function HomeScreen() {
                   {isFrozen ? 'Extend the current freeze.' : 'Request a membership freeze.'}
                 </Text>
                 <Text style={styles.modalBody}>
-                  Freeze pricing is $10/week for up to 12 weeks. Requests are
-                  held for cash confirmation at the counter.
+                  Freeze for up to 12 weeks at $10/week. Requests are kept on hold until cash confirmation at the counter.
                 </Text>
 
                 <View style={styles.stepperRow}>
@@ -1002,10 +1022,11 @@ export default function HomeScreen() {
                 <Text style={styles.modalKicker}>Renew / Extend Membership</Text>
                 <Text style={styles.modalTitle}>Choose any duration.</Text>
                 <Text style={styles.modalBody}>
-                  Select 1 to 12 months. Subscription is $75/month and can be
-                  renewed for up to 12 months. Pricing follows the available
-                  membership plans.
+                  {`Renew for up to 12 months at $${monthlyRenewalPrice}/month. Requests are kept on hold until cash confirmation at the counter.`}
                 </Text>
+                {renewalPricingNote ? (
+                  <Text style={styles.modalNote}>{renewalPricingNote}</Text>
+                ) : null}
 
                 <View style={styles.stepperRow}>
                   <Pressable
@@ -1598,7 +1619,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 7,
-    backgroundColor: 'rgba(255, 255, 255, 0.075)',
+    backgroundColor: 'rgba(255, 255, 255, 0.095)',
   },
   activityFill: {
     width: '100%',
@@ -1606,8 +1627,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 6,
     shadowColor: '#FFFFFF',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
+    shadowOpacity: 0.34,
+    shadowRadius: 10,
+    elevation: 4,
   },
   activityLabel: {
     color: premiumColors.textMuted,
@@ -1806,6 +1828,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   modalCard: {
+    position: 'relative',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     borderWidth: 1,
@@ -1868,7 +1891,21 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     borderRadius: 999,
     backgroundColor: 'rgba(255, 255, 255, 0.28)',
-    marginBottom: 18,
+  },
+  modalDragZone: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: -22,
+    minHeight: 46,
+    marginBottom: 8,
+  },
+  modalTopDragHitbox: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 68,
+    zIndex: 2,
   },
   modalKicker: {
     color: accentColor,
@@ -1889,6 +1926,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
+    marginTop: 10,
+  },
+  modalNote: {
+    color: premiumColors.redBright,
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 18,
     marginTop: 10,
   },
   stepperRow: {

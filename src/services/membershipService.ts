@@ -9,7 +9,10 @@ import type {
   MembershipStatus,
   Payment,
 } from '../types';
+import { getStudentVerificationStatus } from './studentVerificationService';
 
+const monthlyMembershipPrice = 85;
+const studentMonthlyMembershipPrice = 70;
 let membershipRecord: Membership = { ...activeMembership };
 
 export const getMembershipStatus = async (): Promise<MembershipStatus> => {
@@ -21,7 +24,38 @@ export const getCurrentMembership = async (): Promise<Membership> => {
 };
 
 export const getMembershipPlans = async (): Promise<MembershipPlan[]> => {
-  return membershipPlans;
+  return membershipPlans.map((plan) => ({
+    ...plan,
+    price: plan.durationInMonths * monthlyMembershipPrice,
+  }));
+};
+
+export const getMembershipMonthlyRenewalPrice = async (): Promise<number> => {
+  return monthlyMembershipPrice;
+};
+
+export type RenewalPricing = {
+  monthlyPrice: number;
+  standardMonthlyPrice: number;
+  studentMonthlyPrice: number;
+  studentStatus: Awaited<ReturnType<typeof getStudentVerificationStatus>>;
+};
+
+export const getMembershipRenewalPricing = async (
+  memberId: string,
+): Promise<RenewalPricing> => {
+  const studentStatus = await getStudentVerificationStatus(memberId);
+  const monthlyPrice =
+    studentStatus === 'Confirmed'
+      ? studentMonthlyMembershipPrice
+      : monthlyMembershipPrice;
+
+  return {
+    monthlyPrice,
+    standardMonthlyPrice: monthlyMembershipPrice,
+    studentMonthlyPrice: studentMonthlyMembershipPrice,
+    studentStatus,
+  };
 };
 
 export const activateMembership = async (
@@ -129,6 +163,8 @@ export const membershipService = {
   getMembershipStatus,
   getCurrentMembership,
   getMembershipPlans,
+  getMembershipMonthlyRenewalPrice,
+  getMembershipRenewalPricing,
   activateMembership,
   freezeMembership,
   unfreezeMembership,

@@ -7,31 +7,51 @@ import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
 import { authService } from '@/services';
 
-const adminSections = [
+const adminGroups = [
   {
-    description: 'Search members and manage mock membership details.',
-    href: '/admin/members',
-    title: 'Members',
+    title: 'Member Operations',
+    sections: [
+      {
+        description: 'Search members and manage mock membership details.',
+        href: '/admin/members',
+        title: 'Members',
+      },
+      {
+        description: 'Confirm or cancel pending member vouchers.',
+        href: '/admin/vouchers',
+        title: 'Vouchers',
+      },
+      {
+        description: 'Approve or reject student ID pricing requests.',
+        href: '/admin/student-verification',
+        title: 'Student Verification',
+      },
+    ],
   },
   {
-    description: 'Add, edit, remove, and schedule classes.',
-    href: '/admin/classes',
-    title: 'Classes',
+    title: 'Gym Content',
+    sections: [
+      {
+        description: 'Add, edit, remove, and schedule classes.',
+        href: '/admin/classes',
+        title: 'Classes',
+      },
+      {
+        description: 'Manage shop product listings and availability.',
+        href: '/admin/products',
+        title: 'Shop Products',
+      },
+    ],
   },
   {
-    description: 'Manage shop product listings and availability.',
-    href: '/admin/products',
-    title: 'Shop Products',
-  },
-  {
-    description: 'Confirm or cancel pending member vouchers.',
-    href: '/admin/vouchers',
-    title: 'Vouchers',
-  },
-  {
-    description: 'Manage Welcome Page carousel placeholders.',
-    href: '/admin/photos',
-    title: 'Welcome Photos',
+    title: 'App Display',
+    sections: [
+      {
+        description: 'Manage Welcome Page carousel placeholders.',
+        href: '/admin/photos',
+        title: 'Welcome Photos',
+      },
+    ],
   },
 ] as const;
 
@@ -52,38 +72,43 @@ export default function AdminDashboardScreen() {
         <View style={styles.headerCard}>
           <Text style={styles.kicker}>Marvel Gym Staff</Text>
           <Text style={styles.title}>Admin Dashboard</Text>
-          <Text style={styles.subtitle}>Staff-only testing area</Text>
+          <Text style={styles.subtitle}>
+            Manage Marvel Gym app content, members, and verification requests.
+          </Text>
           <Text style={styles.body}>
-            Temporary admin surface for routing separation and future content
-            management planning. Full admin tools and permissions are not built yet.
+            Staff-only mock testing area for demo workflows. Real permissions,
+            storage, and backend enforcement are still future work.
           </Text>
         </View>
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionLabel}>Coming next</Text>
-          <Text style={styles.sectionTitle}>Management sections</Text>
-        </View>
-
-        <View style={styles.grid}>
-          {adminSections.map((section) => (
-            <Pressable
-              key={section.title}
-              onPress={() => router.push(section.href as Href)}
-              style={({ pressed }) => [
-                styles.card,
-                pressed && styles.buttonPressed,
-              ]}>
-              <View style={styles.cardIcon}>
-                <Text style={styles.cardIconText}>{section.title.slice(0, 1)}</Text>
-              </View>
-              <View style={styles.cardCopy}>
-                <Text style={styles.cardTitle}>{section.title}</Text>
-                <Text style={styles.cardBody}>{section.description}</Text>
-              </View>
-              <Text style={styles.cardArrow}>Open</Text>
-            </Pressable>
-          ))}
-        </View>
+        {adminGroups.map((group) => (
+          <View key={group.title} style={styles.groupBlock}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionLabel}>Admin tools</Text>
+              <Text style={styles.sectionTitle}>{group.title}</Text>
+            </View>
+            <View style={styles.grid}>
+              {group.sections.map((section) => (
+                <Pressable
+                  key={section.title}
+                  onPress={() => router.push(section.href as Href)}
+                  style={({ pressed }) => [
+                    styles.card,
+                    pressed && styles.buttonPressed,
+                  ]}>
+                  <View style={styles.cardIcon}>
+                    <Text style={styles.cardIconText}>{section.title.slice(0, 1)}</Text>
+                  </View>
+                  <View style={styles.cardCopy}>
+                    <Text style={styles.cardTitle}>{section.title}</Text>
+                    <Text style={styles.cardBody}>{section.description}</Text>
+                  </View>
+                  <Text style={styles.cardArrow}>Open</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ))}
 
         <Pressable
           onPress={handleLogout}
@@ -144,6 +169,9 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     marginTop: 4,
+  },
+  groupBlock: {
+    gap: 10,
   },
   sectionLabel: {
     color: premiumColors.redBright,

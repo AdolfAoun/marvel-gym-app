@@ -27,6 +27,23 @@ export type Member = {
   updatedAt: string;
 };
 
+export type StudentVerificationStatus =
+  | 'Not Submitted'
+  | 'Pending Verification'
+  | 'Confirmed'
+  | 'Rejected';
+
+export type StudentVerificationRequest = {
+  id: string;
+  memberId: string;
+  status: StudentVerificationStatus;
+  submittedAt: string;
+  reviewedAt?: string;
+  proofUri?: string;
+  proofLabel?: string;
+  reviewerNote?: string;
+};
+
 export type MembershipPlan = {
   id: string;
   name: string;

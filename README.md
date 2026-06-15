@@ -25,17 +25,16 @@ The app is now in an advanced frontend product refinement and delivery preparati
 * Created shared TypeScript models in `src/types`.
 * Added mock data in `src/mock`.
 * Added backend-ready service-layer functions in `src/services`.
-* Built a member-only app direction, avoiding admin dashboards and staff tools.
+* Built a member-focused app direction, keeping admin tooling separate from member tabs.
+* Added a separate frontend-only mock admin/testing portal for demo and future planning.
 * Added Marvel Gym branding, visual identity, and image assets.
 * Built polished onboarding/auth screens:
-
   * Startup/loading experience
   * Welcome screen
   * Login screen
   * Create account screen
 * Added main member-facing navigation and screens.
-* Built/started core member screens:
-
+* Built core member screens:
   * Home
   * Classes
   * Gym Shop
@@ -68,7 +67,8 @@ The app is now in an advanced frontend product refinement and delivery preparati
 * Gmind/backend will become the future source of truth.
 * Screens must call services only.
 * Mock data must stay behind the service layer.
-* Do not build admin/staff workflows.
+* Do not put admin/staff workflows inside the normal member app.
+* The separate mock admin/testing portal is frontend-only and not production security.
 * Do not hardcode backend assumptions.
 * Keep changes small, clean, and easy to review.
 * Run TypeScript checks after changes:
@@ -79,19 +79,19 @@ npx tsc --noEmit
 
 ## Current Main Folders
 
-* `src/app` — Expo Router routes
-* `src/screens` — Screen components
-* `src/services` — Backend-ready service layer
-* `src/mock` — Temporary frontend mock data
-* `src/types` — Shared TypeScript types
-* `src/constants` — Theme/constants
-* `src/components` — Reusable UI components
-* `assets/images` — Marvel Gym and app image assets
-* `docs` — Project documentation/progress notes
+* `src/app` - Expo Router routes
+* `src/screens` - Screen components
+* `src/services` - Backend-ready service layer
+* `src/mock` - Temporary frontend mock data
+* `src/types` - Shared TypeScript types
+* `src/constants` - Theme/constants
+* `src/components` - Reusable UI components
+* `assets/images` - Marvel Gym and app image assets
+* `docs` - Project documentation/progress notes
 
 ## Current Status
 
-The app has moved beyond the default Expo starter and now contains the core Marvel Gym member app structure, branded UI, service-layer architecture, mock data, authentication/onboarding flow, tab navigation, profile support, classes, shop, journey, help/machine guide, activity-related data, and voucher/payment-related mock content.
+The app has moved beyond the default Expo starter and now contains the core Marvel Gym member app structure, branded UI, service-layer architecture, mock data, authentication/onboarding flow, tab navigation, profile support, classes, shop, journey, help/machine guide, activity-related data, voucher/payment-related mock content, and a separate mock admin/testing portal.
 
 Current state:
 

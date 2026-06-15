@@ -1,4 +1,10 @@
-import type { Member, Membership, MembershipStatus, Voucher } from '@/types';
+import type {
+  Member,
+  Membership,
+  MembershipStatus,
+  StudentVerificationRequest,
+  Voucher,
+} from '@/types';
 
 import {
   extendMemberMembership,
@@ -7,6 +13,7 @@ import {
   updateMemberMembership,
 } from './membershipService';
 import { getLocalMemberById, searchLocalMemberByPhone } from './localAccountStore';
+import { getMemberStudentVerification } from './studentVerificationService';
 import { getMemberVouchers } from './voucherService';
 
 export type AdminMemberSummary = {
@@ -14,6 +21,7 @@ export type AdminMemberSummary = {
   membership: Membership;
   pendingVouchersCount: number;
   remainingDays: number;
+  studentVerification?: StudentVerificationRequest;
   vouchers: Voucher[];
 };
 
@@ -42,9 +50,10 @@ export const getAdminMemberSummary = async (
     return undefined;
   }
 
-  const [membership, vouchers] = await Promise.all([
+  const [membership, vouchers, studentVerification] = await Promise.all([
     getCurrentMembership(),
     getMemberVouchers(),
+    getMemberStudentVerification(memberId),
   ]);
 
   return {
@@ -52,6 +61,7 @@ export const getAdminMemberSummary = async (
     membership,
     pendingVouchersCount: vouchers.filter((voucher) => voucher.status === 'Pending').length,
     remainingDays: calculateRemainingDays(membership.endDate),
+    studentVerification,
     vouchers,
   };
 };
