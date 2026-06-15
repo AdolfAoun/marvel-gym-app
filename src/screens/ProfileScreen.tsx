@@ -199,7 +199,6 @@ export default function ProfileScreen() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: true,
-      aspect: [1, 1],
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.82,
     });
@@ -221,7 +220,6 @@ export default function ProfileScreen() {
 
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
-      aspect: [1, 1],
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.82,
     });
@@ -422,6 +420,24 @@ export default function ProfileScreen() {
           <View style={styles.photoSheet}>
             <Text style={styles.sheetKicker}>Profile picture</Text>
             <Text style={styles.sheetTitle}>Update photo</Text>
+            <View style={styles.photoPreviewWrap}>
+              <View style={styles.photoPreview}>
+                {draftProfileImageUri ? (
+                  <Image
+                    source={{ uri: draftProfileImageUri }}
+                    style={styles.photoPreviewImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Text style={styles.photoPreviewText}>
+                    {avatar.fallbackLabel}
+                  </Text>
+                )}
+              </View>
+              <Text style={styles.photoPreviewHint}>
+                Preview matches the circular profile avatar.
+              </Text>
+            </View>
             <View style={styles.photoChoiceStack}>
               <Pressable
                 onPress={handleChooseProfilePhoto}
@@ -737,6 +753,37 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     paddingBottom: 30,
     ...premiumShadow,
+  },
+  photoPreviewWrap: {
+    alignItems: 'center',
+    marginTop: 18,
+  },
+  photoPreview: {
+    width: 96,
+    height: 96,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 48,
+    backgroundColor: premiumColors.surfaceSoft,
+  },
+  photoPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  photoPreviewText: {
+    color: accentColor,
+    fontSize: 28,
+    fontWeight: '900',
+  },
+  photoPreviewHint: {
+    color: premiumColors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 9,
+    textAlign: 'center',
   },
   confirmCard: {
     width: '100%',

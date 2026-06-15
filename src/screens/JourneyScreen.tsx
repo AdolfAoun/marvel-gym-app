@@ -137,7 +137,6 @@ export default function JourneyScreen() {
   const [isAllResetUndoable, setIsAllResetUndoable] = useState(false);
   const [pendingTimerSeconds, setPendingTimerSeconds] = useState(0);
   const [isHistoryVisible, setIsHistoryVisible] = useState(false);
-  const [isAssistantChatStarted, setIsAssistantChatStarted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const timerStartedAtRef = useRef<number | undefined>(undefined);
   const pausedElapsedRef = useRef(0);
@@ -469,10 +468,10 @@ export default function JourneyScreen() {
         <View style={styles.heroCard}>
           <Text style={styles.kicker}>Journey</Text>
           <Text style={styles.heroTitle}>
-            {member?.firstName ?? 'Member'}'s fitness dashboard
+            {member?.firstName ?? 'Member'}'s Fitness Dashboard
           </Text>
           <Text style={styles.heroBody}>
-            Track consistency, training time, attendance, and personal notes.
+            Tailor your plan with AI and track consistency through attendance and training time.
           </Text>
           <View style={styles.heroStatsRow}>
             <View style={styles.heroStatPill}>
@@ -499,22 +498,13 @@ export default function JourneyScreen() {
             and training preferences.
           </Text>
           <Pressable
-            onPress={() => setIsAssistantChatStarted(true)}
+            onPress={() => undefined}
             style={({ pressed }) => [
               styles.aiChatButton,
               pressed && styles.buttonPressed,
             ]}>
-            <Text style={styles.aiChatButtonText}>
-              {isAssistantChatStarted ? 'Continue Chat' : 'Start Chat'}
-            </Text>
+            <Text style={styles.aiChatButtonText}>Start Chat</Text>
           </Pressable>
-          {isAssistantChatStarted ? (
-            <View style={styles.aiChatPreview}>
-              <Text style={styles.aiChatPreviewText}>
-                Training chat is ready. Use About Me below to keep your guidance personal.
-              </Text>
-            </View>
-          ) : null}
         </View>
 
         <View style={styles.timerCard}>

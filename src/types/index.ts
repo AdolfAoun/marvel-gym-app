@@ -13,6 +13,7 @@ export type NotificationType = 'Info' | 'Success' | 'Warning' | 'Error';
 
 export type Member = {
   id: string;
+  role?: 'Member' | 'Admin';
   firstName: string;
   lastName: string;
   email: string;

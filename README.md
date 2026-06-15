@@ -1,56 +1,125 @@
-# Welcome to your Expo app 👋
+## Project Progress Summary
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Marvel Gym App is a member-facing mobile application built with React Native, Expo SDK 54, Expo Router, and TypeScript.
 
-## Get started
+The project is currently frontend-only. All data is handled through mock data behind a service layer, so screens do not import mock data directly.
 
-1. Install dependencies
+Current architecture:
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```text
+Screen -> Service -> Mock Data
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Future architecture:
 
-### Other setup steps
+```text
+Screen -> Service -> Gmind/backend
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+The app is now in an advanced frontend product refinement and delivery preparation stage. The main member-facing frontend flows are already built, and the UI/UX is approximately 99% complete. Only small visual tweaks, wording improvements, and final polish remain before moving into the next major stages.
 
-## Learn more
+## What Has Been Built
 
-To learn more about developing your project with Expo, look at the following resources:
+* Set up the Expo Router app structure under `src/app`.
+* Added thin route files that render screen components from `src/screens`.
+* Created shared TypeScript models in `src/types`.
+* Added mock data in `src/mock`.
+* Added backend-ready service-layer functions in `src/services`.
+* Built a member-only app direction, avoiding admin dashboards and staff tools.
+* Added Marvel Gym branding, visual identity, and image assets.
+* Built polished onboarding/auth screens:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+  * Startup/loading experience
+  * Welcome screen
+  * Login screen
+  * Create account screen
+* Added main member-facing navigation and screens.
+* Built/started core member screens:
 
-## Join the community
+  * Home
+  * Classes
+  * Gym Shop
+  * Journey
+  * Help / Machine Guide
+  * Profile
+* Added profile access through the top-right avatar/profile button.
+* Added local account/profile support through services.
+* Added avatar/profile picture display support.
+* Added class listing support.
+* Added shop/product support.
+* Added member journey content, attendance, achievements, and workout-related mock data.
+* Added machine guide content and service support.
+* Added voucher/payment-style mock data where needed for frontend flows.
+* Added gym activity schedule mock data.
 
-Join our community of developers creating universal apps.
+## Current Tech Stack
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+* React Native
+* Expo SDK 54
+* Expo Router
+* TypeScript
+* Mock data for the current frontend phase
+* Service-layer architecture for future Gmind/backend integration
+
+## Important Project Rules
+
+* Current phase is frontend-only refinement.
+* No real backend integration yet.
+* Gmind/backend will become the future source of truth.
+* Screens must call services only.
+* Mock data must stay behind the service layer.
+* Do not build admin/staff workflows.
+* Do not hardcode backend assumptions.
+* Keep changes small, clean, and easy to review.
+* Run TypeScript checks after changes:
+
+```bash
+npx tsc --noEmit
+```
+
+## Current Main Folders
+
+* `src/app` — Expo Router routes
+* `src/screens` — Screen components
+* `src/services` — Backend-ready service layer
+* `src/mock` — Temporary frontend mock data
+* `src/types` — Shared TypeScript types
+* `src/constants` — Theme/constants
+* `src/components` — Reusable UI components
+* `assets/images` — Marvel Gym and app image assets
+* `docs` — Project documentation/progress notes
+
+## Current Status
+
+The app has moved beyond the default Expo starter and now contains the core Marvel Gym member app structure, branded UI, service-layer architecture, mock data, authentication/onboarding flow, tab navigation, profile support, classes, shop, journey, help/machine guide, activity-related data, and voucher/payment-related mock content.
+
+Current state:
+
+* Advanced frontend/product polish stage.
+* UI/UX is approximately 99% complete.
+* Main member-facing frontend flows are already built.
+* Remaining frontend work is mostly small visual tweaks, wording improvements, and final polish.
+
+## Upcoming Direction
+
+The next major milestones after final UI polish are admin-side content management and real database/backend integration. These are not complete yet.
+
+### Admin / Management Side
+
+The project will need an admin user or admin-side system where staff can modify shared app content used across member accounts.
+
+Admin-managed items may include:
+
+* Welcome page photos
+* Gym product listings
+* Machine guide content
+* Classes
+* Pricing
+* Membership-related display data
+* Other common content shared between accounts
+
+### Database / Backend Connection
+
+After frontend polish, the app will begin connecting to an actual database/backend. Gmind/backend integration remains the long-term source of truth where possible.
+
+The current service-layer architecture should make this easier because screens already call services instead of importing mock data directly. Backend work should replace mock-backed service implementations without requiring major screen rewrites.

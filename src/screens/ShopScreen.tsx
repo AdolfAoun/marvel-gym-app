@@ -98,7 +98,7 @@ export default function ShopScreen() {
           <Text style={styles.kicker}>Gym Shop</Text>
           <Text style={styles.heroTitle}>Premium gym essentials.</Text>
           <Text style={styles.heroBody}>
-            Check current availability and compare prices for Marvel Gym products.
+            Check current availability and prices for Marvel Gym products.
           </Text>
           <View style={styles.heroPill}>
             <Text style={styles.heroPillText}>Availability and pricing</Text>
@@ -188,9 +188,13 @@ export default function ShopScreen() {
                 !product.isAvailable && styles.productCardUnavailable,
               ]}>
               <View style={styles.productImage}>
-                <Text style={styles.productImageText}>
-                  {getProductImageLabel(product)}
-                </Text>
+                <View style={styles.productImageGlow} />
+                <View style={styles.productImageFrame}>
+                  <Text style={styles.productImageInitialText}>
+                    {getProductImageLabel(product)}
+                  </Text>
+                </View>
+                <Text style={styles.productImageText}>Photo soon</Text>
                 <View
                   style={[
                     styles.availabilityBadge,
@@ -438,9 +442,35 @@ const styles = StyleSheet.create({
     backgroundColor: premiumColors.surfaceSoft,
     marginBottom: 12,
   },
+  productImageGlow: {
+    position: 'absolute',
+    left: -26,
+    bottom: -28,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: 'rgba(225, 29, 46, 0.14)',
+  },
+  productImageFrame: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 16,
+    backgroundColor: 'rgba(7, 8, 12, 0.78)',
+  },
   productImageText: {
     color: accentColor,
-    fontSize: 22,
+    fontSize: 10,
+    fontWeight: '900',
+    marginTop: 6,
+    textTransform: 'uppercase',
+  },
+  productImageInitialText: {
+    color: accentColor,
+    fontSize: 20,
     fontWeight: '900',
   },
   availabilityBadge: {

@@ -18,6 +18,7 @@ export default function RootLayout() {
       <Stack.Screen name="welcome" />
       <Stack.Screen name="login" />
       <Stack.Screen name="create-account" />
+      <Stack.Screen name="admin" />
       <Stack.Screen
         name="(tabs)"
         options={{

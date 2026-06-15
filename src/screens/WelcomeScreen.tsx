@@ -71,7 +71,7 @@ export default function WelcomeScreen() {
                 <Image
                   source={slide.image}
                   style={styles.heroImage}
-                  resizeMode="cover"
+                  resizeMode="contain"
                 />
                 <View pointerEvents="none" style={styles.heroVeil} />
               </View>

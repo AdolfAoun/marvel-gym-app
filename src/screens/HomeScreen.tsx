@@ -44,7 +44,7 @@ const backgroundColor = premiumColors.background;
 const surfaceColor = premiumColors.surface;
 const textColor = premiumColors.text;
 const mutedColor = premiumColors.textMuted;
-const voucherStatuses: VoucherStatus[] = ['Confirmed', 'Pending', 'Canceled'];
+const voucherStatuses: VoucherStatus[] = ['Pending', 'Confirmed', 'Canceled'];
 const weeklyFreezePrice = 10;
 const maxRenewMonths = 12;
 const minRenewMonths = 1;
@@ -201,7 +201,7 @@ export default function HomeScreen() {
   const [selectedActivityDayId, setSelectedActivityDayId] = useState('');
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [selectedVoucherStatus, setSelectedVoucherStatus] =
-    useState<VoucherStatus>('Confirmed');
+    useState<VoucherStatus>('Pending');
   const [membershipModal, setMembershipModal] = useState<MembershipModal>();
   const [selectedFreezeWeeks, setSelectedFreezeWeeks] = useState(1);
   const [selectedRenewMonths, setSelectedRenewMonths] = useState(1);
@@ -684,6 +684,12 @@ export default function HomeScreen() {
             styles.machineGuideCard,
             pressed && styles.buttonPressed,
           ]}>
+          <View style={styles.featureImagePlaceholder}>
+            <View style={styles.featureImageGlow} />
+            <View style={styles.featureImageFrame}>
+              <Text style={styles.featureImageText}>MG</Text>
+            </View>
+          </View>
           <View style={styles.machineGuideCopy}>
             <Text style={styles.cardLabel}>Machine Guide</Text>
             <Text style={styles.machineGuideTitle}>Find the right equipment</Text>
@@ -700,11 +706,17 @@ export default function HomeScreen() {
             styles.machineGuideCard,
             pressed && styles.buttonPressed,
           ]}>
+          <View style={styles.featureImagePlaceholder}>
+            <View style={styles.featureImageGlow} />
+            <View style={styles.featureImageFrame}>
+              <Text style={styles.featureImageText}>AI</Text>
+            </View>
+          </View>
           <View style={styles.machineGuideCopy}>
-            <Text style={styles.cardLabel}>Help</Text>
+            <Text style={styles.cardLabel}>AI Gym Help</Text>
             <Text style={styles.machineGuideTitle}>How to use the app</Text>
             <Text style={styles.machineGuideBody}>
-              Open instructions, support details, and the AI assistant.
+              Open for instructions, support from AI assistant, or contact us for help.
             </Text>
           </View>
           <Text style={styles.machineGuideAction}>Open</Text>
@@ -933,8 +945,8 @@ export default function HomeScreen() {
                   {isFrozen ? 'Extend the current freeze.' : 'Request a membership freeze.'}
                 </Text>
                 <Text style={styles.modalBody}>
-                  Freeze pricing is $10/week. Requests are held for cash
-                  confirmation at the counter.
+                  Freeze pricing is $10/week for up to 12 weeks. Requests are
+                  held for cash confirmation at the counter.
                 </Text>
 
                 <View style={styles.stepperRow}>
@@ -990,7 +1002,8 @@ export default function HomeScreen() {
                 <Text style={styles.modalKicker}>Renew / Extend Membership</Text>
                 <Text style={styles.modalTitle}>Choose any duration.</Text>
                 <Text style={styles.modalBody}>
-                  Select 1 to 12 months. Pricing follows the available
+                  Select 1 to 12 months. Subscription is $75/month and can be
+                  renewed for up to 12 months. Pricing follows the available
                   membership plans.
                 </Text>
 
@@ -1452,6 +1465,43 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     marginBottom: 16,
     ...premiumShadow,
+  },
+  featureImagePlaceholder: {
+    width: 58,
+    height: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: premiumColors.borderStrong,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginRight: 14,
+  },
+  featureImageGlow: {
+    position: 'absolute',
+    right: -18,
+    top: -18,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(225, 29, 46, 0.24)',
+  },
+  featureImageFrame: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 13,
+    backgroundColor: 'rgba(7, 8, 12, 0.82)',
+  },
+  featureImageText: {
+    color: wineColor,
+    fontSize: 15,
+    fontWeight: '900',
   },
   machineGuideCopy: {
     flex: 1,

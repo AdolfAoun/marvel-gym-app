@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import type { Href } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -180,10 +181,17 @@ export default function LoginScreen() {
     setIsSubmitting(true);
 
     try {
-      await authService.loginMember({
+      const member = await authService.loginMember({
         email: loginMode === 'phone' ? normalizedPhone : normalizedEmail,
         password,
       });
+
+      // TODO: Enforce admin authentication and permissions from the backend.
+      if (member.role === 'Admin') {
+        router.replace('/admin' as Href);
+        return;
+      }
+
       router.replace('/(tabs)');
     } catch {
       setPasswordMessage(loginFailureMessage);

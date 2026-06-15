@@ -145,6 +145,17 @@ function createClass(seed: ScheduleSeed, index: number): GymClass {
 let classRecords: GymClass[] = scheduleSeeds.map(createClass);
 let latestClassUpdate: AppNotification | undefined;
 
+export type ClassMutationInput = {
+  capacity: number;
+  instructorName: string;
+  isPaid: boolean;
+  location: string;
+  price: number;
+  startTime: string;
+  status: GymClass['status'];
+  title: string;
+};
+
 function createClassUpdate(
   gymClass: GymClass,
   action: 'reserved' | 'canceled',
@@ -165,6 +176,85 @@ function createClassUpdate(
 
 export const getScheduledClasses = async (): Promise<GymClass[]> => {
   return classRecords;
+};
+
+export const getAdminClasses = async (): Promise<GymClass[]> => {
+  return classRecords;
+};
+
+export const createAdminClass = async (
+  input: ClassMutationInput,
+): Promise<GymClass> => {
+  const start = new Date(input.startTime);
+  const end = new Date(start.getTime() + 50 * 60_000);
+  const gymClass: GymClass = {
+    id: `class-${Date.now().toString(36)}`,
+    title: input.title,
+    description: `${input.location} session with Coach ${input.instructorName}.`,
+    instructorName: input.instructorName,
+    startTime: start.toISOString(),
+    endTime: end.toISOString(),
+    price: input.isPaid ? input.price : 0,
+    currency: 'USD',
+    isPaid: input.isPaid,
+    status: input.status,
+    isRegistered: false,
+    capacity: input.capacity,
+    enrolledCount: 0,
+    location: input.location,
+    isActive: true,
+  };
+
+  classRecords = [gymClass, ...classRecords];
+
+  return gymClass;
+};
+
+export const updateAdminClass = async (
+  classId: string,
+  updates: Partial<ClassMutationInput>,
+): Promise<GymClass | undefined> => {
+  let updatedClass: GymClass | undefined;
+
+  classRecords = classRecords.map((gymClass) => {
+    if (gymClass.id !== classId) {
+      return gymClass;
+    }
+
+    const startTime = updates.startTime
+      ? new Date(updates.startTime).toISOString()
+      : gymClass.startTime;
+    const endTime = updates.startTime
+      ? new Date(new Date(updates.startTime).getTime() + 50 * 60_000).toISOString()
+      : gymClass.endTime;
+    const isPaid = updates.isPaid ?? gymClass.isPaid;
+
+    updatedClass = {
+      ...gymClass,
+      ...updates,
+      startTime,
+      endTime,
+      isPaid,
+      price: isPaid ? updates.price ?? gymClass.price : 0,
+      description: `${updates.location ?? gymClass.location} session with Coach ${
+        updates.instructorName ?? gymClass.instructorName
+      }.`,
+    };
+
+    return updatedClass;
+  });
+
+  return updatedClass;
+};
+
+export const deleteAdminClass = async (
+  classId: string,
+): Promise<GymClass | undefined> => {
+  const deletedClass = classRecords.find((gymClass) => gymClass.id === classId);
+
+  classRecords = classRecords.filter((gymClass) => gymClass.id !== classId);
+
+  return deletedClass;
 };
 
 export const registerForClass = async (
@@ -230,6 +320,10 @@ export const getLatestClassUpdate = async (): Promise<
 
 export const classService = {
   getScheduledClasses,
+  getAdminClasses,
+  createAdminClass,
+  updateAdminClass,
+  deleteAdminClass,
   registerForClass,
   cancelClassRegistration,
   getLatestClassUpdate,

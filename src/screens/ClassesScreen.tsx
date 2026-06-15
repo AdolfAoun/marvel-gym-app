@@ -3,6 +3,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -34,6 +35,15 @@ function formatClassTime(value: string) {
   }).format(new Date(value));
 }
 
+function formatClassDateTime(value: string) {
+  return new Intl.DateTimeFormat('en', {
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    month: 'short',
+  }).format(new Date(value));
+}
+
 function formatClassDuration(startTime: string, endTime: string) {
   const duration = Math.max(
     0,
@@ -48,6 +58,10 @@ export default function ClassesScreen() {
   const [selectedCategory, setSelectedCategory] =
     useState<(typeof categories)[number]>('Fitness Classes');
   const [selectedDay, setSelectedDay] = useState('Wednesday');
+  const [pendingClassAction, setPendingClassAction] = useState<{
+    action: 'cancel' | 'reserve';
+    gymClass: GymClass;
+  }>();
   const [isLoading, setIsLoading] = useState(true);
 
   const loadClasses = useCallback(async () => {
@@ -81,11 +95,13 @@ export default function ClassesScreen() {
   const handleReserve = async (classId: string) => {
     await classService.registerForClass(classId);
     await loadClasses();
+    setPendingClassAction(undefined);
   };
 
   const handleCancel = async (classId: string) => {
     await classService.cancelClassRegistration(classId);
     await loadClasses();
+    setPendingClassAction(undefined);
   };
 
   if (isLoading) {
@@ -219,6 +235,11 @@ export default function ClassesScreen() {
 
                 return (
                   <View key={gymClass.id} style={styles.classCard}>
+                    <View style={styles.instructorImage}>
+                      <Text style={styles.instructorImageText}>
+                        {gymClass.instructorName.slice(0, 1).toUpperCase()}
+                      </Text>
+                    </View>
                     <View style={styles.timeRail}>
                       <Text style={styles.classTime}>
                         {formatClassTime(gymClass.startTime)}
@@ -257,9 +278,10 @@ export default function ClassesScreen() {
                       <Pressable
                         disabled={isFull}
                         onPress={() =>
-                          isReserved
-                            ? handleCancel(gymClass.id)
-                            : handleReserve(gymClass.id)
+                          setPendingClassAction({
+                            action: isReserved ? 'cancel' : 'reserve',
+                            gymClass,
+                          })
                         }
                         style={({ pressed }) => [
                           styles.reserveButton,
@@ -283,6 +305,65 @@ export default function ClassesScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <Modal transparent visible={Boolean(pendingClassAction)} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setPendingClassAction(undefined)}
+          />
+          <View style={styles.confirmCard}>
+            <Text style={styles.cardLabel}>Confirm</Text>
+            <Text style={styles.confirmTitle}>
+              {pendingClassAction?.action === 'cancel'
+                ? 'Cancel reservation?'
+                : 'Reserve this class?'}
+            </Text>
+            {pendingClassAction ? (
+              <>
+                <Text style={styles.confirmBody}>
+                  {pendingClassAction.gymClass.title}
+                </Text>
+                <Text style={styles.confirmMeta}>
+                  {formatClassDateTime(pendingClassAction.gymClass.startTime)}
+                </Text>
+                <Text style={styles.confirmMeta}>
+                  Coach {pendingClassAction.gymClass.instructorName}
+                </Text>
+              </>
+            ) : null}
+            <View style={styles.confirmRow}>
+              <Pressable
+                onPress={() => setPendingClassAction(undefined)}
+                style={({ pressed }) => [
+                  styles.confirmSecondary,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.confirmSecondaryText}>No</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  if (!pendingClassAction) {
+                    return;
+                  }
+
+                  if (pendingClassAction.action === 'cancel') {
+                    handleCancel(pendingClassAction.gymClass.id);
+                    return;
+                  }
+
+                  handleReserve(pendingClassAction.gymClass.id);
+                }}
+                style={({ pressed }) => [
+                  styles.confirmPrimary,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.confirmPrimaryText}>Yes</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </PremiumScreenBackground>
   );
 }
@@ -493,8 +574,23 @@ const styles = StyleSheet.create({
     backgroundColor: premiumColors.surfaceSoft,
     padding: 13,
   },
+  instructorImage: {
+    width: 48,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: premiumColors.borderStrong,
+    borderRadius: 16,
+    backgroundColor: premiumColors.surfaceSoft,
+  },
+  instructorImageText: {
+    color: premiumColors.redBright,
+    fontSize: 18,
+    fontWeight: '900',
+  },
   timeRail: {
-    width: 66,
+    width: 56,
     alignItems: 'center',
     gap: 8,
     paddingTop: 3,
@@ -589,5 +685,76 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     opacity: 0.76,
+  },
+  modalOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.58)',
+    padding: 20,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 26,
+    backgroundColor: premiumColors.surface,
+    padding: 20,
+    ...premiumShadow,
+  },
+  confirmTitle: {
+    color: premiumColors.text,
+    fontSize: 23,
+    fontWeight: '900',
+    marginTop: 4,
+  },
+  confirmBody: {
+    color: premiumColors.text,
+    fontSize: 16,
+    fontWeight: '900',
+    marginTop: 12,
+  },
+  confirmMeta: {
+    color: premiumColors.textMuted,
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 5,
+  },
+  confirmRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 18,
+  },
+  confirmSecondary: {
+    minHeight: 52,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: premiumColors.borderStrong,
+    borderRadius: 18,
+    backgroundColor: premiumColors.surfaceSoft,
+  },
+  confirmSecondaryText: {
+    color: premiumColors.redBright,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  confirmPrimary: {
+    minHeight: 52,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+    backgroundColor: premiumColors.red,
+  },
+  confirmPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
   },
 });

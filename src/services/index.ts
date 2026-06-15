@@ -10,3 +10,4 @@ export * from './voucherService';
 export * from './journeyService';
 export * from './machineGuideService';
 export * from './entryContentService';
+export * from './adminMemberService';

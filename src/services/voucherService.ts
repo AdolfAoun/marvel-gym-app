@@ -17,10 +17,29 @@ function createVoucherId() {
 }
 
 export const getVouchers = async (): Promise<Voucher[]> => {
-  return [...voucherRecords].sort(
-    (first, second) =>
-      new Date(second.date).getTime() - new Date(first.date).getTime(),
-  );
+  return getAllVouchers();
+};
+
+export const getAllVouchers = async (): Promise<Voucher[]> => {
+  const statusOrder: Record<VoucherStatus, number> = {
+    Pending: 0,
+    Confirmed: 1,
+    Canceled: 2,
+  };
+
+  return [...voucherRecords].sort((first, second) => {
+    const statusDifference = statusOrder[first.status] - statusOrder[second.status];
+
+    if (statusDifference !== 0) {
+      return statusDifference;
+    }
+
+    return new Date(second.date).getTime() - new Date(first.date).getTime();
+  });
+};
+
+export const getMemberVouchers = async (): Promise<Voucher[]> => {
+  return getAllVouchers();
 };
 
 export const getPendingVouchers = async (): Promise<Voucher[]> => {
@@ -117,6 +136,27 @@ export const confirmShopVoucher = async (
   return confirmedVoucher;
 };
 
+export const confirmVoucher = async (
+  voucherId: string,
+): Promise<Voucher | undefined> => {
+  const voucher = voucherRecords.find((item) => item.id === voucherId);
+
+  if (!voucher) {
+    return undefined;
+  }
+
+  const confirmedVoucher: Voucher = {
+    ...voucher,
+    status: 'Confirmed',
+  };
+
+  voucherRecords = voucherRecords.map((item) =>
+    item.id === voucherId ? confirmedVoucher : item,
+  );
+
+  return confirmedVoucher;
+};
+
 export const cancelVoucher = async (
   voucherId: string,
 ): Promise<Voucher | undefined> => {
@@ -140,6 +180,8 @@ export const cancelVoucher = async (
 
 export const voucherService = {
   getVouchers,
+  getAllVouchers,
+  getMemberVouchers,
   getPendingVouchers,
   getVouchersByStatus,
   getShopVouchers,
@@ -148,5 +190,6 @@ export const voucherService = {
   createMembershipFreezeVoucher,
   createShopVoucher,
   confirmShopVoucher,
+  confirmVoucher,
   cancelVoucher,
 };

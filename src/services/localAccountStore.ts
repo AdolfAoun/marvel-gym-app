@@ -17,9 +17,11 @@ type StoredAccount = {
 };
 
 const now = () => new Date().toISOString();
+const seedTimestamp = now();
 
 let guestMember: Member = {
   id: 'guest-member',
+  role: 'Member',
   firstName: 'Guest',
   lastName: '',
   email: '',
@@ -28,7 +30,41 @@ let guestMember: Member = {
   createdAt: now(),
   updatedAt: now(),
 };
-let accounts: StoredAccount[] = [];
+let accounts: StoredAccount[] = [
+  {
+    member: {
+      id: 'admin-member',
+      role: 'Admin',
+      firstName: 'Admin',
+      lastName: 'User',
+      email: 'admin@admin.com',
+      phone: '+961 00 000 000',
+      location: 'Marvel Gym',
+      createdAt: seedTimestamp,
+      updatedAt: seedTimestamp,
+    },
+    password: 'admin@1',
+    gender: 'Male',
+  },
+  {
+    member: {
+      id: 'member-001',
+      role: 'Member',
+      firstName: 'Tony',
+      lastName: 'Stark',
+      email: 'tony.stark@example.com',
+      phone: '+961 70 123 456',
+      location: 'Beirut, Lebanon',
+      dateOfBirth: '1985-05-29',
+      emergencyContactName: 'Pepper Potts',
+      emergencyContactPhone: '+961 70 654 321',
+      createdAt: seedTimestamp,
+      updatedAt: seedTimestamp,
+    },
+    password: 'member@1',
+    gender: 'Male',
+  },
+];
 let activeMemberId: string | undefined;
 
 function normalizeEmail(value: string) {
@@ -64,6 +100,7 @@ export const registerLocalMember = async (
   const timestamp = now();
   const member: Member = {
     id: `member-${Date.now().toString(36)}`,
+    role: 'Member',
     firstName: input.firstName,
     lastName: input.lastName,
     email: normalizeEmail(input.email),
@@ -102,6 +139,27 @@ export const getActiveMember = async (): Promise<Member> => {
   const account = accounts.find((item) => item.member.id === activeMemberId);
 
   return account?.member ?? guestMember;
+};
+
+export const getLocalMemberById = async (
+  memberId: string,
+): Promise<Member | undefined> => {
+  return accounts.find((item) => item.member.id === memberId)?.member;
+};
+
+export const searchLocalMemberByPhone = async (
+  phone: string,
+): Promise<Member | undefined> => {
+  const normalizedPhone = normalizePhone(phone);
+
+  if (normalizedPhone.length !== 8) {
+    return undefined;
+  }
+
+  return accounts
+    .filter((account) => account.member.role !== 'Admin')
+    .find((account) => normalizePhone(account.member.phone) === normalizedPhone)
+    ?.member;
 };
 
 export const updateActiveMember = async (
