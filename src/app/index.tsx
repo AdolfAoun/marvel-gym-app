@@ -71,6 +71,10 @@ export default function IndexRoute() {
               source={source}
               style={[
                 styles.signImage,
+                index === 0 && styles.signDot,
+                index === 1 && styles.signX,
+                index === 2 && styles.signSlash,
+                index === 3 && styles.signDivide,
                 {
                   transform: [
                     {
@@ -183,19 +187,35 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   signRow: {
-    height: 38,
+    height: 34,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
-    marginBottom: -2,
+    gap: 13,
+    marginBottom: -4,
   },
   signImage: {
-    width: 36,
-    height: 36,
+    width: 30,
+    height: 30,
+  },
+  signDot: {
+    width: 17,
+    height: 17,
+  },
+  signX: {
+    width: 34,
+    height: 34,
+  },
+  signSlash: {
+    width: 28,
+    height: 34,
+  },
+  signDivide: {
+    width: 42,
+    height: 34,
   },
   startupLogo: {
-    width: 268,
-    height: 106,
+    width: 236,
+    height: 74,
   },
 });

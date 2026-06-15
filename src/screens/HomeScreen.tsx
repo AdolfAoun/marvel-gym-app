@@ -653,6 +653,18 @@ export default function HomeScreen() {
 
             <Pressable
               onPress={() => {
+                setSelectedRenewMonths(1);
+                setMembershipModal('renew');
+              }}
+              style={({ pressed }) => [
+                styles.actionCard,
+                pressed && styles.buttonPressed,
+              ]}>
+              <Text style={styles.actionTitle}>Renew/Extend</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
                 if (isFrozen) {
                   setSelectedFreezeWeeks(1);
                   setMembershipModal('freeze');
@@ -667,18 +679,6 @@ export default function HomeScreen() {
                 pressed && styles.buttonPressed,
               ]}>
               <Text style={styles.actionTitle}>Freeze</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => {
-                setSelectedRenewMonths(1);
-                setMembershipModal('renew');
-              }}
-              style={({ pressed }) => [
-                styles.actionCard,
-                pressed && styles.buttonPressed,
-              ]}>
-              <Text style={styles.actionTitle}>Renew/Extend</Text>
             </Pressable>
           </View>
 
