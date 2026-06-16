@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  Image,
   Keyboard,
   Linking,
   Platform,
@@ -243,18 +242,11 @@ export default function LoginScreen() {
     <View style={styles.safeArea}>
       <StatusBar style="light" />
       <View style={styles.phoneFrame}>
-        <View pointerEvents="none" style={styles.prototypeAtmosphereLayer}>
-          <Image
-            source={require('@/assets/images/prototype-three-finger-back-pose-background.png')}
-            style={styles.prototypeAtmosphereImage}
-            resizeMode="cover"
-          />
-          <View style={styles.prototypeAtmosphereVeil} />
-          <View style={styles.prototypeAtmosphereLowerFade} />
-        </View>
-        <View pointerEvents="none" style={styles.glowSmall} />
-        <View pointerEvents="none" style={styles.glowLarge} />
-        <View pointerEvents="none" style={styles.futuristicBlade} />
+        <View pointerEvents="none" style={styles.bgRedGlowTop} />
+        <View pointerEvents="none" style={styles.bgRedGlowBottom} />
+        <View pointerEvents="none" style={styles.bgGrid} />
+        <View pointerEvents="none" style={styles.bgDiagonalOne} />
+        <View pointerEvents="none" style={styles.bgDiagonalTwo} />
 
         <SafeAreaView style={styles.contentSafeArea}>
           <Animated.View
@@ -464,7 +456,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: Platform.OS === 'web' ? 414 : undefined,
     overflow: 'hidden',
-    backgroundColor: '#06070A',
+    backgroundColor: '#07080C',
     borderColor: Platform.OS === 'web' ? '#1d2733' : 'transparent',
     borderRadius: Platform.OS === 'web' ? 34 : 0,
     borderWidth: Platform.OS === 'web' ? 1 : 0,
@@ -477,74 +469,58 @@ const styles = StyleSheet.create({
   contentSafeArea: {
     flex: 1,
   },
-  glowSmall: {
-    position: 'absolute',
-    zIndex: 1,
-    bottom: 70,
-    left: -110,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: accentColor,
-    opacity: 0.16,
-  },
-  glowLarge: {
-    position: 'absolute',
-    zIndex: 1,
-    top: -76,
-    right: -76,
-    width: 186,
-    height: 186,
-    borderRadius: 93,
-    backgroundColor: '#5A0711',
-    opacity: 0.22,
-  },
-  futuristicBlade: {
-    position: 'absolute',
-    zIndex: 1,
-    top: 64,
-    right: -70,
-    width: 102,
-    height: 520,
-    borderRadius: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    transform: [{ rotate: '24deg' }],
-  },
-  prototypeAtmosphereLayer: {
+  bgRedGlowTop: {
     position: 'absolute',
     zIndex: 0,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    overflow: 'hidden',
-    opacity: 1,
+    right: -120,
+    top: -90,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: 'rgba(177, 18, 38, 0.22)',
   },
-  prototypeAtmosphereImage: {
+  bgRedGlowBottom: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-    opacity: 0.44,
+    zIndex: 0,
+    left: -150,
+    bottom: -40,
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    backgroundColor: 'rgba(177, 18, 38, 0.12)',
   },
-  prototypeAtmosphereVeil: {
+  bgGrid: {
     position: 'absolute',
+    zIndex: 0,
+    left: 0,
+    right: 0,
     top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.42)',
+    height: 320,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.035)',
+    backgroundColor: 'rgba(255, 255, 255, 0.018)',
   },
-  prototypeAtmosphereLowerFade: {
+  bgDiagonalOne: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 140,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    zIndex: 0,
+    right: 40,
+    top: 90,
+    width: 2,
+    height: 300,
+    borderRadius: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    transform: [{ rotate: '28deg' }],
+  },
+  bgDiagonalTwo: {
+    position: 'absolute',
+    zIndex: 0,
+    left: 34,
+    top: 220,
+    width: 1,
+    height: 300,
+    borderRadius: 1,
+    backgroundColor: 'rgba(177, 18, 38, 0.22)',
+    transform: [{ rotate: '28deg' }],
   },
   contactHubLayer: {
   position: 'absolute',

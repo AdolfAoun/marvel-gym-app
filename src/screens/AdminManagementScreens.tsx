@@ -1,9 +1,11 @@
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as ImagePicker from 'expo-image-picker';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -63,7 +65,7 @@ const studentStatusFilters: StudentVerificationStatus[] = [
   'Confirmed',
   'Rejected',
 ];
-type ClassFilter = 'All' | 'Today' | 'Upcoming' | 'Available' | 'Full' | 'Paid' | 'Free';
+type ClassFilter = 'All' | 'Today' | 'Upcoming' | 'Available' | 'Full';
 type ProductFilter =
   | 'All'
   | 'Available'
@@ -81,13 +83,54 @@ type ConfirmAction = {
 type ClassForm = {
   capacity: string;
   instructorName: string;
-  isPaid: boolean;
   category: ClassCategory;
-  price: string;
   startTime: string;
   status: GymClass['status'];
   title: string;
 };
+
+const classStatusOptions: GymClass['status'][] = ['Available', 'Full', 'Upcoming'];
+
+// Admin start-time field is a simple 24-hour HH:MM value; convert to/from the
+// ISO datetime the service layer stores.
+function formatTimeInput(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 4);
+
+  if (digits.length <= 2) {
+    return digits;
+  }
+
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+
+function timeToIso(time: string) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
+
+  if (!match) {
+    return defaultClassStart;
+  }
+
+  const hours = Math.min(23, Number(match[1]));
+  const minutes = Math.min(59, Number(match[2]));
+  const base = new Date(defaultClassStart);
+
+  base.setHours(hours, minutes, 0, 0);
+
+  return base.toISOString();
+}
+
+function isoToTime(iso: string) {
+  const date = new Date(iso);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+
+  return `${hours}:${minutes}`;
+}
 
 type ProductForm = {
   category: ProductCategory;
@@ -95,7 +138,30 @@ type ProductForm = {
   isAvailable: boolean;
   name: string;
   price: string;
+  imageUri: string;
 };
+
+// Opens the device gallery and returns a local image URI (frontend-only mock
+// storage). Returns undefined if permission is denied or the user cancels.
+async function pickImageFromLibrary(): Promise<string | undefined> {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+  if (!permission.granted) {
+    return undefined;
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    allowsEditing: true,
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    quality: 0.8,
+  });
+
+  if (result.canceled) {
+    return undefined;
+  }
+
+  return result.assets[0].uri;
+}
 
 function formatDate(value?: string) {
   if (!value) {
@@ -127,7 +193,8 @@ function getStatusColor(status: string) {
     status === 'Frozen' ||
     status === 'Pending' ||
     status === 'Pending Approval' ||
-    status === 'Pending Verification'
+    status === 'Pending Verification' ||
+    status === 'Upcoming'
   ) {
     return '#F59E0B';
   }
@@ -156,10 +223,8 @@ function toClassInput(form: ClassForm): ClassMutationInput {
   return {
     capacity: Number(form.capacity) || 12,
     instructorName: form.instructorName.trim() || 'Coach',
-    isPaid: form.isPaid,
     category: form.category,
-    price: Number(form.price) || 0,
-    startTime: form.startTime.trim() || defaultClassStart,
+    startTime: timeToIso(form.startTime),
     status: form.status,
     title: form.title.trim() || 'New Class',
   };
@@ -172,17 +237,16 @@ function toProductInput(form: ProductForm): ProductMutationInput {
     isAvailable: form.isAvailable,
     name: form.name.trim() || 'New Product',
     price: Number(form.price) || 0,
+    imageUrl: form.imageUri.trim() || undefined,
   };
 }
 
 function getClassForm(gymClass?: GymClass): ClassForm {
   return {
-    capacity: String(gymClass?.capacity ?? 16),
+    capacity: gymClass ? String(gymClass.capacity) : '0',
     instructorName: gymClass?.instructorName ?? '',
-    isPaid: gymClass?.isPaid ?? false,
     category: gymClass?.category ?? classCategories[0],
-    price: String(gymClass?.price ?? 0),
-    startTime: gymClass?.startTime ?? defaultClassStart,
+    startTime: gymClass ? isoToTime(gymClass.startTime) : '',
     status: gymClass?.status ?? 'Available',
     title: gymClass?.title ?? '',
   };
@@ -195,6 +259,7 @@ function getProductForm(product?: Product): ProductForm {
     isAvailable: product?.isAvailable ?? true,
     name: product?.name ?? '',
     price: String(product?.price ?? 0),
+    imageUri: product?.imageUrl ?? '',
   };
 }
 
@@ -757,14 +822,6 @@ export function AdminClassManagementScreen() {
       return gymClass.status === classFilter;
     }
 
-    if (classFilter === 'Paid') {
-      return gymClass.isPaid;
-    }
-
-    if (classFilter === 'Free') {
-      return !gymClass.isPaid;
-    }
-
     return true;
   });
 
@@ -780,7 +837,7 @@ export function AdminClassManagementScreen() {
           style={styles.searchInput}
         />
         <View style={styles.pillRow}>
-          {(['All', 'Today', 'Upcoming', 'Available', 'Full', 'Paid', 'Free'] as ClassFilter[]).map(
+          {(['All', 'Today', 'Upcoming', 'Available', 'Full'] as ClassFilter[]).map(
             (filter) => (
               <Pressable
                 key={filter}
@@ -857,19 +914,23 @@ export function AdminClassManagementScreen() {
           <Text style={styles.fieldLabel}>Start time</Text>
           <TextInput
             value={form.startTime}
-            onChangeText={(startTime) => setForm((current) => ({ ...current, startTime }))}
-            placeholder={defaultClassStart}
+            onChangeText={(value) =>
+              setForm((current) => ({ ...current, startTime: formatTimeInput(value) }))
+            }
+            placeholder="HH:MM"
             placeholderTextColor={premiumColors.textFaint}
+            keyboardType="number-pad"
+            maxLength={5}
             style={styles.input}
           />
-          <Text style={styles.fieldHint}>ISO format, e.g. {defaultClassStart}</Text>
+          <Text style={styles.fieldHint}>24-hour time, e.g. 18:30</Text>
         </View>
 
-        <Text style={styles.formSectionLabel}>Status & pricing</Text>
+        <Text style={styles.formSectionLabel}>Availability & capacity</Text>
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>Availability</Text>
           <View style={styles.pillRow}>
-            {(['Available', 'Full'] as const).map((status) => (
+            {classStatusOptions.map((status) => (
               <Pressable
                 key={status}
                 onPress={() => setForm((current) => ({ ...current, status }))}
@@ -880,38 +941,18 @@ export function AdminClassManagementScreen() {
                 </Text>
               </Pressable>
             ))}
-            <Pressable
-              onPress={() => setForm((current) => ({ ...current, isPaid: !current.isPaid }))}
-              style={[styles.pill, form.isPaid && styles.pillSelected]}>
-              <Text style={[styles.pillText, form.isPaid && styles.pillTextSelected]}>
-                {form.isPaid ? 'Paid' : 'Free'}
-              </Text>
-            </Pressable>
           </View>
         </View>
-        <View style={styles.inputRow}>
-          <View style={styles.fieldFlex}>
-            <Text style={styles.fieldLabel}>Capacity</Text>
-            <TextInput
-              value={form.capacity}
-              onChangeText={(capacity) => setForm((current) => ({ ...current, capacity }))}
-              placeholder="16"
-              placeholderTextColor={premiumColors.textFaint}
-              keyboardType="number-pad"
-              style={styles.input}
-            />
-          </View>
-          <View style={styles.fieldFlex}>
-            <Text style={styles.fieldLabel}>Price (USD)</Text>
-            <TextInput
-              value={form.price}
-              onChangeText={(price) => setForm((current) => ({ ...current, price }))}
-              placeholder="0"
-              placeholderTextColor={premiumColors.textFaint}
-              keyboardType="decimal-pad"
-              style={styles.input}
-            />
-          </View>
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Capacity</Text>
+          <TextInput
+            value={form.capacity}
+            onChangeText={(capacity) => setForm((current) => ({ ...current, capacity }))}
+            placeholder="0"
+            placeholderTextColor={premiumColors.textFaint}
+            keyboardType="number-pad"
+            style={styles.input}
+          />
         </View>
 
         <View style={styles.formActions}>
@@ -950,7 +991,6 @@ export function AdminClassManagementScreen() {
             <Text style={styles.bodyText}>Coach {gymClass.instructorName}</Text>
             <View style={styles.pillRow}>
               <StatusChip label={gymClass.status} />
-              <StatusChip label={gymClass.isPaid ? `Paid $${gymClass.price}` : 'Free'} />
             </View>
             <Text style={styles.helperText}>
               {formatDateTime(gymClass.startTime)} · {gymClass.category} · {gymClass.status}
@@ -1019,6 +1059,14 @@ export function AdminProductManagementScreen() {
 
     resetForm();
     await loadProducts();
+  };
+
+  const handlePickProductImage = async () => {
+    const uri = await pickImageFromLibrary();
+
+    if (uri) {
+      setForm((current) => ({ ...current, imageUri: uri }));
+    }
   };
 
   const normalizedProductSearch = search.trim().toLowerCase();
@@ -1091,6 +1139,35 @@ export function AdminProductManagementScreen() {
           <Text style={styles.cardTitle}>
             {editingProduct ? editingProduct.name : 'New product'}
           </Text>
+        </View>
+
+        <Text style={styles.formSectionLabel}>Product image</Text>
+        <View style={styles.field}>
+          <View style={styles.imagePreviewBox}>
+            {form.imageUri ? (
+              <Image
+                source={{ uri: form.imageUri }}
+                style={styles.imagePreview}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.imagePlaceholderText}>No image selected</Text>
+            )}
+          </View>
+          <View style={styles.pillRow}>
+            <Pressable onPress={handlePickProductImage} style={styles.compactPrimary}>
+              <Text style={styles.primaryButtonText}>
+                {form.imageUri ? 'Change image' : 'Upload image'}
+              </Text>
+            </Pressable>
+            {form.imageUri ? (
+              <Pressable
+                onPress={() => setForm((current) => ({ ...current, imageUri: '' }))}
+                style={styles.secondaryButton}>
+                <Text style={styles.secondaryButtonText}>Remove</Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
 
         <Text style={styles.formSectionLabel}>Product details</Text>
@@ -1269,42 +1346,67 @@ export function AdminWelcomePhotoManagementScreen() {
     await loadPhotos();
   };
 
+  const handleUploadPhoto = async () => {
+    const uri = await pickImageFromLibrary();
+
+    if (!uri) {
+      return;
+    }
+
+    await entryContentService.addWelcomePhoto({
+      image: { uri },
+      label: label.trim() || undefined,
+    });
+    setLabel('');
+    await loadPhotos();
+  };
+
+  const handleReplacePhoto = async (photoId: string) => {
+    const uri = await pickImageFromLibrary();
+
+    if (!uri) {
+      return;
+    }
+
+    await entryContentService.updateWelcomePhoto(photoId, { image: { uri } });
+    await loadPhotos();
+  };
+
   return (
-    <AdminShell title="Welcome Photos" subtitle="Manage Welcome Page carousel placeholders.">
+    <AdminShell title="Welcome Photos" subtitle="Manage Welcome Page carousel photos.">
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Add placeholder</Text>
+        <Text style={styles.cardTitle}>Add photo</Text>
         <Text style={styles.bodyText}>
-          Manage the Welcome Page carousel shown before sign in.
+          Upload photos from your gallery for the Welcome Page carousel shown
+          behind the Sign In and Continue as Guest buttons.
         </Text>
-        <View style={styles.inputRow}>
-          <TextInput
-            value={label}
-            onChangeText={setLabel}
-            placeholder="Photo label"
-            placeholderTextColor={premiumColors.textFaint}
-            style={styles.input}
-          />
-          <Pressable
-            onPress={async () => {
-              await entryContentService.addWelcomePhoto(label.trim() || 'New welcome photo');
-              setLabel('');
-              await loadPhotos();
-            }}
-            style={styles.compactPrimary}>
-            <Text style={styles.primaryButtonText}>Add</Text>
-          </Pressable>
-        </View>
+        <TextInput
+          value={label}
+          onChangeText={setLabel}
+          placeholder="Optional photo label"
+          placeholderTextColor={premiumColors.textFaint}
+          style={styles.input}
+        />
+        <Pressable onPress={handleUploadPhoto} style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>Upload Photo</Text>
+        </Pressable>
       </View>
 
       {photos.map((photo, index) => (
         <View key={photo.id} style={styles.rowCard}>
           <View style={styles.photoPreviewSlot}>
-            <Text style={styles.photoPositionText}>#{index + 1}</Text>
-            <Text style={styles.photoPreviewText}>Welcome</Text>
+            <Image
+              source={photo.image}
+              style={styles.photoPreviewImage}
+              resizeMode="cover"
+            />
+            <View style={styles.photoPositionBadge}>
+              <Text style={styles.photoPositionText}>#{index + 1}</Text>
+            </View>
           </View>
           <View style={styles.rowCopy}>
-            <Text style={styles.rowTitle}>{photo.label ?? photo.id}</Text>
-            <Text style={styles.helperText}>Welcome carousel placeholder</Text>
+            <Text style={styles.rowTitle}>{photo.label ?? `Photo ${index + 1}`}</Text>
+            <Text style={styles.helperText}>Welcome carousel photo</Text>
           </View>
           <View style={styles.actionStack}>
             <Pressable
@@ -1318,12 +1420,7 @@ export function AdminWelcomePhotoManagementScreen() {
               <Text style={styles.tinyPrimaryText}>Down</Text>
             </Pressable>
             <Pressable
-              onPress={async () => {
-                await entryContentService.updateWelcomePhoto(photo.id, {
-                  label: `${photo.label ?? 'Photo'} updated`,
-                });
-                await loadPhotos();
-              }}
+              onPress={() => handleReplacePhoto(photo.id)}
               style={styles.tinySecondary}>
               <Text style={styles.tinySecondaryText}>Replace</Text>
             </Pressable>
@@ -1823,6 +1920,20 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: 'rgba(177, 18, 38, 0.12)',
   },
+  photoPreviewImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  photoPositionBadge: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
   photoPositionText: {
     color: premiumColors.redBright,
     fontSize: 12,
@@ -1834,6 +1945,25 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginTop: 2,
     textTransform: 'uppercase',
+  },
+  imagePreviewBox: {
+    height: 150,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 16,
+    backgroundColor: premiumColors.surfaceSoft,
+  },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  imagePlaceholderText: {
+    color: premiumColors.textFaint,
+    fontSize: 12,
+    fontWeight: '800',
   },
   modalOverlay: {
     flex: 1,

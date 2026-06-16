@@ -35,13 +35,14 @@ export const getWelcomePhotos = async (): Promise<EntrySlide[]> => {
   return entrySlides;
 };
 
-export const addWelcomePhoto = async (
-  label: string,
-): Promise<EntrySlide> => {
+export const addWelcomePhoto = async (input: {
+  image: ImageSourcePropType;
+  label?: string;
+}): Promise<EntrySlide> => {
   const slide: EntrySlide = {
     id: `entry-photo-${Date.now().toString(36)}`,
-    image: require('../../assets/images/MarvelPhoto2.png'),
-    label,
+    image: input.image,
+    label: input.label,
   };
 
   entrySlides = [...entrySlides, slide];
@@ -51,7 +52,7 @@ export const addWelcomePhoto = async (
 
 export const updateWelcomePhoto = async (
   photoId: string,
-  updates: Pick<EntrySlide, 'label'>,
+  updates: Partial<Pick<EntrySlide, 'image' | 'label'>>,
 ): Promise<EntrySlide | undefined> => {
   let updatedSlide: EntrySlide | undefined;
 

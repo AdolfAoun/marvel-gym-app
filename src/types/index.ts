@@ -86,7 +86,7 @@ export type GymClass = {
   price: number;
   currency: string;
   isPaid: boolean;
-  status: 'Available' | 'Full';
+  status: 'Available' | 'Full' | 'Upcoming';
   isRegistered?: boolean;
   capacity: number;
   enrolledCount: number;

@@ -647,13 +647,23 @@ export default function JourneyScreen() {
           {[
             {
               key: 'visitsThisMonth' as const,
-              label: `${selectedMonth?.month ?? 'This month'} total visits`,
-              value: selectedMonthVisitCount,
+              label: 'Monthly Visits',
+              value: stats.visitsThisMonth,
+            },
+            {
+              key: 'visitsThisWeek' as const,
+              label: 'Weekly Visits',
+              value: stats.visitsThisWeek,
             },
             {
               key: 'estimatedCaloriesBurned' as const,
-              label: 'Average calories burned per session this month',
-              value: selectedMonthAverageCalories,
+              label: 'Avg Calories',
+              value: stats.estimatedCaloriesBurned,
+            },
+            {
+              key: 'averageWorkoutDuration' as const,
+              label: 'Avg Workout Duration',
+              value: stats.averageWorkoutDuration,
             },
           ].map((stat) => {
             const canReset = hasJourneyStatValue(stats, stat.key);

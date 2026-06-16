@@ -70,52 +70,59 @@ function calculateDaysRemaining(endDate?: string) {
   return Math.max(0, Math.ceil((endTime - now) / 86400000));
 }
 
-function calculateMembershipProgress(membership?: Membership) {
-  if (!membership?.startDate || !membership.endDate) {
+// Remaining fraction (1 = just renewed, 0 = expired) based on the ORIGINAL
+// plan duration and the membership start date. Plan duration comes from the
+// plan data so the ring is correct even after the end date is extended.
+function calculateMembershipProgress(
+  membership?: Membership,
+  planDurationDays?: number,
+) {
+  if (!membership?.startDate) {
     return 1;
   }
 
   const startTime = new Date(membership.startDate).getTime();
-  const endTime = new Date(membership.endDate).getTime();
-  const now = Date.now();
 
-  if (
-    Number.isNaN(startTime) ||
-    Number.isNaN(endTime) ||
-    endTime <= startTime
-  ) {
+  if (Number.isNaN(startTime)) {
     return 1;
   }
 
-  return Math.min(1, Math.max(0, (endTime - now) / (endTime - startTime)));
+  let durationMs: number;
+
+  if (planDurationDays && planDurationDays > 0) {
+    durationMs = planDurationDays * 86400000;
+  } else if (membership.endDate) {
+    const endTime = new Date(membership.endDate).getTime();
+
+    if (Number.isNaN(endTime) || endTime <= startTime) {
+      return 1;
+    }
+
+    durationMs = endTime - startTime;
+  } else {
+    return 1;
+  }
+
+  const remainingMs = durationMs - (Date.now() - startTime);
+
+  return Math.min(1, Math.max(0, remainingMs / durationMs));
 }
 
+// Smooth green -> amber -> red gradient as the membership depletes. Hue runs
+// from 140 (green, full) down to 0 (red, almost expired) for a clean blend.
 function getCountdownColor(progress: number, status?: MembershipStatus) {
-  if (status === 'Frozen') {
+  if (status === 'Frozen' || status === 'Pending Approval') {
     return '#F59E0B';
   }
 
-  if (status === 'Expired' || status === 'Suspended' || progress <= 0.04) {
+  if (status === 'Expired' || status === 'Suspended') {
     return '#7F1D1D';
   }
 
-  if (progress <= 0.12) {
-    return '#DC2626';
-  }
+  const clamped = Math.min(1, Math.max(0, progress));
+  const hue = Math.round(clamped * 140);
 
-  if (progress <= 0.24) {
-    return '#F97316';
-  }
-
-  if (progress <= 0.42 || status === 'Pending Approval') {
-    return '#F59E0B';
-  }
-
-  if (progress <= 0.62) {
-    return '#A3E635';
-  }
-
-  return '#16A34A';
+  return `hsl(${hue}, 72%, 45%)`;
 }
 
 function getStatusTone(status?: MembershipStatus) {
@@ -364,10 +371,13 @@ export default function HomeScreen() {
     () => calculateDaysRemaining(membership?.endDate),
     [membership?.endDate],
   );
-  const membershipProgress = calculateMembershipProgress(membership);
+  const plan = plans.find((item) => item.id === membership?.planId);
+  const membershipProgress = calculateMembershipProgress(
+    membership,
+    plan?.durationInDays,
+  );
   const countdownColor = getCountdownColor(membershipProgress, status);
   const statusTone = getStatusTone(status);
-  const plan = plans.find((item) => item.id === membership?.planId);
   const progressSegmentCount = 36;
   const depletedProgressSegments = Math.round(
     progressSegmentCount * (1 - membershipProgress),

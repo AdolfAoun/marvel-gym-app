@@ -149,9 +149,7 @@ let latestClassUpdate: AppNotification | undefined;
 export type ClassMutationInput = {
   capacity: number;
   instructorName: string;
-  isPaid: boolean;
   category: ClassCategory;
-  price: number;
   startTime: string;
   status: GymClass['status'];
   title: string;
@@ -195,9 +193,9 @@ export const createAdminClass = async (
     instructorName: input.instructorName,
     startTime: start.toISOString(),
     endTime: end.toISOString(),
-    price: input.isPaid ? input.price : 0,
+    price: 0,
     currency: 'USD',
-    isPaid: input.isPaid,
+    isPaid: false,
     status: input.status,
     isRegistered: false,
     capacity: input.capacity,
@@ -228,15 +226,12 @@ export const updateAdminClass = async (
     const endTime = updates.startTime
       ? new Date(new Date(updates.startTime).getTime() + 50 * 60_000).toISOString()
       : gymClass.endTime;
-    const isPaid = updates.isPaid ?? gymClass.isPaid;
 
     updatedClass = {
       ...gymClass,
       ...updates,
       startTime,
       endTime,
-      isPaid,
-      price: isPaid ? updates.price ?? gymClass.price : 0,
       description: `${updates.category ?? gymClass.category} session with Coach ${
         updates.instructorName ?? gymClass.instructorName
       }.`,
