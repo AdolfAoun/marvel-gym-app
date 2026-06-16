@@ -2,6 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -34,6 +35,14 @@ function getProductImageLabel(product: Product) {
     .join('')
     .slice(0, 2)
     .toUpperCase();
+}
+
+function getDisplayProductImageUri(product: Product) {
+  if (!product.imageUrl || product.imageUrl.includes('example.com')) {
+    return undefined;
+  }
+
+  return product.imageUrl;
 }
 
 export default function ShopScreen() {
@@ -180,53 +189,67 @@ export default function ShopScreen() {
         </View>
 
         <View style={styles.productGrid}>
-          {visibleProducts.map((product) => (
-            <View
-              key={product.id}
-              style={[
-                styles.productCard,
-                !product.isAvailable && styles.productCardUnavailable,
-              ]}>
-              <View style={styles.productImage}>
-                <View style={styles.productImageGlow} />
-                <View style={styles.productImageFrame}>
-                  <Text style={styles.productImageInitialText}>
-                    {getProductImageLabel(product)}
-                  </Text>
+          {visibleProducts.map((product) => {
+            const displayImageUri = getDisplayProductImageUri(product);
+
+            return (
+              <View
+                key={product.id}
+                style={[
+                  styles.productCard,
+                  !product.isAvailable && styles.productCardUnavailable,
+                ]}>
+                <View style={styles.productImage}>
+                  {displayImageUri ? (
+                    <Image
+                      source={{ uri: displayImageUri }}
+                      style={styles.productPhoto}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <>
+                      <View style={styles.productImageGlow} />
+                      <View style={styles.productImageFrame}>
+                        <Text style={styles.productImageInitialText}>
+                          {getProductImageLabel(product)}
+                        </Text>
+                      </View>
+                      <Text style={styles.productImageText}>Photo soon</Text>
+                    </>
+                  )}
                 </View>
-                <Text style={styles.productImageText}>Photo soon</Text>
-              </View>
 
-              <View style={styles.productCopy}>
-                <Text style={styles.productName}>{product.name}</Text>
-                {product.description ? (
-                  <Text style={styles.productDescription}>
-                    {product.description}
-                  </Text>
-                ) : null}
-              </View>
-
-              <View style={styles.productFooter}>
-                <View style={styles.priceStatusRow}>
-                  <Text style={styles.productPrice}>{formatPrice(product)}</Text>
-                  <View
-                    style={[
-                      styles.availabilityPill,
-                      !product.isAvailable && styles.availabilityPillUnavailable,
-                    ]}>
-                    <Text
-                      style={[
-                        styles.availabilityPillText,
-                        !product.isAvailable && styles.availabilityPillTextUnavailable,
-                      ]}>
-                      {product.isAvailable ? 'Available' : 'Out of stock'}
+                <View style={styles.productCopy}>
+                  <Text style={styles.productName}>{product.name}</Text>
+                  {product.description ? (
+                    <Text style={styles.productDescription}>
+                      {product.description}
                     </Text>
-                  </View>
+                  ) : null}
                 </View>
-                <Text style={styles.productCategoryText}>{product.category}</Text>
+
+                <View style={styles.productFooter}>
+                  <View style={styles.priceStatusRow}>
+                    <Text style={styles.productPrice}>{formatPrice(product)}</Text>
+                    <View
+                      style={[
+                        styles.availabilityPill,
+                        !product.isAvailable && styles.availabilityPillUnavailable,
+                      ]}>
+                      <Text
+                        style={[
+                          styles.availabilityPillText,
+                          !product.isAvailable && styles.availabilityPillTextUnavailable,
+                        ]}>
+                        {product.isAvailable ? 'Available' : 'Out of stock'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.productCategoryText}>{product.category}</Text>
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       </ScrollView>
     </PremiumScreenBackground>
@@ -461,6 +484,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 16,
     backgroundColor: 'rgba(7, 8, 12, 0.78)',
+  },
+  productPhoto: {
+    width: '100%',
+    height: '100%',
   },
   productImageText: {
     color: accentColor,

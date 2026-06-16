@@ -81,6 +81,7 @@ export type GymClass = {
   title: string;
   description?: string;
   instructorName: string;
+  instructorImageUrl?: string;
   startTime: string;
   endTime: string;
   price: number;

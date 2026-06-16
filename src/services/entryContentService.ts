@@ -19,6 +19,12 @@ let entrySlides: EntrySlide[] = [
   },
 ];
 
+let signInWallpaper: EntrySlide = {
+  id: 'sign-in-wallpaper',
+  image: require('../../assets/images/prototype-back-pose-background.png'),
+  label: 'Sign In Wallpaper',
+};
+
 export const getEntrySlides = async (): Promise<EntrySlide[]> => {
   return entrySlides;
 };
@@ -92,6 +98,23 @@ export const reorderWelcomePhotos = async (
   return entrySlides;
 };
 
+export const getSignInWallpaper = async (): Promise<EntrySlide> => {
+  return signInWallpaper;
+};
+
+export const updateSignInWallpaper = async (input: {
+  image: ImageSourcePropType;
+  label?: string;
+}): Promise<EntrySlide> => {
+  signInWallpaper = {
+    ...signInWallpaper,
+    image: input.image,
+    label: input.label ?? signInWallpaper.label,
+  };
+
+  return signInWallpaper;
+};
+
 export const entryContentService = {
   getEntrySlides,
   replaceEntrySlides,
@@ -100,4 +123,6 @@ export const entryContentService = {
   updateWelcomePhoto,
   deleteWelcomePhoto,
   reorderWelcomePhotos,
+  getSignInWallpaper,
+  updateSignInWallpaper,
 };

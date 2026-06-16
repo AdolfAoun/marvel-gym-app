@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Image,
   Keyboard,
   Linking,
   Platform,
@@ -14,11 +15,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import type { ImageSourcePropType } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { authService } from '@/services';
+import { authService, entryContentService } from '@/services';
 
 const accentColor = '#B11226';
+const defaultBackgroundPhoto = require('@/assets/images/prototype-back-pose-background.png');
 
 function formatLebanesePhone(value: string) {
   const digits = value.replace(/\D/g, '').slice(0, 8);
@@ -44,6 +47,8 @@ export default function LoginScreen() {
   const [identifierMessage, setIdentifierMessage] = useState('');
   const [passwordMessage, setPasswordMessage] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [backgroundPhoto, setBackgroundPhoto] =
+    useState<ImageSourcePropType>(defaultBackgroundPhoto);
   const feedbackOpacity = useRef(new Animated.Value(0)).current;
   const contactRaysProgress = useRef(new Animated.Value(0)).current;
   const keyboardLift = useRef(new Animated.Value(0)).current;
@@ -51,6 +56,16 @@ export default function LoginScreen() {
   const emailInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
   const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    const loadSignInWallpaper = async () => {
+      const wallpaper = await entryContentService.getSignInWallpaper();
+
+      setBackgroundPhoto(wallpaper.image);
+    };
+
+    loadSignInWallpaper();
+  }, []);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -242,6 +257,14 @@ export default function LoginScreen() {
     <View style={styles.safeArea}>
       <StatusBar style="light" />
       <View style={styles.phoneFrame}>
+        <Image
+          source={backgroundPhoto}
+          style={styles.backgroundPhoto}
+          resizeMode="cover"
+        />
+        <View pointerEvents="none" style={styles.backgroundPhotoVeil} />
+        <View pointerEvents="none" style={styles.backgroundVignette} />
+        <View pointerEvents="none" style={styles.backgroundRedWash} />
         <View pointerEvents="none" style={styles.bgRedGlowTop} />
         <View pointerEvents="none" style={styles.bgRedGlowBottom} />
         <View pointerEvents="none" style={styles.bgGrid} />
@@ -456,7 +479,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: Platform.OS === 'web' ? 414 : undefined,
     overflow: 'hidden',
-    backgroundColor: '#07080C',
+    backgroundColor: '#030407',
     borderColor: Platform.OS === 'web' ? '#1d2733' : 'transparent',
     borderRadius: Platform.OS === 'web' ? 34 : 0,
     borderWidth: Platform.OS === 'web' ? 1 : 0,
@@ -465,6 +488,45 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 24 },
     shadowOpacity: Platform.OS === 'web' ? 0.2 : 0,
     shadowRadius: 42,
+  },
+  backgroundPhoto: {
+    position: 'absolute',
+    top: -18,
+    left: -28,
+    right: -28,
+    bottom: -18,
+    zIndex: 0,
+    width: '114%',
+    height: '106%',
+    opacity: 0.34,
+    transform: [{ scale: 1.04 }],
+  },
+  backgroundPhotoVeil: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+    backgroundColor: 'rgba(2, 3, 6, 0.58)',
+  },
+  backgroundVignette: {
+    position: 'absolute',
+    zIndex: 0,
+    top: -80,
+    left: -70,
+    right: -70,
+    bottom: -90,
+    borderRadius: 90,
+    borderWidth: 54,
+    borderColor: 'rgba(0, 0, 0, 0.48)',
+  },
+  backgroundRedWash: {
+    position: 'absolute',
+    zIndex: 0,
+    left: -110,
+    right: -110,
+    bottom: -150,
+    height: 430,
+    borderRadius: 220,
+    backgroundColor: 'rgba(177, 18, 38, 0.11)',
+    transform: [{ rotate: '-8deg' }],
   },
   contentSafeArea: {
     flex: 1,
@@ -645,13 +707,13 @@ callRay: {
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.18)',
     borderRadius: 30,
-    backgroundColor: 'rgba(12, 13, 17, 0.9)',
+    backgroundColor: 'rgba(8, 9, 13, 0.88)',
     paddingHorizontal: 21,
     paddingVertical: 21,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 24 },
-    shadowOpacity: 0.46,
-    shadowRadius: 32,
+    shadowOpacity: 0.56,
+    shadowRadius: 36,
     elevation: 10,
   },
   cardGloss: {
@@ -660,7 +722,7 @@ callRay: {
     left: 22,
     right: 22,
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
   },
   loginCardHeader: {
     marginBottom: 2,
@@ -725,9 +787,9 @@ callRay: {
   input: {
     minHeight: 56,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.13)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.075)',
+    backgroundColor: 'rgba(3, 5, 10, 0.48)',
     color: '#f8fafc',
     fontSize: 16,
     paddingHorizontal: 16,
@@ -767,9 +829,9 @@ callRay: {
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.13)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    backgroundColor: 'rgba(3, 5, 10, 0.54)',
     paddingHorizontal: 14,
   },
   countryCodeText: {
@@ -782,9 +844,9 @@ callRay: {
     minHeight: 56,
     flex: 1,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.13)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.075)',
+    backgroundColor: 'rgba(3, 5, 10, 0.48)',
     color: '#f8fafc',
     fontSize: 16,
     paddingHorizontal: 16,
@@ -794,9 +856,9 @@ callRay: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.13)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.075)',
+    backgroundColor: 'rgba(3, 5, 10, 0.48)',
   },
   passwordInput: {
     flex: 1,

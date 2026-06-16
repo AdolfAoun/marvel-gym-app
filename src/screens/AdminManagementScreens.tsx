@@ -66,13 +66,9 @@ const studentStatusFilters: StudentVerificationStatus[] = [
   'Rejected',
 ];
 type ClassFilter = 'All' | 'Today' | 'Upcoming' | 'Available' | 'Full';
-type ProductFilter =
-  | 'All'
-  | 'Available'
-  | 'Unavailable'
-  | 'Gym Equipment'
-  | 'Beverages'
-  | 'Snacks';
+type ClassCategoryFilter = 'All' | ClassCategory;
+type ProductCategoryFilter = 'All' | ProductCategory;
+type ProductAvailabilityFilter = 'All' | 'Available' | 'Unavailable';
 
 type ConfirmAction = {
   body: string;
@@ -83,6 +79,7 @@ type ConfirmAction = {
 type ClassForm = {
   capacity: string;
   instructorName: string;
+  instructorImageUri: string;
   category: ClassCategory;
   startTime: string;
   status: GymClass['status'];
@@ -223,6 +220,7 @@ function toClassInput(form: ClassForm): ClassMutationInput {
   return {
     capacity: Number(form.capacity) || 12,
     instructorName: form.instructorName.trim() || 'Coach',
+    instructorImageUrl: form.instructorImageUri.trim() || undefined,
     category: form.category,
     startTime: timeToIso(form.startTime),
     status: form.status,
@@ -245,6 +243,7 @@ function getClassForm(gymClass?: GymClass): ClassForm {
   return {
     capacity: gymClass ? String(gymClass.capacity) : '0',
     instructorName: gymClass?.instructorName ?? '',
+    instructorImageUri: gymClass?.instructorImageUrl ?? '',
     category: gymClass?.category ?? classCategories[0],
     startTime: gymClass ? isoToTime(gymClass.startTime) : '',
     status: gymClass?.status ?? 'Available',
@@ -761,6 +760,8 @@ export function AdminVoucherManagementScreen() {
 
 export function AdminClassManagementScreen() {
   const [classes, setClasses] = useState<GymClass[]>([]);
+  const [classCategoryFilter, setClassCategoryFilter] =
+    useState<ClassCategoryFilter>('All');
   const [classFilter, setClassFilter] = useState<ClassFilter>('All');
   const [search, setSearch] = useState('');
   const [editingClass, setEditingClass] = useState<GymClass>();
@@ -791,8 +792,20 @@ export function AdminClassManagementScreen() {
     await loadClasses();
   };
 
+  const handlePickInstructorImage = async () => {
+    const uri = await pickImageFromLibrary();
+
+    if (uri) {
+      setForm((current) => ({ ...current, instructorImageUri: uri }));
+    }
+  };
+
   const normalizedClassSearch = search.trim().toLowerCase();
   const filteredClasses = classes.filter((gymClass) => {
+    if (classCategoryFilter !== 'All' && gymClass.category !== classCategoryFilter) {
+      return false;
+    }
+
     if (normalizedClassSearch) {
       const haystack = `${gymClass.title} ${gymClass.instructorName} ${
         gymClass.category
@@ -836,6 +849,34 @@ export function AdminClassManagementScreen() {
           placeholderTextColor={premiumColors.textFaint}
           style={styles.searchInput}
         />
+        <Text style={styles.fieldLabel}>Category</Text>
+        <View style={styles.pillRow}>
+          {(['All', ...classCategories] as ClassCategoryFilter[]).map((filter) => {
+            const count =
+              filter === 'All'
+                ? classes.length
+                : classes.filter((gymClass) => gymClass.category === filter).length;
+
+            return (
+              <Pressable
+                key={filter}
+                onPress={() => setClassCategoryFilter(filter)}
+                style={[
+                  styles.pill,
+                  classCategoryFilter === filter && styles.pillSelected,
+                ]}>
+                <Text
+                  style={[
+                    styles.pillText,
+                    classCategoryFilter === filter && styles.pillTextSelected,
+                  ]}>
+                  {filter} ({count})
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={styles.fieldLabel}>Schedule & status</Text>
         <View style={styles.pillRow}>
           {(['All', 'Today', 'Upcoming', 'Available', 'Full'] as ClassFilter[]).map(
             (filter) => (
@@ -888,6 +929,38 @@ export function AdminClassManagementScreen() {
             placeholderTextColor={premiumColors.textFaint}
             style={styles.input}
           />
+        </View>
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Instructor profile picture</Text>
+          <View style={styles.imagePreviewBox}>
+            {form.instructorImageUri ? (
+              <Image
+                source={{ uri: form.instructorImageUri }}
+                style={styles.imagePreview}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.imagePlaceholderText}>
+                No instructor photo selected
+              </Text>
+            )}
+          </View>
+          <View style={styles.pillRow}>
+            <Pressable onPress={handlePickInstructorImage} style={styles.compactPrimary}>
+              <Text style={styles.primaryButtonText}>
+                {form.instructorImageUri ? 'Change photo' : 'Upload photo'}
+              </Text>
+            </Pressable>
+            {form.instructorImageUri ? (
+              <Pressable
+                onPress={() =>
+                  setForm((current) => ({ ...current, instructorImageUri: '' }))
+                }
+                style={styles.secondaryButton}>
+                <Text style={styles.secondaryButtonText}>Remove</Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>Category</Text>
@@ -982,9 +1055,17 @@ export function AdminClassManagementScreen() {
         filteredClasses.map((gymClass) => (
           <View key={gymClass.id} style={styles.rowCard}>
           <View style={styles.adminAvatar}>
-            <Text style={styles.adminAvatarText}>
-              {gymClass.instructorName.slice(0, 1).toUpperCase()}
-            </Text>
+            {gymClass.instructorImageUrl ? (
+              <Image
+                source={{ uri: gymClass.instructorImageUrl }}
+                style={styles.adminAvatarImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.adminAvatarText}>
+                {gymClass.instructorName.slice(0, 1).toUpperCase()}
+              </Text>
+            )}
           </View>
           <View style={styles.rowCopy}>
             <Text style={styles.rowTitle}>{gymClass.title}</Text>
@@ -1031,7 +1112,10 @@ export function AdminClassManagementScreen() {
 
 export function AdminProductManagementScreen() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [productFilter, setProductFilter] = useState<ProductFilter>('All');
+  const [productCategoryFilter, setProductCategoryFilter] =
+    useState<ProductCategoryFilter>('All');
+  const [productAvailabilityFilter, setProductAvailabilityFilter] =
+    useState<ProductAvailabilityFilter>('All');
   const [search, setSearch] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product>();
   const [form, setForm] = useState<ProductForm>(getProductForm());
@@ -1081,20 +1165,19 @@ export function AdminProductManagementScreen() {
       }
     }
 
-    if (productFilter === 'Available') {
+    if (
+      productCategoryFilter !== 'All' &&
+      product.category !== productCategoryFilter
+    ) {
+      return false;
+    }
+
+    if (productAvailabilityFilter === 'Available') {
       return product.isAvailable;
     }
 
-    if (productFilter === 'Unavailable') {
+    if (productAvailabilityFilter === 'Unavailable') {
       return !product.isAvailable;
-    }
-
-    if (
-      productFilter === 'Gym Equipment' ||
-      productFilter === 'Beverages' ||
-      productFilter === 'Snacks'
-    ) {
-      return product.category === productFilter;
     }
 
     return true;
@@ -1111,22 +1194,64 @@ export function AdminProductManagementScreen() {
           placeholderTextColor={premiumColors.textFaint}
           style={styles.searchInput}
         />
+        <Text style={styles.fieldLabel}>Category</Text>
         <View style={styles.pillRow}>
-          {(['All', 'Available', 'Unavailable', ...productCategories] as ProductFilter[]).map(
-            (filter) => (
+          {(['All', ...productCategories] as ProductCategoryFilter[]).map((filter) => {
+            const count =
+              filter === 'All'
+                ? products.length
+                : products.filter((product) => product.category === filter).length;
+
+            return (
               <Pressable
                 key={filter}
-                onPress={() => setProductFilter(filter)}
-                style={[styles.pill, productFilter === filter && styles.pillSelected]}>
+                onPress={() => setProductCategoryFilter(filter)}
+                style={[
+                  styles.pill,
+                  productCategoryFilter === filter && styles.pillSelected,
+                ]}>
                 <Text
                   style={[
                     styles.pillText,
-                    productFilter === filter && styles.pillTextSelected,
+                    productCategoryFilter === filter && styles.pillTextSelected,
                   ]}>
-                  {filter}
+                  {filter} ({count})
                 </Text>
               </Pressable>
-            ),
+            );
+          })}
+        </View>
+        <Text style={styles.fieldLabel}>Availability</Text>
+        <View style={styles.pillRow}>
+          {(['All', 'Available', 'Unavailable'] as ProductAvailabilityFilter[]).map(
+            (filter) => {
+              const count =
+                filter === 'All'
+                  ? products.length
+                  : products.filter((product) =>
+                      filter === 'Available'
+                        ? product.isAvailable
+                        : !product.isAvailable,
+                    ).length;
+
+              return (
+                <Pressable
+                  key={filter}
+                  onPress={() => setProductAvailabilityFilter(filter)}
+                  style={[
+                    styles.pill,
+                    productAvailabilityFilter === filter && styles.pillSelected,
+                  ]}>
+                  <Text
+                    style={[
+                      styles.pillText,
+                      productAvailabilityFilter === filter && styles.pillTextSelected,
+                    ]}>
+                    {filter} ({count})
+                  </Text>
+                </Pressable>
+              );
+            },
           )}
         </View>
       </View>
@@ -1262,7 +1387,15 @@ export function AdminProductManagementScreen() {
         filteredProducts.map((product) => (
           <View key={product.id} style={styles.rowCard}>
           <View style={styles.adminAvatar}>
-            <Text style={styles.adminAvatarText}>{product.name.slice(0, 1)}</Text>
+            {product.imageUrl ? (
+              <Image
+                source={{ uri: product.imageUrl }}
+                style={styles.adminAvatarImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.adminAvatarText}>{product.name.slice(0, 1)}</Text>
+            )}
           </View>
           <View style={styles.rowCopy}>
             <Text style={styles.rowTitle}>{product.name}</Text>
@@ -1320,10 +1453,12 @@ export function AdminProductManagementScreen() {
 
 export function AdminWelcomePhotoManagementScreen() {
   const [photos, setPhotos] = useState<EntrySlide[]>([]);
+  const [signInWallpaper, setSignInWallpaper] = useState<EntrySlide>();
   const [label, setLabel] = useState('');
 
   const loadPhotos = useCallback(async () => {
     setPhotos(await entryContentService.getWelcomePhotos());
+    setSignInWallpaper(await entryContentService.getSignInWallpaper());
   }, []);
 
   useEffect(() => {
@@ -1372,8 +1507,45 @@ export function AdminWelcomePhotoManagementScreen() {
     await loadPhotos();
   };
 
+  const handleReplaceSignInWallpaper = async () => {
+    const uri = await pickImageFromLibrary();
+
+    if (!uri) {
+      return;
+    }
+
+    await entryContentService.updateSignInWallpaper({
+      image: { uri },
+      label: 'Sign In Wallpaper',
+    });
+    await loadPhotos();
+  };
+
   return (
-    <AdminShell title="Welcome Photos" subtitle="Manage Welcome Page carousel photos.">
+    <AdminShell
+      title="Welcome Photos"
+      subtitle="Manage Welcome Page carousel photos and the Sign In wallpaper.">
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Sign In wallpaper</Text>
+        <Text style={styles.bodyText}>
+          This image is used behind the phone and password fields on the Sign In screen.
+        </Text>
+        <View style={styles.imagePreviewBox}>
+          {signInWallpaper ? (
+            <Image
+              source={signInWallpaper.image}
+              style={styles.imagePreview}
+              resizeMode="cover"
+            />
+          ) : (
+            <Text style={styles.imagePlaceholderText}>No wallpaper loaded</Text>
+          )}
+        </View>
+        <Pressable onPress={handleReplaceSignInWallpaper} style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>Replace Sign In Wallpaper</Text>
+        </Pressable>
+      </View>
+
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Add photo</Text>
         <Text style={styles.bodyText}>
@@ -1899,10 +2071,15 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: premiumColors.borderStrong,
     borderRadius: 15,
     backgroundColor: premiumColors.surfaceSoft,
+  },
+  adminAvatarImage: {
+    width: '100%',
+    height: '100%',
   },
   adminAvatarText: {
     color: premiumColors.redBright,

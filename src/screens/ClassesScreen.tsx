@@ -3,6 +3,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -243,9 +244,17 @@ export default function ClassesScreen() {
                 return (
                   <View key={gymClass.id} style={styles.classCard}>
                     <View style={styles.instructorImage}>
-                      <Text style={styles.instructorImageText}>
-                        {gymClass.instructorName.slice(0, 1).toUpperCase()}
-                      </Text>
+                      {gymClass.instructorImageUrl ? (
+                        <Image
+                          source={{ uri: gymClass.instructorImageUrl }}
+                          style={styles.instructorPhoto}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <Text style={styles.instructorImageText}>
+                          {gymClass.instructorName.slice(0, 1).toUpperCase()}
+                        </Text>
+                      )}
                     </View>
                     <View style={styles.classBodyBlock}>
                       <View style={styles.classTopRow}>
@@ -581,10 +590,15 @@ const styles = StyleSheet.create({
     height: 76,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: premiumColors.borderStrong,
     borderRadius: 38,
     backgroundColor: premiumColors.surfaceSoft,
+  },
+  instructorPhoto: {
+    width: '100%',
+    height: '100%',
   },
   instructorImageText: {
     color: premiumColors.redBright,

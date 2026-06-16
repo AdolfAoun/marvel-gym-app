@@ -149,6 +149,7 @@ let latestClassUpdate: AppNotification | undefined;
 export type ClassMutationInput = {
   capacity: number;
   instructorName: string;
+  instructorImageUrl?: string;
   category: ClassCategory;
   startTime: string;
   status: GymClass['status'];
@@ -191,6 +192,7 @@ export const createAdminClass = async (
     title: input.title,
     description: `${input.category} session with Coach ${input.instructorName}.`,
     instructorName: input.instructorName,
+    instructorImageUrl: input.instructorImageUrl,
     startTime: start.toISOString(),
     endTime: end.toISOString(),
     price: 0,
