@@ -27,6 +27,8 @@ import {
   membershipService,
   notificationService,
   voucherService,
+  FREEZE_WEEKLY_PRICE,
+  MONTHLY_MEMBERSHIP_PRICE,
 } from '@/services';
 import type {
   AppNotification,
@@ -47,7 +49,7 @@ const surfaceColor = premiumColors.surface;
 const textColor = premiumColors.text;
 const mutedColor = premiumColors.textMuted;
 const voucherStatuses: VoucherStatus[] = ['Pending', 'Confirmed', 'Canceled'];
-const weeklyFreezePrice = 10;
+const weeklyFreezePrice = FREEZE_WEEKLY_PRICE;
 const maxRenewMonths = 12;
 const minRenewMonths = 1;
 
@@ -185,7 +187,9 @@ export default function HomeScreen() {
   const [membership, setMembership] = useState<Membership>();
   const [status, setStatus] = useState<MembershipStatus>();
   const [plans, setPlans] = useState<MembershipPlan[]>([]);
-  const [monthlyRenewalPrice, setMonthlyRenewalPrice] = useState(85);
+  const [monthlyRenewalPrice, setMonthlyRenewalPrice] = useState(
+    MONTHLY_MEMBERSHIP_PRICE,
+  );
   const [studentVerificationStatus, setStudentVerificationStatus] =
     useState<StudentVerificationStatus>('Not Submitted');
   const [notification, setNotification] = useState<AppNotification>();

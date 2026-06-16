@@ -1,5 +1,6 @@
 export * from './authService';
 export * from './avatarService';
+export * from './pricingService';
 export * from './memberService';
 export * from './membershipService';
 export * from './classService';

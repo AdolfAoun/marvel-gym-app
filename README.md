@@ -2,6 +2,8 @@
 
 Marvel Gym App is a member-facing mobile application built with React Native, Expo SDK 54, Expo Router, and TypeScript.
 
+For future Codex sessions, see `docs/CODEX_HANDOFF.md` for the current handoff summary and project memory checkpoint.
+
 The project is currently frontend-only. All data is handled through mock data behind a service layer, so screens do not import mock data directly.
 
 Current architecture:

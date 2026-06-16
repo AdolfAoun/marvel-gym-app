@@ -88,7 +88,7 @@ export default function ClassesScreen() {
     return classes
       .filter(
         (gymClass) =>
-          gymClass.location === selectedCategory &&
+          gymClass.category === selectedCategory &&
           getClassDay(gymClass.startTime) === selectedDay,
       )
       .sort((first, second) => first.startTime.localeCompare(second.startTime));
@@ -152,7 +152,7 @@ export default function ClassesScreen() {
           {categories.map((category) => {
             const isSelected = selectedCategory === category;
             const count = classes.filter(
-              (gymClass) => gymClass.location === category,
+              (gymClass) => gymClass.category === category,
             ).length;
 
             return (
@@ -199,7 +199,7 @@ export default function ClassesScreen() {
               const isSelected = selectedDay === day;
               const count = classes.filter(
                 (gymClass) =>
-                  gymClass.location === selectedCategory &&
+                  gymClass.category === selectedCategory &&
                   getClassDay(gymClass.startTime) === day,
               ).length;
 

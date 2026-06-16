@@ -16,16 +16,19 @@ import type {
   Voucher,
 } from '../types';
 
+// Mirrors the canonical member-001 record seeded in localAccountStore so the
+// two never drift. localAccountStore remains the source of truth for the
+// signed-in member; this seed only provides ids/values for other mock data.
 export const currentMember: Member = {
   id: 'member-001',
   firstName: 'Tony',
   lastName: 'Stark',
   email: 'tony.stark@example.com',
-  phone: '+1 212 555 0185',
+  phone: '+961 70 123 456',
   location: 'Beirut, Lebanon',
   dateOfBirth: '1985-05-29',
   emergencyContactName: 'Pepper Potts',
-  emergencyContactPhone: '+1 212 555 0199',
+  emergencyContactPhone: '+961 70 654 321',
   createdAt: '2026-01-10T09:00:00.000Z',
   updatedAt: '2026-05-28T14:30:00.000Z',
 };
@@ -108,6 +111,7 @@ export const gymClasses: GymClass[] = [
     isRegistered: true,
     capacity: 16,
     enrolledCount: 10,
+    category: 'Fitness Classes',
     location: 'Studio A',
     isActive: true,
   },
@@ -125,6 +129,7 @@ export const gymClasses: GymClass[] = [
     isRegistered: false,
     capacity: 14,
     enrolledCount: 9,
+    category: 'Martial Arts',
     location: 'Combat Room',
     isActive: true,
   },
@@ -142,6 +147,7 @@ export const gymClasses: GymClass[] = [
     isRegistered: false,
     capacity: 12,
     enrolledCount: 12,
+    category: 'Fitness Classes',
     location: 'Studio B',
     isActive: true,
   },
@@ -159,6 +165,7 @@ export const gymClasses: GymClass[] = [
     isRegistered: true,
     capacity: 10,
     enrolledCount: 10,
+    category: 'Fitness Classes',
     location: 'Performance Zone',
     isActive: true,
   },
@@ -374,6 +381,7 @@ export const gymActivitySchedule: GymActivityDay[] = [
 export const vouchers: Voucher[] = [
   {
     id: 'voucher-001',
+    memberId: currentMember.id,
     date: '2026-06-01T08:30:00.000Z',
     type: 'Membership Renewal',
     amount: 129,
@@ -383,6 +391,7 @@ export const vouchers: Voucher[] = [
   },
   {
     id: 'voucher-002',
+    memberId: currentMember.id,
     date: '2026-05-18T16:45:00.000Z',
     type: 'Shop Reservation',
     amount: 2.75,
@@ -392,6 +401,7 @@ export const vouchers: Voucher[] = [
   },
   {
     id: 'voucher-003',
+    memberId: currentMember.id,
     date: '2026-05-21T12:10:00.000Z',
     type: 'Shop Reservation',
     amount: 3.5,

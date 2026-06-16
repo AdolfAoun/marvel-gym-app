@@ -162,6 +162,12 @@ export const searchLocalMemberByPhone = async (
     ?.member;
 };
 
+export const listLocalMembers = async (): Promise<Member[]> => {
+  return accounts
+    .filter((account) => account.member.role !== 'Admin')
+    .map((account) => account.member);
+};
+
 export const updateActiveMember = async (
   updates: Partial<Member>,
 ): Promise<Member> => {

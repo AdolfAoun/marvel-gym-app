@@ -2,7 +2,7 @@ import { gymActivityLevels } from '../mock';
 import type { GymActivityDay, GymActivityLevel } from '../types';
 
 export const getGymActivityLevels = async (): Promise<GymActivityLevel[]> => {
-  return gymActivityLevels;
+  return [...gymActivityLevels];
 };
 
 const weekdayHours = [

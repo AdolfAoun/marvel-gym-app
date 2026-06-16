@@ -1,10 +1,11 @@
-import type { AppNotification, GymClass, NotificationType } from '../types';
+import type {
+  AppNotification,
+  ClassCategory,
+  GymClass,
+  NotificationType,
+} from '../types';
 
-type ScheduleCategory =
-  | 'Fitness Classes'
-  | 'Martial Arts'
-  | 'Extra Classes'
-  | 'Gymnastics';
+type ScheduleCategory = ClassCategory;
 
 type ScheduleSeed = {
   category: ScheduleCategory;
@@ -137,7 +138,7 @@ function createClass(seed: ScheduleSeed, index: number): GymClass {
     isRegistered: false,
     capacity,
     enrolledCount,
-    location: seed.category,
+    category: seed.category,
     isActive: true,
   };
 }
@@ -149,7 +150,7 @@ export type ClassMutationInput = {
   capacity: number;
   instructorName: string;
   isPaid: boolean;
-  location: string;
+  category: ClassCategory;
   price: number;
   startTime: string;
   status: GymClass['status'];
@@ -175,11 +176,11 @@ function createClassUpdate(
 }
 
 export const getScheduledClasses = async (): Promise<GymClass[]> => {
-  return classRecords;
+  return [...classRecords];
 };
 
 export const getAdminClasses = async (): Promise<GymClass[]> => {
-  return classRecords;
+  return [...classRecords];
 };
 
 export const createAdminClass = async (
@@ -190,7 +191,7 @@ export const createAdminClass = async (
   const gymClass: GymClass = {
     id: `class-${Date.now().toString(36)}`,
     title: input.title,
-    description: `${input.location} session with Coach ${input.instructorName}.`,
+    description: `${input.category} session with Coach ${input.instructorName}.`,
     instructorName: input.instructorName,
     startTime: start.toISOString(),
     endTime: end.toISOString(),
@@ -201,7 +202,7 @@ export const createAdminClass = async (
     isRegistered: false,
     capacity: input.capacity,
     enrolledCount: 0,
-    location: input.location,
+    category: input.category,
     isActive: true,
   };
 
@@ -236,7 +237,7 @@ export const updateAdminClass = async (
       endTime,
       isPaid,
       price: isPaid ? updates.price ?? gymClass.price : 0,
-      description: `${updates.location ?? gymClass.location} session with Coach ${
+      description: `${updates.category ?? gymClass.category} session with Coach ${
         updates.instructorName ?? gymClass.instructorName
       }.`,
     };

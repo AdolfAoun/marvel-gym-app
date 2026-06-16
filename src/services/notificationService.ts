@@ -2,7 +2,7 @@ import { appNotifications } from '../mock';
 import type { AppNotification } from '../types';
 
 export const getNotifications = async (): Promise<AppNotification[]> => {
-  return appNotifications;
+  return [...appNotifications];
 };
 
 export const markNotificationAsRead = async (

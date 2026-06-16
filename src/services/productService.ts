@@ -1,5 +1,6 @@
-import { paymentHistory, products } from '../mock';
+import { products } from '../mock';
 import type { Payment, Product, ProductCategory } from '../types';
+import { getActiveMember } from './localAccountStore';
 
 export type ProductMutationInput = {
   category: ProductCategory;
@@ -13,7 +14,7 @@ export type ProductMutationInput = {
 let productRecords: Product[] = [...products];
 
 export const getProducts = async (): Promise<Product[]> => {
-  return productRecords;
+  return [...productRecords];
 };
 
 export const getProductCategories = async (): Promise<ProductCategory[]> => {
@@ -29,20 +30,25 @@ export const buyProduct = async (
     return undefined;
   }
 
+  const member = await getActiveMember();
+  const timestamp = new Date().toISOString();
+
   return {
-    ...paymentHistory[1],
+    id: `payment-${Date.now().toString(36)}`,
+    memberId: member.id,
     productId: product.id,
     amount: product.price,
     currency: product.currency,
     method: 'Cash',
     status: 'Paid',
-    paidAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    paidAt: timestamp,
+    createdAt: timestamp,
+    updatedAt: timestamp,
   };
 };
 
 export const getAdminProducts = async (): Promise<Product[]> => {
-  return productRecords;
+  return [...productRecords];
 };
 
 export const createProduct = async (

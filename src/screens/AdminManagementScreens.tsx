@@ -22,6 +22,7 @@ import {
   productService,
   studentVerificationService,
   voucherService,
+  FREEZE_WEEKLY_PRICE,
 } from '@/services';
 import type {
   AdminMemberSummary,
@@ -31,6 +32,7 @@ import type {
   StudentVerificationWithMember,
 } from '@/services';
 import type {
+  ClassCategory,
   GymClass,
   Member,
   MembershipStatus,
@@ -48,7 +50,7 @@ const statusOptions: MembershipStatus[] = [
   'Pending Approval',
 ];
 const productCategories: ProductCategory[] = ['Gym Equipment', 'Beverages', 'Snacks'];
-const classCategories = [
+const classCategories: ClassCategory[] = [
   'Fitness Classes',
   'Martial Arts',
   'Gymnastics',
@@ -80,7 +82,7 @@ type ClassForm = {
   capacity: string;
   instructorName: string;
   isPaid: boolean;
-  location: string;
+  category: ClassCategory;
   price: string;
   startTime: string;
   status: GymClass['status'];
@@ -94,10 +96,6 @@ type ProductForm = {
   name: string;
   price: string;
 };
-
-function normalizePhone(value: string) {
-  return value.replace(/\D/g, '').slice(0, 8);
-}
 
 function formatDate(value?: string) {
   if (!value) {
@@ -159,7 +157,7 @@ function toClassInput(form: ClassForm): ClassMutationInput {
     capacity: Number(form.capacity) || 12,
     instructorName: form.instructorName.trim() || 'Coach',
     isPaid: form.isPaid,
-    location: form.location,
+    category: form.category,
     price: Number(form.price) || 0,
     startTime: form.startTime.trim() || defaultClassStart,
     status: form.status,
@@ -182,7 +180,7 @@ function getClassForm(gymClass?: GymClass): ClassForm {
     capacity: String(gymClass?.capacity ?? 16),
     instructorName: gymClass?.instructorName ?? '',
     isPaid: gymClass?.isPaid ?? false,
-    location: gymClass?.location ?? classCategories[0],
+    category: gymClass?.category ?? classCategories[0],
     price: String(gymClass?.price ?? 0),
     startTime: gymClass?.startTime ?? defaultClassStart,
     status: gymClass?.status ?? 'Available',
@@ -289,10 +287,10 @@ function ConfirmModal({
 }
 
 export function AdminMemberManagementScreen() {
-  const [phone, setPhone] = useState('');
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<Member[]>([]);
   const [foundMember, setFoundMember] = useState<Member>();
   const [summary, setSummary] = useState<AdminMemberSummary>();
-  const [message, setMessage] = useState('Search by local 8-digit Lebanese phone number.');
   const [months, setMonths] = useState(1);
   const [weeks, setWeeks] = useState(1);
   const [selectedStatus, setSelectedStatus] = useState<MembershipStatus>('Active');
@@ -304,20 +302,28 @@ export function AdminMemberManagementScreen() {
     setSummary(nextSummary);
   }, []);
 
-  const handleSearch = async () => {
-    const member = await adminMemberService.searchMemberByPhone(phone);
+  useEffect(() => {
+    let isActive = true;
 
-    setFoundMember(member);
-    setSummary(undefined);
+    adminMemberService.searchMembers(query).then((members) => {
+      if (isActive) {
+        setResults(members);
+      }
+    });
 
-    if (!member) {
-      setMessage('No member found for that phone number.');
-      return;
-    }
+    return () => {
+      isActive = false;
+    };
+  }, [query]);
 
-    setMessage('Member found.');
-    await refreshSummary(member.id);
-  };
+  const selectMember = useCallback(
+    async (member: Member) => {
+      setFoundMember(member);
+      setSummary(undefined);
+      await refreshSummary(member.id);
+    },
+    [refreshSummary],
+  );
 
   const selectedMemberId = foundMember?.id;
 
@@ -326,24 +332,53 @@ export function AdminMemberManagementScreen() {
       title="Member Management"
       subtitle="Search members and manage mock membership state.">
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Phone search</Text>
+        <Text style={styles.cardTitle}>Member directory</Text>
         <Text style={styles.bodyText}>
+          Search the mock member directory by name or phone number, then tap a
+          member to manage their membership.
+        </Text>
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search by name or phone"
+          placeholderTextColor={premiumColors.textFaint}
+          style={styles.searchInput}
+        />
+        {results.length === 0 ? (
+          <Text style={styles.helperText}>No members match this search.</Text>
+        ) : (
+          results.map((member) => {
+            const selected = member.id === selectedMemberId;
+
+            return (
+              <Pressable
+                key={member.id}
+                onPress={() => selectMember(member)}
+                style={[
+                  styles.selectableRow,
+                  selected && styles.selectableRowSelected,
+                ]}>
+                <View style={styles.adminAvatar}>
+                  <Text style={styles.adminAvatarText}>
+                    {member.firstName.slice(0, 1).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.rowCopy}>
+                  <Text style={styles.rowTitle}>
+                    {member.firstName} {member.lastName}
+                  </Text>
+                  <Text style={styles.helperText}>{member.phone}</Text>
+                </View>
+                {selected ? (
+                  <Text style={styles.selectedTag}>Selected</Text>
+                ) : null}
+              </Pressable>
+            );
+          })
+        )}
+        <Text style={styles.helperText}>
           TODO: Real admin permissions and authority checks must later be enforced by backend/Gmind.
         </Text>
-        <View style={styles.inputRow}>
-          <TextInput
-            value={phone}
-            onChangeText={(value) => setPhone(normalizePhone(value))}
-            placeholder="70 123 456"
-            placeholderTextColor={premiumColors.textFaint}
-            keyboardType="number-pad"
-            style={styles.input}
-          />
-          <Pressable onPress={handleSearch} style={styles.compactPrimary}>
-            <Text style={styles.primaryButtonText}>Search</Text>
-          </Pressable>
-        </View>
-        <Text style={styles.helperText}>{message}</Text>
       </View>
 
       {summary ? (
@@ -403,7 +438,7 @@ export function AdminMemberManagementScreen() {
           <View style={styles.card}>
             <Text style={styles.sectionLabel}>Membership Actions</Text>
             <Text style={styles.cardTitle}>Extend, freeze, or update status</Text>
-            <Text style={styles.helperText}>Extend membership</Text>
+            <Text style={styles.fieldLabel}>Extend membership</Text>
             <View style={styles.pillRow}>
               {[1, 3, 6, 12].map((value) => (
                 <Pressable
@@ -433,7 +468,9 @@ export function AdminMemberManagementScreen() {
               <Text style={styles.primaryButtonText}>Extend</Text>
             </Pressable>
 
-            <Text style={styles.helperText}>Freeze membership: ${weeks * 10}.00 total</Text>
+            <Text style={styles.fieldLabel}>
+              Freeze membership: ${weeks * FREEZE_WEEKLY_PRICE}.00 total
+            </Text>
             <View style={styles.pillRow}>
               {[1, 4, 8, 12].map((value) => (
                 <Pressable
@@ -480,7 +517,7 @@ export function AdminMemberManagementScreen() {
               <Text style={styles.secondaryButtonText}>Unfreeze</Text>
             </Pressable>
 
-            <Text style={styles.helperText}>Change status</Text>
+            <Text style={styles.fieldLabel}>Change status</Text>
             <View style={styles.pillRow}>
               {statusOptions.map((status) => (
                 <Pressable
@@ -549,6 +586,7 @@ export function AdminVoucherManagementScreen() {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [selectedVoucherStatus, setSelectedVoucherStatus] =
     useState<Voucher['status']>('Pending');
+  const [search, setSearch] = useState('');
 
   const loadVouchers = useCallback(async () => {
     setVouchers(await voucherService.getAllVouchers());
@@ -562,6 +600,13 @@ export function AdminVoucherManagementScreen() {
     <AdminShell title="Voucher Management" subtitle="Confirm or cancel demo vouchers.">
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Status filters</Text>
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search by voucher type or description"
+          placeholderTextColor={premiumColors.textFaint}
+          style={styles.searchInput}
+        />
         <View style={styles.pillRow}>
           {voucherStatusOrder.map((status) => {
             const selected = selectedVoucherStatus === status;
@@ -585,13 +630,30 @@ export function AdminVoucherManagementScreen() {
           return null;
         }
 
-        const statusVouchers = vouchers.filter((voucher) => voucher.status === status);
+        const normalizedVoucherSearch = search.trim().toLowerCase();
+        const statusVouchers = vouchers.filter((voucher) => {
+          if (voucher.status !== status) {
+            return false;
+          }
+
+          if (!normalizedVoucherSearch) {
+            return true;
+          }
+
+          return `${voucher.type} ${voucher.description}`
+            .toLowerCase()
+            .includes(normalizedVoucherSearch);
+        });
 
         return (
           <View key={status} style={styles.card}>
             <Text style={styles.cardTitle}>{status}</Text>
             {statusVouchers.length === 0 ? (
-              <Text style={styles.helperText}>No {status.toLowerCase()} vouchers.</Text>
+              <Text style={styles.helperText}>
+                {normalizedVoucherSearch
+                  ? `No ${status.toLowerCase()} vouchers match this search.`
+                  : `No ${status.toLowerCase()} vouchers.`}
+              </Text>
             ) : (
               statusVouchers.map((voucher) => (
                 <View key={voucher.id} style={styles.rowCard}>
@@ -635,6 +697,7 @@ export function AdminVoucherManagementScreen() {
 export function AdminClassManagementScreen() {
   const [classes, setClasses] = useState<GymClass[]>([]);
   const [classFilter, setClassFilter] = useState<ClassFilter>('All');
+  const [search, setSearch] = useState('');
   const [editingClass, setEditingClass] = useState<GymClass>();
   const [form, setForm] = useState<ClassForm>(getClassForm());
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>();
@@ -663,7 +726,18 @@ export function AdminClassManagementScreen() {
     await loadClasses();
   };
 
+  const normalizedClassSearch = search.trim().toLowerCase();
   const filteredClasses = classes.filter((gymClass) => {
+    if (normalizedClassSearch) {
+      const haystack = `${gymClass.title} ${gymClass.instructorName} ${
+        gymClass.category
+      }`.toLowerCase();
+
+      if (!haystack.includes(normalizedClassSearch)) {
+        return false;
+      }
+    }
+
     const startDate = new Date(gymClass.startTime);
     const today = new Date();
     const isToday =
@@ -698,6 +772,13 @@ export function AdminClassManagementScreen() {
     <AdminShell title="Class Management" subtitle="Manage mock class schedule data.">
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Class filters</Text>
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search by class, coach, or category"
+          placeholderTextColor={premiumColors.textFaint}
+          style={styles.searchInput}
+        />
         <View style={styles.pillRow}>
           {(['All', 'Today', 'Upcoming', 'Available', 'Full', 'Paid', 'Free'] as ClassFilter[]).map(
             (filter) => (
@@ -718,90 +799,135 @@ export function AdminClassManagementScreen() {
         </View>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>{editingClass ? 'Edit class' : 'Add class'}</Text>
-        <TextInput
-          value={form.title}
-          onChangeText={(title) => setForm((current) => ({ ...current, title }))}
-          placeholder="Class name"
-          placeholderTextColor={premiumColors.textFaint}
-          style={styles.input}
-        />
-        <TextInput
-          value={form.instructorName}
-          onChangeText={(instructorName) =>
-            setForm((current) => ({ ...current, instructorName }))
-          }
-          placeholder="Instructor name"
-          placeholderTextColor={premiumColors.textFaint}
-          style={styles.input}
-        />
-        <TextInput
-          value={form.startTime}
-          onChangeText={(startTime) => setForm((current) => ({ ...current, startTime }))}
-          placeholder={defaultClassStart}
-          placeholderTextColor={premiumColors.textFaint}
-          style={styles.input}
-        />
-        <View style={styles.pillRow}>
-          {classCategories.map((category) => (
-            <Pressable
-              key={category}
-              onPress={() => setForm((current) => ({ ...current, location: category }))}
-              style={[styles.pill, form.location === category && styles.pillSelected]}>
-              <Text
-                style={[
-                  styles.pillText,
-                  form.location === category && styles.pillTextSelected,
-                ]}>
-                {category}
-              </Text>
-            </Pressable>
-          ))}
+      <View style={[styles.card, editingClass ? styles.cardEditing : styles.cardCreating]}>
+        <View style={styles.formHeader}>
+          <Text style={styles.formModeKicker}>
+            {editingClass ? 'Editing class' : 'Creating class'}
+          </Text>
+          <Text style={styles.cardTitle}>
+            {editingClass ? editingClass.title : 'New class'}
+          </Text>
         </View>
-        <View style={styles.pillRow}>
-          {(['Available', 'Full'] as const).map((status) => (
+
+        <Text style={styles.formSectionLabel}>Class details</Text>
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Class name</Text>
+          <TextInput
+            value={form.title}
+            onChangeText={(title) => setForm((current) => ({ ...current, title }))}
+            placeholder="e.g. Morning Strength"
+            placeholderTextColor={premiumColors.textFaint}
+            style={styles.input}
+          />
+        </View>
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Instructor</Text>
+          <TextInput
+            value={form.instructorName}
+            onChangeText={(instructorName) =>
+              setForm((current) => ({ ...current, instructorName }))
+            }
+            placeholder="e.g. Steve Rogers"
+            placeholderTextColor={premiumColors.textFaint}
+            style={styles.input}
+          />
+        </View>
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Category</Text>
+          <View style={styles.pillRow}>
+            {classCategories.map((category) => (
+              <Pressable
+                key={category}
+                onPress={() => setForm((current) => ({ ...current, category }))}
+                style={[styles.pill, form.category === category && styles.pillSelected]}>
+                <Text
+                  style={[
+                    styles.pillText,
+                    form.category === category && styles.pillTextSelected,
+                  ]}>
+                  {category}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        <Text style={styles.formSectionLabel}>Schedule</Text>
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Start time</Text>
+          <TextInput
+            value={form.startTime}
+            onChangeText={(startTime) => setForm((current) => ({ ...current, startTime }))}
+            placeholder={defaultClassStart}
+            placeholderTextColor={premiumColors.textFaint}
+            style={styles.input}
+          />
+          <Text style={styles.fieldHint}>ISO format, e.g. {defaultClassStart}</Text>
+        </View>
+
+        <Text style={styles.formSectionLabel}>Status & pricing</Text>
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Availability</Text>
+          <View style={styles.pillRow}>
+            {(['Available', 'Full'] as const).map((status) => (
+              <Pressable
+                key={status}
+                onPress={() => setForm((current) => ({ ...current, status }))}
+                style={[styles.pill, form.status === status && styles.pillSelected]}>
+                <Text
+                  style={[styles.pillText, form.status === status && styles.pillTextSelected]}>
+                  {status}
+                </Text>
+              </Pressable>
+            ))}
             <Pressable
-              key={status}
-              onPress={() => setForm((current) => ({ ...current, status }))}
-              style={[styles.pill, form.status === status && styles.pillSelected]}>
-              <Text style={[styles.pillText, form.status === status && styles.pillTextSelected]}>
-                {status}
+              onPress={() => setForm((current) => ({ ...current, isPaid: !current.isPaid }))}
+              style={[styles.pill, form.isPaid && styles.pillSelected]}>
+              <Text style={[styles.pillText, form.isPaid && styles.pillTextSelected]}>
+                {form.isPaid ? 'Paid' : 'Free'}
               </Text>
             </Pressable>
-          ))}
-          <Pressable
-            onPress={() => setForm((current) => ({ ...current, isPaid: !current.isPaid }))}
-            style={[styles.pill, form.isPaid && styles.pillSelected]}>
-            <Text style={[styles.pillText, form.isPaid && styles.pillTextSelected]}>
-              {form.isPaid ? 'Paid' : 'Free'}
-            </Text>
-          </Pressable>
+          </View>
         </View>
         <View style={styles.inputRow}>
-          <TextInput
-            value={form.capacity}
-            onChangeText={(capacity) => setForm((current) => ({ ...current, capacity }))}
-            placeholder="Capacity"
-            placeholderTextColor={premiumColors.textFaint}
-            keyboardType="number-pad"
-            style={styles.input}
-          />
-          <TextInput
-            value={form.price}
-            onChangeText={(price) => setForm((current) => ({ ...current, price }))}
-            placeholder="Price"
-            placeholderTextColor={premiumColors.textFaint}
-            keyboardType="decimal-pad"
-            style={styles.input}
-          />
+          <View style={styles.fieldFlex}>
+            <Text style={styles.fieldLabel}>Capacity</Text>
+            <TextInput
+              value={form.capacity}
+              onChangeText={(capacity) => setForm((current) => ({ ...current, capacity }))}
+              placeholder="16"
+              placeholderTextColor={premiumColors.textFaint}
+              keyboardType="number-pad"
+              style={styles.input}
+            />
+          </View>
+          <View style={styles.fieldFlex}>
+            <Text style={styles.fieldLabel}>Price (USD)</Text>
+            <TextInput
+              value={form.price}
+              onChangeText={(price) => setForm((current) => ({ ...current, price }))}
+              placeholder="0"
+              placeholderTextColor={premiumColors.textFaint}
+              keyboardType="decimal-pad"
+              style={styles.input}
+            />
+          </View>
         </View>
-        <View style={styles.modalRow}>
-          <Pressable onPress={resetForm} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Clear</Text>
+
+        <View style={styles.formActions}>
+          <Pressable
+            onPress={resetForm}
+            style={[styles.secondaryButton, styles.formActionButton]}>
+            <Text style={styles.secondaryButtonText}>
+              {editingClass ? 'Cancel' : 'Clear'}
+            </Text>
           </Pressable>
-          <Pressable onPress={saveClass} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>{editingClass ? 'Save' : 'Add'}</Text>
+          <Pressable
+            onPress={saveClass}
+            style={[styles.primaryButton, styles.formActionButton]}>
+            <Text style={styles.primaryButtonText}>
+              {editingClass ? 'Save changes' : 'Add class'}
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -827,7 +953,7 @@ export function AdminClassManagementScreen() {
               <StatusChip label={gymClass.isPaid ? `Paid $${gymClass.price}` : 'Free'} />
             </View>
             <Text style={styles.helperText}>
-              {formatDateTime(gymClass.startTime)} · {gymClass.location} · {gymClass.status}
+              {formatDateTime(gymClass.startTime)} · {gymClass.category} · {gymClass.status}
             </Text>
           </View>
           <View style={styles.actionStack}>
@@ -866,6 +992,7 @@ export function AdminClassManagementScreen() {
 export function AdminProductManagementScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const [productFilter, setProductFilter] = useState<ProductFilter>('All');
+  const [search, setSearch] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product>();
   const [form, setForm] = useState<ProductForm>(getProductForm());
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>();
@@ -894,7 +1021,18 @@ export function AdminProductManagementScreen() {
     await loadProducts();
   };
 
+  const normalizedProductSearch = search.trim().toLowerCase();
   const filteredProducts = products.filter((product) => {
+    if (normalizedProductSearch) {
+      const haystack = `${product.name} ${product.description ?? ''} ${
+        product.category ?? ''
+      }`.toLowerCase();
+
+      if (!haystack.includes(normalizedProductSearch)) {
+        return false;
+      }
+    }
+
     if (productFilter === 'Available') {
       return product.isAvailable;
     }
@@ -918,6 +1056,13 @@ export function AdminProductManagementScreen() {
     <AdminShell title="Product Management" subtitle="Manage mock Gym Shop listings.">
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Inventory filters</Text>
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search by product, description, or category"
+          placeholderTextColor={premiumColors.textFaint}
+          style={styles.searchInput}
+        />
         <View style={styles.pillRow}>
           {(['All', 'Available', 'Unavailable', ...productCategories] as ProductFilter[]).map(
             (filter) => (
@@ -938,63 +1083,95 @@ export function AdminProductManagementScreen() {
         </View>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>{editingProduct ? 'Edit product' : 'Add product'}</Text>
-        <TextInput
-          value={form.name}
-          onChangeText={(name) => setForm((current) => ({ ...current, name }))}
-          placeholder="Product name"
-          placeholderTextColor={premiumColors.textFaint}
-          style={styles.input}
-        />
-        <TextInput
-          value={form.description}
-          onChangeText={(description) =>
-            setForm((current) => ({ ...current, description }))
-          }
-          placeholder="Description"
-          placeholderTextColor={premiumColors.textFaint}
-          style={styles.input}
-        />
-        <TextInput
-          value={form.price}
-          onChangeText={(price) => setForm((current) => ({ ...current, price }))}
-          placeholder="Price"
-          placeholderTextColor={premiumColors.textFaint}
-          keyboardType="decimal-pad"
-          style={styles.input}
-        />
-        <View style={styles.pillRow}>
-          {productCategories.map((category) => (
+      <View style={[styles.card, editingProduct ? styles.cardEditing : styles.cardCreating]}>
+        <View style={styles.formHeader}>
+          <Text style={styles.formModeKicker}>
+            {editingProduct ? 'Editing product' : 'Creating product'}
+          </Text>
+          <Text style={styles.cardTitle}>
+            {editingProduct ? editingProduct.name : 'New product'}
+          </Text>
+        </View>
+
+        <Text style={styles.formSectionLabel}>Product details</Text>
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Product name</Text>
+          <TextInput
+            value={form.name}
+            onChangeText={(name) => setForm((current) => ({ ...current, name }))}
+            placeholder="e.g. Energy Drink"
+            placeholderTextColor={premiumColors.textFaint}
+            style={styles.input}
+          />
+        </View>
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Description</Text>
+          <TextInput
+            value={form.description}
+            onChangeText={(description) =>
+              setForm((current) => ({ ...current, description }))
+            }
+            placeholder="Short product description"
+            placeholderTextColor={premiumColors.textFaint}
+            style={styles.input}
+          />
+        </View>
+
+        <Text style={styles.formSectionLabel}>Pricing & availability</Text>
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Price (USD)</Text>
+          <TextInput
+            value={form.price}
+            onChangeText={(price) => setForm((current) => ({ ...current, price }))}
+            placeholder="0"
+            placeholderTextColor={premiumColors.textFaint}
+            keyboardType="decimal-pad"
+            style={styles.input}
+          />
+        </View>
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Category & stock</Text>
+          <View style={styles.pillRow}>
+            {productCategories.map((category) => (
+              <Pressable
+                key={category}
+                onPress={() => setForm((current) => ({ ...current, category }))}
+                style={[styles.pill, form.category === category && styles.pillSelected]}>
+                <Text
+                  style={[
+                    styles.pillText,
+                    form.category === category && styles.pillTextSelected,
+                  ]}>
+                  {category}
+                </Text>
+              </Pressable>
+            ))}
             <Pressable
-              key={category}
-              onPress={() => setForm((current) => ({ ...current, category }))}
-              style={[styles.pill, form.category === category && styles.pillSelected]}>
-              <Text
-                style={[
-                  styles.pillText,
-                  form.category === category && styles.pillTextSelected,
-                ]}>
-                {category}
+              onPress={() =>
+                setForm((current) => ({ ...current, isAvailable: !current.isAvailable }))
+              }
+              style={[styles.pill, form.isAvailable && styles.pillSelected]}>
+              <Text style={[styles.pillText, form.isAvailable && styles.pillTextSelected]}>
+                {form.isAvailable ? 'Available' : 'Out of stock'}
               </Text>
             </Pressable>
-          ))}
+          </View>
+        </View>
+
+        <View style={styles.formActions}>
           <Pressable
-            onPress={() =>
-              setForm((current) => ({ ...current, isAvailable: !current.isAvailable }))
-            }
-            style={[styles.pill, form.isAvailable && styles.pillSelected]}>
-            <Text style={[styles.pillText, form.isAvailable && styles.pillTextSelected]}>
-              {form.isAvailable ? 'Available' : 'Out'}
+            onPress={resetForm}
+            style={[styles.secondaryButton, styles.formActionButton]}>
+            <Text style={styles.secondaryButtonText}>
+              {editingProduct ? 'Cancel' : 'Clear'}
             </Text>
           </Pressable>
-        </View>
-        <View style={styles.modalRow}>
-          <Pressable onPress={resetForm} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Clear</Text>
-          </Pressable>
-          <Pressable onPress={saveProduct} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>{editingProduct ? 'Save' : 'Add'}</Text>
+          <Pressable
+            onPress={saveProduct}
+            style={[styles.primaryButton, styles.formActionButton]}>
+            <Text style={styles.primaryButtonText}>
+              {editingProduct ? 'Save changes' : 'Add product'}
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -1169,6 +1346,7 @@ export function AdminStudentVerificationScreen() {
   const [requests, setRequests] = useState<StudentVerificationWithMember[]>([]);
   const [selectedStatus, setSelectedStatus] =
     useState<StudentVerificationStatus>('Pending Verification');
+  const [search, setSearch] = useState('');
 
   const loadRequests = useCallback(async () => {
     setRequests(await studentVerificationService.getStudentVerificationRequests());
@@ -1178,7 +1356,25 @@ export function AdminStudentVerificationScreen() {
     loadRequests();
   }, [loadRequests]);
 
-  const visibleRequests = requests.filter((request) => request.status === selectedStatus);
+  const normalizedRequestSearch = search.trim().toLowerCase();
+  const visibleRequests = requests.filter((request) => {
+    if (request.status !== selectedStatus) {
+      return false;
+    }
+
+    if (!normalizedRequestSearch) {
+      return true;
+    }
+
+    const memberName = request.member
+      ? `${request.member.firstName} ${request.member.lastName}`
+      : request.memberId;
+    const haystack = `${memberName} ${request.member?.phone ?? ''} ${
+      request.member?.email ?? ''
+    }`.toLowerCase();
+
+    return haystack.includes(normalizedRequestSearch);
+  });
 
   return (
     <AdminShell
@@ -1189,6 +1385,13 @@ export function AdminStudentVerificationScreen() {
         <Text style={styles.bodyText}>
           Pending requests keep normal $85/month pricing until approved by staff.
         </Text>
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search by member name, phone, or email"
+          placeholderTextColor={premiumColors.textFaint}
+          style={styles.searchInput}
+        />
         <View style={styles.pillRow}>
           {studentStatusFilters.map((status) => {
             const selected = selectedStatus === status;
@@ -1212,7 +1415,9 @@ export function AdminStudentVerificationScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>No requests</Text>
           <Text style={styles.helperText}>
-            Student ID submissions will appear here after members upload proof from Profile.
+            {normalizedRequestSearch
+              ? 'No requests match this search.'
+              : 'Student ID submissions will appear here after members upload proof from Profile.'}
           </Text>
         </View>
       ) : (
@@ -1329,6 +1534,55 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
   },
+  cardEditing: {
+    borderColor: premiumColors.red,
+  },
+  cardCreating: {
+    borderColor: premiumColors.borderStrong,
+  },
+  formHeader: {
+    gap: 2,
+  },
+  formModeKicker: {
+    color: premiumColors.redBright,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  formSectionLabel: {
+    color: premiumColors.text,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+    marginTop: 4,
+    textTransform: 'uppercase',
+  },
+  field: {
+    gap: 6,
+  },
+  fieldFlex: {
+    flex: 1,
+    gap: 6,
+  },
+  fieldLabel: {
+    color: premiumColors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  fieldHint: {
+    color: premiumColors.textFaint,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  formActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  formActionButton: {
+    flex: 1,
+  },
   sectionLabel: {
     color: premiumColors.redBright,
     fontSize: 10,
@@ -1381,6 +1635,37 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     paddingHorizontal: 13,
+  },
+  searchInput: {
+    minHeight: 46,
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 14,
+    backgroundColor: premiumColors.surfaceSoft,
+    color: premiumColors.text,
+    fontSize: 13,
+    fontWeight: '800',
+    paddingHorizontal: 13,
+  },
+  selectableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 16,
+    backgroundColor: premiumColors.surfaceSoft,
+    padding: 12,
+  },
+  selectableRowSelected: {
+    borderColor: premiumColors.red,
+    backgroundColor: 'rgba(177, 18, 38, 0.16)',
+  },
+  selectedTag: {
+    color: premiumColors.redBright,
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
   },
   compactPrimary: {
     minHeight: 48,

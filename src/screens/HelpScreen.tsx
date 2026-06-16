@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import {
   Alert,
@@ -14,7 +13,6 @@ import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
 
 const accentColor = premiumColors.red;
-const wineColor = premiumColors.redBright;
 const backgroundColor = premiumColors.background;
 const surfaceColor = premiumColors.surface;
 const textColor = premiumColors.text;

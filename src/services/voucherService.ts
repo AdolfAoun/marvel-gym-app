@@ -1,5 +1,6 @@
 import { vouchers } from '../mock';
 import type { Voucher, VoucherStatus, VoucherType } from '../types';
+import { getActiveMember } from './localAccountStore';
 
 type CreateVoucherInput = {
   type: VoucherType;
@@ -16,18 +17,14 @@ function createVoucherId() {
   return `voucher-${Date.now().toString(36)}`;
 }
 
-export const getVouchers = async (): Promise<Voucher[]> => {
-  return getAllVouchers();
-};
-
-export const getAllVouchers = async (): Promise<Voucher[]> => {
+function sortVouchers(records: Voucher[]): Voucher[] {
   const statusOrder: Record<VoucherStatus, number> = {
     Pending: 0,
     Confirmed: 1,
     Canceled: 2,
   };
 
-  return [...voucherRecords].sort((first, second) => {
+  return [...records].sort((first, second) => {
     const statusDifference = statusOrder[first.status] - statusOrder[second.status];
 
     if (statusDifference !== 0) {
@@ -36,10 +33,26 @@ export const getAllVouchers = async (): Promise<Voucher[]> => {
 
     return new Date(second.date).getTime() - new Date(first.date).getTime();
   });
+}
+
+// Member-facing: vouchers belonging to the currently signed-in member.
+export const getVouchers = async (): Promise<Voucher[]> => {
+  const member = await getActiveMember();
+
+  return getMemberVouchers(member.id);
 };
 
-export const getMemberVouchers = async (): Promise<Voucher[]> => {
-  return getAllVouchers();
+// Admin-facing: every voucher across all members (the staff queue).
+export const getAllVouchers = async (): Promise<Voucher[]> => {
+  return sortVouchers(voucherRecords);
+};
+
+export const getMemberVouchers = async (
+  memberId: string,
+): Promise<Voucher[]> => {
+  return sortVouchers(
+    voucherRecords.filter((voucher) => voucher.memberId === memberId),
+  );
 };
 
 export const getPendingVouchers = async (): Promise<Voucher[]> => {
@@ -63,8 +76,10 @@ export const createVoucher = async ({
   status,
   description,
 }: CreateVoucherInput): Promise<Voucher> => {
+  const member = await getActiveMember();
   const voucher: Voucher = {
     id: createVoucherId(),
+    memberId: member.id,
     date: new Date().toISOString(),
     type,
     amount,

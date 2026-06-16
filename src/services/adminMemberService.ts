@@ -9,10 +9,14 @@ import type {
 import {
   extendMemberMembership,
   freezeMemberMembership,
-  getCurrentMembership,
+  getMembershipForMember,
   updateMemberMembership,
 } from './membershipService';
-import { getLocalMemberById, searchLocalMemberByPhone } from './localAccountStore';
+import {
+  getLocalMemberById,
+  listLocalMembers,
+  searchLocalMemberByPhone,
+} from './localAccountStore';
 import { getMemberStudentVerification } from './studentVerificationService';
 import { getMemberVouchers } from './voucherService';
 
@@ -41,6 +45,27 @@ export const searchMemberByPhone = async (
   return searchLocalMemberByPhone(phone);
 };
 
+export const searchMembers = async (query: string): Promise<Member[]> => {
+  const members = await listLocalMembers();
+  const trimmed = query.trim().toLowerCase();
+
+  if (!trimmed) {
+    return members;
+  }
+
+  const digits = trimmed.replace(/\D/g, '');
+
+  return members.filter((member) => {
+    const fullName = `${member.firstName} ${member.lastName}`.toLowerCase();
+    const phoneDigits = member.phone.replace(/\D/g, '');
+    const matchesName = fullName.includes(trimmed);
+    const matchesEmail = member.email.toLowerCase().includes(trimmed);
+    const matchesPhone = digits.length > 0 && phoneDigits.includes(digits);
+
+    return matchesName || matchesEmail || matchesPhone;
+  });
+};
+
 export const getAdminMemberSummary = async (
   memberId: string,
 ): Promise<AdminMemberSummary | undefined> => {
@@ -51,8 +76,8 @@ export const getAdminMemberSummary = async (
   }
 
   const [membership, vouchers, studentVerification] = await Promise.all([
-    getCurrentMembership(),
-    getMemberVouchers(),
+    getMembershipForMember(memberId),
+    getMemberVouchers(memberId),
     getMemberStudentVerification(memberId),
   ]);
 
@@ -98,6 +123,7 @@ export const changeMembershipStatus = async (
 
 export const adminMemberService = {
   searchMemberByPhone,
+  searchMembers,
   getAdminMemberSummary,
   extendMembership,
   freezeMembershipForMember,

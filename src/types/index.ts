@@ -70,6 +70,12 @@ export type Membership = {
   updatedAt: string;
 };
 
+export type ClassCategory =
+  | 'Fitness Classes'
+  | 'Martial Arts'
+  | 'Gymnastics'
+  | 'Extra Classes';
+
 export type GymClass = {
   id: string;
   title: string;
@@ -84,6 +90,7 @@ export type GymClass = {
   isRegistered?: boolean;
   capacity: number;
   enrolledCount: number;
+  category: ClassCategory;
   location?: string;
   isActive: boolean;
 };
@@ -154,6 +161,7 @@ export type VoucherType =
 
 export type Voucher = {
   id: string;
+  memberId?: string;
   date: string;
   type: VoucherType;
   amount: number;
