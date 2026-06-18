@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -14,7 +15,12 @@ import {
 } from 'react-native';
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
-import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
+import { MarvelMarks } from '@/components/PremiumUI';
+import {
+  premiumColors,
+  premiumGradients,
+  premiumShadow,
+} from '@/constants/premiumTheme';
 import { journeyService, memberService } from '@/services';
 import type {
   Achievement,
@@ -492,7 +498,13 @@ export default function JourneyScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
-        <View style={styles.heroCard}>
+        <LinearGradient
+          colors={premiumGradients.redPanel}
+          start={{ x: 0.1, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          style={styles.heroCard}>
+          <View pointerEvents="none" style={styles.heroGloss} />
+          <MarvelMarks variant="corner" color="#FFFFFF" />
           <Text style={styles.kicker}>Journey</Text>
           <Text style={styles.heroTitle}>
             {member?.firstName ?? 'Member'}'s Fitness Dashboard
@@ -510,7 +522,7 @@ export default function JourneyScreen() {
               <Text style={styles.heroStatLabel}>avg calories/session</Text>
             </View>
           </View>
-        </View>
+        </LinearGradient>
 
         <View style={styles.aiAssistantCard}>
           <View style={styles.sectionHeaderRow}>
@@ -643,7 +655,10 @@ export default function JourneyScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.statsGrid}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.statsRail}>
           {[
             {
               key: 'visitsThisMonth' as const,
@@ -712,7 +727,7 @@ export default function JourneyScreen() {
               </View>
             );
           })}
-        </View>
+        </ScrollView>
 
         <View style={styles.card}>
           <View style={styles.sectionHeaderRow}>
@@ -1089,18 +1104,38 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: 26,
-    backgroundColor: 'rgba(18, 20, 28, 0.78)',
     padding: 22,
     marginBottom: 16,
-    ...premiumShadow,
+    shadowColor: premiumColors.red,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.4,
+    shadowRadius: 26,
+    elevation: 10,
+  },
+  heroGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  heroSheen: {
+    position: 'absolute',
+    top: -70,
+    right: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 120,
+    backgroundColor: 'rgba(255, 120, 130, 0.2)',
   },
   kicker: {
-    color: premiumColors.redBright,
+    color: 'rgba(255, 255, 255, 0.78)',
     fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 0,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   heroTitle: {
@@ -1110,9 +1145,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     lineHeight: 35,
     marginTop: 6,
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   heroBody: {
-    color: premiumColors.textMuted,
+    color: 'rgba(255, 255, 255, 0.86)',
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
@@ -1126,9 +1164,9 @@ const styles = StyleSheet.create({
   heroStatPill: {
     flex: 1,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.055)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     padding: 15,
   },
   heroStatValue: {
@@ -1137,7 +1175,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   heroStatLabel: {
-    color: premiumColors.textMuted,
+    color: 'rgba(255, 255, 255, 0.82)',
     fontSize: 11,
     fontWeight: '800',
     marginTop: 2,
@@ -1278,10 +1316,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
     textAlign: 'center',
   },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  statsRail: {
     gap: 12,
+    paddingRight: 4,
     marginBottom: 16,
   },
   statsHeaderRow: {
@@ -1342,13 +1379,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   statCard: {
-    minHeight: 108,
-    flexBasis: '47%',
-    flexGrow: 1,
+    width: 172,
+    minHeight: 116,
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 24,
+    borderColor: premiumColors.glassBorder,
+    borderRadius: 22,
     backgroundColor: surfaceColor,
     padding: 16,
     ...premiumShadow,

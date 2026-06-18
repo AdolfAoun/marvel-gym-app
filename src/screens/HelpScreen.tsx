@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import {
   Alert,
@@ -10,7 +11,12 @@ import {
 } from 'react-native';
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
-import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
+import { MarvelMarks } from '@/components/PremiumUI';
+import {
+  premiumColors,
+  premiumGradients,
+  premiumShadow,
+} from '@/constants/premiumTheme';
 
 const accentColor = premiumColors.red;
 const backgroundColor = premiumColors.background;
@@ -33,13 +39,19 @@ export default function HelpScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.heroCard}>
+        <LinearGradient
+          colors={premiumGradients.redPanel}
+          start={{ x: 0.1, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          style={styles.heroCard}>
+          <View pointerEvents="none" style={styles.heroGloss} />
+          <MarvelMarks variant="corner" color="#FFFFFF" />
           <Text style={styles.kicker}>Help</Text>
           <Text style={styles.heroTitle}>Support Hub</Text>
           <Text style={styles.heroBody}>
             How to use the app, contact options, and the future Marvel Gym assistant.
           </Text>
-        </View>
+        </LinearGradient>
 
         <View style={styles.aiCard}>
           <View style={styles.aiBadge}>
@@ -54,13 +66,14 @@ export default function HelpScreen() {
           </View>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>How it works</Text>
-          <Text style={styles.supportTitle}>How to use the app</Text>
-          <Text style={styles.supportBody}>
-            A quick guide to the main Marvel Gym member tools.
-          </Text>
-          <View style={styles.stepList}>
+        <View style={styles.sectionHeading}>
+          <View style={styles.accentBar} />
+          <View style={styles.sectionHeadingText}>
+            <Text style={styles.sectionEyebrow}>How it works</Text>
+            <Text style={styles.sectionHeadingTitle}>How to use the app</Text>
+          </View>
+        </View>
+        <View style={styles.stepList}>
             <View style={styles.stepRow}>
               <Text style={styles.stepNumber}>01</Text>
               <View style={styles.stepCopy}>
@@ -116,15 +129,15 @@ export default function HelpScreen() {
               </View>
             </View>
           </View>
-        </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Contact Us</Text>
-          <Text style={styles.supportTitle}>Need help from Marvel Gym?</Text>
-          <Text style={styles.supportBody}>
-            Reach the team through WhatsApp or a direct phone call.
-          </Text>
-          <View style={styles.contactRow}>
+        <View style={styles.sectionHeading}>
+          <View style={styles.accentBar} />
+          <View style={styles.sectionHeadingText}>
+            <Text style={styles.sectionEyebrow}>Contact Us</Text>
+            <Text style={styles.sectionHeadingTitle}>Need help from Marvel Gym?</Text>
+          </View>
+        </View>
+        <View style={styles.contactRow}>
             <Pressable
               onPress={() => handleContact('https://wa.me/96179197997')}
               style={({ pressed }) => [
@@ -143,7 +156,6 @@ export default function HelpScreen() {
               <Text style={styles.contactButtonTextDark}>Phone call</Text>
             </Pressable>
           </View>
-        </View>
       </ScrollView>
     </PremiumScreenBackground>
   );
@@ -163,18 +175,38 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: 26,
-    backgroundColor: 'rgba(18, 20, 28, 0.72)',
-    padding: 20,
+    padding: 22,
     marginBottom: 16,
-    ...premiumShadow,
+    shadowColor: premiumColors.red,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.4,
+    shadowRadius: 26,
+    elevation: 10,
+  },
+  heroGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  heroSheen: {
+    position: 'absolute',
+    top: -70,
+    right: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 120,
+    backgroundColor: 'rgba(255, 120, 130, 0.2)',
   },
   kicker: {
-    color: premiumColors.redBright,
+    color: 'rgba(255, 255, 255, 0.78)',
     fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 0,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   heroTitle: {
@@ -183,9 +215,12 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 37,
     marginTop: 6,
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   heroBody: {
-    color: premiumColors.textMuted,
+    color: 'rgba(255, 255, 255, 0.86)',
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
@@ -199,6 +234,37 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     ...premiumShadow,
+  },
+  sectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  accentBar: {
+    width: 4,
+    height: 36,
+    borderRadius: 3,
+    backgroundColor: premiumColors.redBright,
+  },
+  sectionHeadingText: {
+    flex: 1,
+  },
+  sectionEyebrow: {
+    color: premiumColors.redBright,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  sectionHeadingTitle: {
+    color: textColor,
+    fontSize: 21,
+    fontWeight: '900',
+  },
+  contactSpacer: {
+    marginBottom: 16,
   },
   cardLabel: {
     color: accentColor,

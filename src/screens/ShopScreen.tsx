@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -11,7 +12,12 @@ import {
 } from 'react-native';
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
-import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
+import { MarvelMarks } from '@/components/PremiumUI';
+import {
+  premiumColors,
+  premiumGradients,
+  premiumShadow,
+} from '@/constants/premiumTheme';
 import { productService } from '@/services';
 import type { Product, ProductCategory } from '@/types';
 
@@ -98,12 +104,16 @@ export default function ShopScreen() {
   return (
     <PremiumScreenBackground>
       <StatusBar style="light" />
-      <View pointerEvents="none" style={styles.pageGlow} />
-      <View pointerEvents="none" style={styles.pageBlade} />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.heroCard}>
+        <LinearGradient
+          colors={premiumGradients.redPanel}
+          start={{ x: 0.1, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          style={styles.heroCard}>
+          <View pointerEvents="none" style={styles.heroGloss} />
+          <MarvelMarks variant="corner" color="#FFFFFF" />
           <Text style={styles.kicker}>Gym Shop</Text>
           <Text style={styles.heroTitle}>Premium gym essentials.</Text>
           <Text style={styles.heroBody}>
@@ -112,21 +122,21 @@ export default function ShopScreen() {
           <View style={styles.heroPill}>
             <Text style={styles.heroPillText}>Availability and pricing</Text>
           </View>
+        </LinearGradient>
+
+        <View style={styles.sectionHeading}>
+          <View style={styles.accentBar} />
+          <View style={styles.sectionHeadingText}>
+            <Text style={styles.sectionEyebrow}>Categories</Text>
+            <Text style={styles.sectionHeadingTitle}>Browse by category</Text>
+          </View>
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.sectionHeaderRow}>
-            <View>
-              <Text style={styles.cardLabel}>Categories</Text>
-              <Text style={styles.sectionTitle}>Browse by category</Text>
-            </View>
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryList}>
-            {categories.map((category) => {
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryList}>
+          {categories.map((category) => {
               const isSelected = selectedCategory === category;
 
               return (
@@ -148,12 +158,12 @@ export default function ShopScreen() {
               );
             })}
           </ScrollView>
-        </View>
 
-        <View style={styles.productsHeader}>
-          <View>
-            <Text style={styles.cardLabel}>Products</Text>
-            <Text style={styles.sectionTitle}>{selectedCategory}</Text>
+        <View style={styles.sectionHeading}>
+          <View style={styles.accentBar} />
+          <View style={styles.sectionHeadingText}>
+            <Text style={styles.sectionEyebrow}>Products</Text>
+            <Text style={styles.productCategoryHeading}>{selectedCategory}</Text>
             <Text style={styles.sortLabel}>{sortLabel}</Text>
           </View>
           <View style={styles.sortGroup}>
@@ -261,25 +271,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor,
   },
-  pageGlow: {
-    position: 'absolute',
-    right: -120,
-    top: 80,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: 'rgba(177, 18, 38, 0.08)',
-  },
-  pageBlade: {
-    position: 'absolute',
-    left: -40,
-    top: 260,
-    width: 74,
-    height: 360,
-    borderRadius: 34,
-    backgroundColor: 'rgba(177, 18, 38, 0.04)',
-    transform: [{ rotate: '20deg' }],
-  },
   content: {
     paddingHorizontal: 20,
     paddingTop: 72,
@@ -300,18 +291,38 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: 26,
-    backgroundColor: 'rgba(18, 20, 28, 0.72)',
-    padding: 20,
+    padding: 22,
     marginBottom: 16,
-    ...premiumShadow,
+    shadowColor: premiumColors.red,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.4,
+    shadowRadius: 26,
+    elevation: 10,
+  },
+  heroGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  heroSheen: {
+    position: 'absolute',
+    top: -70,
+    right: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 120,
+    backgroundColor: 'rgba(255, 120, 130, 0.2)',
   },
   kicker: {
-    color: premiumColors.redBright,
+    color: 'rgba(255, 255, 255, 0.78)',
     fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 0,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   heroTitle: {
@@ -320,9 +331,12 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 35,
     marginTop: 6,
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   heroBody: {
-    color: premiumColors.textMuted,
+    color: 'rgba(255, 255, 255, 0.86)',
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
@@ -331,9 +345,9 @@ const styles = StyleSheet.create({
   heroPill: {
     alignSelf: 'flex-start',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderColor: 'rgba(255, 255, 255, 0.28)',
     borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.055)',
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
     marginTop: 16,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -343,14 +357,33 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
   },
-  card: {
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 26,
-    backgroundColor: surfaceColor,
-    padding: 16,
-    marginBottom: 16,
-    ...premiumShadow,
+  sectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  accentBar: {
+    width: 4,
+    height: 36,
+    borderRadius: 3,
+    backgroundColor: premiumColors.redBright,
+  },
+  sectionHeadingText: {
+    flex: 1,
+  },
+  sectionEyebrow: {
+    color: premiumColors.redBright,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  sectionHeadingTitle: {
+    color: textColor,
+    fontSize: 21,
+    fontWeight: '900',
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -376,10 +409,11 @@ const styles = StyleSheet.create({
     color: mutedColor,
     fontSize: 12,
     fontWeight: '800',
-    marginTop: 5,
+    marginTop: 8,
   },
   categoryList: {
     gap: 8,
+    paddingBottom: 18,
   },
   categoryChip: {
     minHeight: 40,
@@ -409,6 +443,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
     marginBottom: 12,
+  },
+  productCategoryHeading: {
+    color: textColor,
+    fontSize: 23,
+    fontWeight: '900',
+    lineHeight: 29,
+    marginTop: 4,
   },
   sortGroup: {
     flexDirection: 'row',
@@ -442,28 +483,29 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   productCard: {
-    minHeight: 246,
+    minHeight: 256,
     flexBasis: '47%',
     flexGrow: 1,
     justifyContent: 'space-between',
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 26,
+    borderColor: premiumColors.glassBorder,
+    borderRadius: 24,
     backgroundColor: surfaceColor,
-    padding: 13,
+    padding: 12,
     ...premiumShadow,
   },
   productCardUnavailable: {
     opacity: 0.58,
   },
   productImage: {
-    height: 100,
+    height: 130,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
     overflow: 'hidden',
-    borderRadius: 20,
-    backgroundColor: premiumColors.surfaceSoft,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
     marginBottom: 12,
   },
   productImageGlow: {

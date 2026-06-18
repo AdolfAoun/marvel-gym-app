@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
@@ -17,7 +18,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
-import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
+import {
+  premiumColors,
+  premiumShadow,
+} from '@/constants/premiumTheme';
 import {
   activityService,
   avatarService,
@@ -52,6 +56,23 @@ const voucherStatuses: VoucherStatus[] = ['Pending', 'Confirmed', 'Canceled'];
 const weeklyFreezePrice = FREEZE_WEEKLY_PRICE;
 const maxRenewMonths = 12;
 const minRenewMonths = 1;
+const homeWallpaperMarks = [
+  { symbol: 'x', top: 4, left: 14, size: 58, rotate: '-14deg', opacity: 0.035 },
+  { symbol: '+', top: 70, right: 26, size: 38, rotate: '10deg', opacity: 0.04 },
+  { symbol: '/', top: 142, left: 82, size: 62, rotate: '17deg', opacity: 0.03 },
+  { symbol: '=', top: 210, right: 44, size: 48, rotate: '-8deg', opacity: 0.035 },
+  { symbol: '+', top: 308, left: 24, size: 72, rotate: '12deg', opacity: 0.028 },
+  { symbol: 'x', top: 390, right: 18, size: 56, rotate: '15deg', opacity: 0.034 },
+  { symbol: '/', top: 520, left: 42, size: 44, rotate: '-18deg', opacity: 0.03 },
+  { symbol: '=', top: 640, right: 70, size: 64, rotate: '7deg', opacity: 0.032 },
+  { symbol: '+', top: 780, left: 112, size: 40, rotate: '-10deg', opacity: 0.036 },
+  { symbol: 'x', top: 910, right: 36, size: 76, rotate: '-15deg', opacity: 0.026 },
+  { symbol: '/', top: 1060, left: 18, size: 58, rotate: '18deg', opacity: 0.03 },
+  { symbol: '=', top: 1200, right: 20, size: 48, rotate: '-7deg', opacity: 0.032 },
+  { symbol: '+', top: 1360, left: 70, size: 68, rotate: '9deg', opacity: 0.025 },
+  { symbol: 'x', top: 1520, right: 92, size: 42, rotate: '13deg', opacity: 0.034 },
+  { symbol: '/', top: 1680, left: 122, size: 54, rotate: '-17deg', opacity: 0.028 },
+];
 
 type MembershipModal = 'freeze' | 'renew';
 
@@ -378,10 +399,6 @@ export default function HomeScreen() {
   );
   const countdownColor = getCountdownColor(membershipProgress, status);
   const statusTone = getStatusTone(status);
-  const progressSegmentCount = 36;
-  const depletedProgressSegments = Math.round(
-    progressSegmentCount * (1 - membershipProgress),
-  );
   const isFrozen = status === 'Frozen';
   const canShowQr = status === 'Active';
   const expiryDate = formatDate(membership?.endDate);
@@ -560,7 +577,27 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
+        <View pointerEvents="none" style={styles.homeWallpaper}>
+          {homeWallpaperMarks.map((mark, index) => (
+            <Text
+              key={index}
+              style={[
+                styles.homeWallpaperMark,
+                {
+                  fontSize: mark.size,
+                  opacity: mark.opacity,
+                  top: mark.top,
+                  left: 'left' in mark ? mark.left : undefined,
+                  right: 'right' in mark ? mark.right : undefined,
+                  transform: [{ rotate: mark.rotate }],
+                },
+              ]}>
+              {mark.symbol}
+            </Text>
+          ))}
+        </View>
         <View style={styles.heroCard}>
+          <View pointerEvents="none" style={styles.heroGloss} />
           <View style={styles.heroTopRow}>
             <View style={styles.heroTextBlock}>
               <Text style={styles.kicker}>Welcome back</Text>
@@ -591,78 +628,88 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={styles.progressCard}>
-          <View style={styles.cardHeaderRow}>
-            <View>
-              <Text style={styles.cardLabel}>Membership</Text>
-              <Text style={styles.cardTitle}>Days Remaining</Text>
-            </View>
-            <View style={styles.expiryPill}>
-              <Text style={styles.expiryPillLabel}>Expires</Text>
-              <Text style={styles.expiryPillText}>{expiryDate}</Text>
-            </View>
+        <View style={styles.sectionHeading}>
+          <View style={styles.accentBar} />
+          <View style={styles.sectionHeadingText}>
+            <Text style={styles.sectionEyebrow}>Membership</Text>
+            <Text style={styles.sectionHeadingTitle}>Days Remaining</Text>
           </View>
-
-          <View style={styles.progressCenter}>
-            <View
-              style={[
-                styles.progressRing,
-                {
-                  shadowColor: countdownColor,
-                },
-              ]}>
-              {Array.from({ length: progressSegmentCount }).map((_, index) => {
-                const isActive = index >= depletedProgressSegments;
-                const angle =
-                  (index / progressSegmentCount) * Math.PI * 2 - Math.PI / 2;
-                const segmentRadius = 96;
-
-                return (
-                  <View
-                    key={index}
-                    style={[
-                      styles.progressSegment,
-                      {
-                        backgroundColor: isActive
-                          ? countdownColor
-                          : 'rgba(177, 18, 38, 0.12)',
-                        left: 107 + Math.cos(angle) * segmentRadius - 3,
-                        opacity: isActive ? 1 : 0.34,
-                        top: 107 + Math.sin(angle) * segmentRadius - 9,
-                        transform: [
-                          { rotate: `${(angle * 180) / Math.PI + 90}deg` },
-                        ],
-                      },
-                    ]}
-                  />
-                );
-              })}
-              <View style={styles.progressInner}>
-                <Text style={styles.daysNumber}>{daysRemaining}</Text>
-                <Text style={styles.daysLabel}>Days Remaining</Text>
-              </View>
-            </View>
+          <View style={styles.expiryPill}>
+            <Text style={styles.expiryPillLabel}>Expires</Text>
+            <Text style={styles.expiryPillText}>{expiryDate}</Text>
           </View>
         </View>
 
-        <View style={styles.quickActionsCard}>
-          <View style={styles.sectionHeaderRow}>
-            <View>
-              <Text style={styles.cardLabel}>Quick actions</Text>
-              <Text style={styles.sectionTitle}>Membership tools</Text>
+        <View style={styles.ringStage}>
+          <LinearGradient
+            colors={[
+              'rgba(255, 255, 255, 0.12)',
+              'rgba(255, 255, 255, 0.055)',
+              'rgba(177, 18, 38, 0.1)',
+            ]}
+            start={{ x: 0.08, y: 0 }}
+            end={{ x: 0.92, y: 1 }}
+            style={styles.daysGlassCard}>
+            <View pointerEvents="none" style={styles.daysGlassHighlight} />
+            <View style={styles.daysTopRow}>
+              <View>
+                <Text style={[styles.daysNumber, { color: countdownColor }]}>
+                  {daysRemaining}
+                </Text>
+                <Text style={styles.daysLabel}>Days Remaining</Text>
+              </View>
+              <View style={styles.daysStatusPill}>
+                <View style={[styles.statusDot, { backgroundColor: statusTone }]} />
+                <Text style={styles.daysStatusText}>{status ?? 'Pending'}</Text>
+              </View>
             </View>
-          </View>
+            <View style={styles.membershipTrack}>
+              <View
+                style={[
+                  styles.membershipTrackFill,
+                  {
+                    backgroundColor: countdownColor,
+                    width: `${Math.round(membershipProgress * 100)}%`,
+                  },
+                ]}
+              />
+            </View>
+            <View style={styles.daysMetaRow}>
+              <Text style={styles.daysMetaText}>
+                {Math.round(membershipProgress * 100)}% of plan remaining
+              </Text>
+              <Text style={styles.daysMetaText}>{expiryDate}</Text>
+            </View>
+          </LinearGradient>
+        </View>
 
-          <View style={styles.actionGrid}>
+        <View style={styles.sectionHeading}>
+          <View style={styles.accentBar} />
+          <View style={styles.sectionHeadingText}>
+            <Text style={styles.sectionEyebrow}>Quick actions</Text>
+            <Text style={styles.sectionHeadingTitle}>Membership tools</Text>
+          </View>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.actionRail}>
+          <View style={styles.actionGridInner}>
             <Pressable
               disabled={!canShowQr}
               onPress={handleShowQr}
               style={({ pressed }) => [
-                styles.actionCard,
+                styles.actionChip,
+                styles.actionChipPrimary,
                 !canShowQr && styles.actionCardDisabled,
                 pressed && styles.buttonPressed,
               ]}>
+              <View style={[styles.actionIconWrap, styles.actionIconWrapPrimary]}>
+                <Text style={styles.actionIcon}>⊞</Text>
+              </View>
               <Text style={styles.actionTitle}>Open QR</Text>
+              <Text style={styles.actionCaption}>Entry scan</Text>
             </Pressable>
 
             <Pressable
@@ -671,10 +718,14 @@ export default function HomeScreen() {
                 setMembershipModal('renew');
               }}
               style={({ pressed }) => [
-                styles.actionCard,
+                styles.actionChip,
                 pressed && styles.buttonPressed,
               ]}>
-              <Text style={styles.actionTitle}>Renew/Extend</Text>
+              <View style={styles.actionIconWrap}>
+                <Text style={styles.actionIcon}>↻</Text>
+              </View>
+              <Text style={styles.actionTitle}>Renew</Text>
+              <Text style={styles.actionCaption}>Add months</Text>
             </Pressable>
 
             <Pressable
@@ -689,80 +740,132 @@ export default function HomeScreen() {
                 setMembershipModal('freeze');
               }}
               style={({ pressed }) => [
-                styles.actionCard,
+                styles.actionChip,
                 pressed && styles.buttonPressed,
               ]}>
+              <View style={styles.actionIconWrap}>
+                <Text style={styles.actionIcon}>❄</Text>
+              </View>
               <Text style={styles.actionTitle}>Freeze</Text>
+              <Text style={styles.actionCaption}>Pause plan</Text>
             </Pressable>
           </View>
+        </ScrollView>
 
-          {isFrozen && (
-            <Pressable
-              onPress={handleUnfreeze}
-              style={({ pressed }) => [
-                styles.unfreezeButton,
-                pressed && styles.buttonPressed,
-              ]}>
-              <Text style={styles.unfreezeButtonText}>Unfreeze Membership</Text>
-            </Pressable>
-          )}
+        {isFrozen && (
+          <Pressable
+            onPress={handleUnfreeze}
+            style={({ pressed }) => [
+              styles.unfreezeButton,
+              pressed && styles.buttonPressed,
+            ]}>
+            <Text style={styles.unfreezeButtonText}>Unfreeze Membership</Text>
+          </Pressable>
+        )}
+
+        <View style={styles.featureRow}>
+          <Pressable
+            onPress={() => router.push('/machine-guide')}
+            style={({ pressed }) => [
+              styles.featureCard,
+              pressed && styles.featurePressed,
+            ]}>
+            <LinearGradient
+              pointerEvents="none"
+              colors={['#7E0F1E', '#3A0B14', '#160609']}
+              start={{ x: 0.1, y: 0 }}
+              end={{ x: 0.9, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <View pointerEvents="none" style={styles.featureSlashOne} />
+            <View pointerEvents="none" style={styles.featureSlashTwo} />
+            <View style={styles.featureTopRow}>
+              <View style={styles.featureIconBadge}>
+                <Text style={styles.featureBadgeText}>MG</Text>
+                <Image
+                  source={require('@/assets/images/marvel-logo-startup-sign-x.png')}
+                  style={styles.featureSignLarge}
+                  resizeMode="contain"
+                />
+                <Image
+                  source={require('@/assets/images/marvel-logo-startup-sign-slash.png')}
+                  style={styles.featureSignSmall}
+                  resizeMode="contain"
+                />
+                <Text style={styles.featureIconGlyph}>⛭</Text>
+              </View>
+              <View style={styles.featureArrow}>
+                <Image
+                  source={require('@/assets/images/marvel-logo-startup-sign-divide.png')}
+                  style={styles.featureArrowSign}
+                  resizeMode="contain"
+                />
+                <Text style={styles.featureArrowText}>→</Text>
+              </View>
+            </View>
+            <Text style={styles.featureKicker}>Machine Guide</Text>
+            <Text style={styles.featureTitle}>Find the right equipment</Text>
+            <Text style={styles.featureBody}>
+              Pick a muscle group and get setup cues.
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push('/how-to-use' as Href)}
+            style={({ pressed }) => [
+              styles.featureCard,
+              pressed && styles.featurePressed,
+            ]}>
+            <LinearGradient
+              pointerEvents="none"
+              colors={['#1C1F29', '#14161D', '#0C0D12']}
+              start={{ x: 0.1, y: 0 }}
+              end={{ x: 0.9, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <View pointerEvents="none" style={styles.featureSlashOneMuted} />
+            <View pointerEvents="none" style={styles.featureSlashTwoMuted} />
+            <View style={styles.featureTopRow}>
+              <View style={[styles.featureIconBadge, styles.featureIconBadgeAi]}>
+                <Text style={styles.featureBadgeText}>?</Text>
+                <Image
+                  source={require('@/assets/images/marvel-logo-startup-sign-dot.png')}
+                  style={styles.featureDotSign}
+                  resizeMode="contain"
+                />
+                <Image
+                  source={require('@/assets/images/marvel-logo-startup-sign-divide.png')}
+                  style={styles.featureSignSmall}
+                  resizeMode="contain"
+                />
+                <Text style={styles.featureIconGlyph}>✦</Text>
+              </View>
+              <View style={styles.featureArrow}>
+                <Text style={styles.featureArrowText}>→</Text>
+              </View>
+            </View>
+            <Text style={[styles.featureKicker, styles.featureKickerAi]}>
+              AI Gym Help
+            </Text>
+            <Text style={styles.featureTitle}>How to use the app</Text>
+            <Text style={styles.featureBody}>
+              Instructions, AI assistant, and contact.
+            </Text>
+          </Pressable>
         </View>
 
-        <Pressable
-          onPress={() => router.push('/machine-guide')}
-          style={({ pressed }) => [
-            styles.machineGuideCard,
-            pressed && styles.buttonPressed,
-          ]}>
-          <View style={styles.featureImagePlaceholder}>
-            <View style={styles.featureImageGlow} />
-            <View style={styles.featureImageFrame}>
-              <Text style={styles.featureImageText}>MG</Text>
-            </View>
+        <View style={styles.sectionHeading}>
+          <View style={styles.accentBar} />
+          <View style={styles.sectionHeadingText}>
+            <Text style={styles.sectionEyebrow}>Gym Activity</Text>
+            <Text style={styles.sectionHeadingTitle}>Crowd level</Text>
           </View>
-          <View style={styles.machineGuideCopy}>
-            <Text style={styles.cardLabel}>Machine Guide</Text>
-            <Text style={styles.machineGuideTitle}>Find the right equipment</Text>
-            <Text style={styles.machineGuideBody}>
-              Choose a muscle group and open setup cues for each machine.
-            </Text>
-          </View>
-          <Text style={styles.machineGuideAction}>Open</Text>
-        </Pressable>
+          <Text style={styles.sectionHint}>
+            {selectedActivityDay?.scheduleLabel ?? 'Today'}
+          </Text>
+        </View>
 
-        <Pressable
-          onPress={() => router.push('/how-to-use' as Href)}
-          style={({ pressed }) => [
-            styles.machineGuideCard,
-            pressed && styles.buttonPressed,
-          ]}>
-          <View style={styles.featureImagePlaceholder}>
-            <View style={styles.featureImageGlow} />
-            <View style={styles.featureImageFrame}>
-              <Text style={styles.featureImageText}>AI</Text>
-            </View>
-          </View>
-          <View style={styles.machineGuideCopy}>
-            <Text style={styles.cardLabel}>AI Gym Help</Text>
-            <Text style={styles.machineGuideTitle}>How to use the app</Text>
-            <Text style={styles.machineGuideBody}>
-              Open for instructions, support from AI assistant, or contact us for help.
-            </Text>
-          </View>
-          <Text style={styles.machineGuideAction}>Open</Text>
-        </Pressable>
-
-        <View style={styles.activityCard}>
-          <View style={styles.sectionHeaderRow}>
-            <View>
-              <Text style={styles.cardLabel}>Gym Activity</Text>
-              <Text style={styles.sectionTitle}>Crowd level</Text>
-            </View>
-            <Text style={styles.sectionHint}>
-              {selectedActivityDay?.scheduleLabel ?? 'Today'}
-            </Text>
-          </View>
-
+        <View style={styles.activityPanel}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -816,9 +919,11 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.voucherSection}>
-          <View style={styles.sectionHeaderRow}>
-            <View>
-              <Text style={styles.sectionTitle}>Vouchers</Text>
+          <View style={styles.sectionHeading}>
+            <View style={styles.accentBar} />
+            <View style={styles.sectionHeadingText}>
+              <Text style={styles.sectionEyebrow}>Rewards</Text>
+              <Text style={styles.sectionHeadingTitle}>Vouchers</Text>
             </View>
             <Text style={styles.sectionHint}>{vouchers.length} total</Text>
           </View>
@@ -871,7 +976,11 @@ export default function HomeScreen() {
               No {selectedVoucherStatus.toLowerCase()} vouchers.
             </Text>
           ) : (
-            visibleVouchers.map((voucher) => {
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.voucherRail}>
+              {visibleVouchers.map((voucher) => {
               const canCancelVoucher =
                 voucher.status === 'Pending' &&
                 (voucher.type === 'Membership Freeze' ||
@@ -913,23 +1022,26 @@ export default function HomeScreen() {
                   </View>
                 </View>
               );
-            })
+            })}
+            </ScrollView>
           )}
         </View>
 
-        <View style={styles.updatesHeader}>
-          <Text style={styles.sectionTitle}>Updates</Text>
+        <View style={styles.sectionHeading}>
+          <View style={styles.accentBar} />
+          <View style={styles.sectionHeadingText}>
+            <Text style={styles.sectionEyebrow}>Latest</Text>
+            <Text style={styles.sectionHeadingTitle}>Updates</Text>
+          </View>
         </View>
-        <View style={styles.infoGrid}>
-          <View style={styles.infoCard}>
-            <Text style={styles.cardLabel}>Latest update</Text>
+        <View style={styles.infoCard}>
+          <Text style={styles.cardLabel}>Latest update</Text>
             <Text style={styles.infoTitle}>
               {notification?.title ?? 'No notifications yet'}
             </Text>
             <Text style={styles.infoBody}>
               {feedback || notification?.message || 'Important membership updates will appear here.'}
             </Text>
-          </View>
         </View>
       </ScrollView>
 
@@ -1196,9 +1308,27 @@ const styles = StyleSheet.create({
     backgroundColor,
   },
   content: {
+    position: 'relative',
     paddingHorizontal: 20,
     paddingTop: 72,
     paddingBottom: 132,
+  },
+  homeWallpaper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1860,
+    overflow: 'hidden',
+  },
+  homeWallpaperMark: {
+    position: 'absolute',
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontStyle: 'italic',
+    textShadowColor: 'rgba(225, 29, 46, 0.12)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 16,
   },
   loadingState: {
     flex: 1,
@@ -1216,11 +1346,40 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderRadius: 24,
-    backgroundColor: 'rgba(18, 20, 28, 0.72)',
-    padding: 20,
-    marginBottom: 16,
-    ...premiumShadow,
+    borderRadius: 28,
+    backgroundColor: 'rgba(15, 17, 23, 0.74)',
+    padding: 18,
+    marginBottom: 22,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.22,
+    shadowRadius: 28,
+    elevation: 8,
+  },
+  heroGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 18,
+    right: 18,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+  },
+  heroBackgroundSign: {
+    position: 'absolute',
+    right: 8,
+    top: -10,
+    width: 78,
+    height: 78,
+    opacity: 0.12,
+  },
+  heroSheen: {
+    position: 'absolute',
+    top: -70,
+    right: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 120,
+    backgroundColor: 'rgba(255, 120, 130, 0.22)',
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -1232,10 +1391,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   kicker: {
-    color: premiumColors.redBright,
+    color: 'rgba(255, 255, 255, 0.78)',
     fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 0,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   title: {
@@ -1244,23 +1403,26 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0,
     marginTop: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   subtitle: {
-    color: mutedColor,
+    color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 15,
     fontWeight: '800',
     lineHeight: 20,
     marginTop: 6,
   },
   avatarBadge: {
-    width: 56,
-    height: 56,
+    width: 54,
+    height: 54,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-    borderRadius: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    borderWidth: 0,
+    borderColor: 'transparent',
+    borderRadius: 27,
+    backgroundColor: 'transparent',
     overflow: 'hidden',
   },
   avatarImage: {
@@ -1278,10 +1440,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-    marginTop: 18,
-    paddingTop: 14,
+    borderTopWidth: 0,
+    marginTop: 12,
+    paddingTop: 0,
   },
   statusBadgeOnRed: {
     minHeight: 34,
@@ -1306,7 +1467,7 @@ const styles = StyleSheet.create({
   },
   heroExpiryText: {
     flex: 1,
-    color: mutedColor,
+    color: 'rgba(255, 255, 255, 0.82)',
     fontSize: 12,
     fontWeight: '800',
     textAlign: 'right',
@@ -1361,53 +1522,93 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginTop: 2,
   },
-  progressCenter: {
-    alignItems: 'center',
+  ringStage: {
+    alignItems: 'stretch',
     justifyContent: 'center',
-    marginVertical: 2,
+    marginTop: 4,
+    marginBottom: 24,
   },
-  progressRing: {
-    width: 214,
-    height: 214,
-    alignItems: 'center',
-    justifyContent: 'center',
+  daysGlassCard: {
     position: 'relative',
-    overflow: 'visible',
-    borderWidth: 0,
-    borderRadius: 107,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.24,
-    shadowRadius: 26,
-    elevation: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 26,
+    width: '100%',
+    padding: 20,
+    shadowColor: '#E11D2E',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.12,
+    shadowRadius: 28,
+    elevation: 6,
   },
-  progressSegment: {
+  daysGlassHighlight: {
     position: 'absolute',
-    width: 6,
-    height: 18,
-    borderRadius: 999,
+    top: 0,
+    left: 20,
+    right: 20,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.24)',
   },
-  progressInner: {
-    width: 164,
-    height: 164,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 82,
-    backgroundColor: premiumColors.background,
+  daysTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 16,
   },
   daysNumber: {
     color: textColor,
-    fontSize: 68,
+    fontSize: 72,
     fontWeight: '900',
     letterSpacing: 0,
     lineHeight: 76,
   },
   daysLabel: {
-    color: mutedColor,
+    color: 'rgba(255, 255, 255, 0.72)',
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0,
     textTransform: 'uppercase',
+  },
+  daysStatusPill: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    paddingHorizontal: 12,
+  },
+  daysStatusText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  membershipTrack: {
+    height: 7,
+    overflow: 'hidden',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.11)',
+    marginTop: 18,
+  },
+  membershipTrackFill: {
+    height: '100%',
+    borderRadius: 999,
+  },
+  daysMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 10,
+  },
+  daysMetaText: {
+    color: 'rgba(255, 255, 255, 0.62)',
+    flexShrink: 1,
+    fontSize: 11,
+    fontWeight: '800',
   },
   quickActionsCard: {
     borderWidth: 1,
@@ -1437,36 +1638,97 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'right',
   },
-  actionGrid: {
+  sectionHeading: {
     flexDirection: 'row',
-    gap: 7,
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
   },
-  actionCard: {
-    minHeight: 50,
+  accentBar: {
+    width: 4,
+    height: 36,
+    borderRadius: 3,
+    backgroundColor: premiumColors.redBright,
+  },
+  sectionHeadingText: {
     flex: 1,
+  },
+  sectionEyebrow: {
+    color: premiumColors.redBright,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  sectionHeadingTitle: {
+    color: textColor,
+    fontSize: 21,
+    fontWeight: '900',
+  },
+  activityPanel: {
+    overflow: 'hidden',
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    padding: 14,
+    marginBottom: 22,
+  },
+  voucherRail: {
+    gap: 12,
+    paddingRight: 4,
+  },
+  actionRail: {
+    paddingRight: 4,
+    marginBottom: 22,
+  },
+  actionGridInner: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionChip: {
+    width: 150,
+    alignItems: 'flex-start',
+    borderWidth: 1,
+    borderColor: premiumColors.glassBorder,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    paddingHorizontal: 14,
+    paddingVertical: 15,
+  },
+  actionChipPrimary: {
+    borderColor: 'rgba(225, 29, 46, 0.5)',
+    backgroundColor: 'rgba(177, 18, 38, 0.16)',
+  },
+  actionIconWrap: {
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.18)',
-    borderRadius: 15,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 12,
+  },
+  actionIconWrapPrimary: {
     backgroundColor: accentColor,
-    paddingHorizontal: 8,
-    paddingVertical: 9,
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-    elevation: 3,
+  },
+  actionIcon: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
   },
   actionCardDisabled: {
     opacity: 0.48,
   },
   actionTitle: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '900',
-    lineHeight: 17,
-    textAlign: 'center',
+  },
+  actionCaption: {
+    color: mutedColor,
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 2,
   },
   unfreezeButton: {
     minHeight: 46,
@@ -1488,81 +1750,149 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
   },
-  machineGuideCard: {
+  featureRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 24,
-    backgroundColor: surfaceColor,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
+    gap: 12,
     marginBottom: 16,
-    ...premiumShadow,
   },
-  featureImagePlaceholder: {
-    width: 58,
-    height: 58,
-    alignItems: 'center',
-    justifyContent: 'center',
+  featureCard: {
+    flex: 1,
+    minHeight: 178,
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: premiumColors.borderStrong,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    marginRight: 14,
+    borderColor: premiumColors.glassBorder,
+    borderRadius: 24,
+    padding: 16,
+    ...premiumShadow,
   },
-  featureImageGlow: {
+  featurePressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.985 }],
+  },
+  featureSlashOne: {
     position: 'absolute',
-    right: -18,
-    top: -18,
+    right: 22,
+    top: -26,
+    width: 22,
+    height: 154,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    transform: [{ rotate: '20deg' }],
+  },
+  featureSlashTwo: {
+    position: 'absolute',
+    right: 58,
+    top: 22,
+    width: 10,
+    height: 112,
+    backgroundColor: 'rgba(225, 29, 46, 0.22)',
+    transform: [{ rotate: '20deg' }],
+  },
+  featureSlashOneMuted: {
+    position: 'absolute',
+    right: 24,
+    top: -20,
+    width: 18,
+    height: 150,
+    backgroundColor: 'rgba(225, 29, 46, 0.18)',
+    transform: [{ rotate: '20deg' }],
+  },
+  featureSlashTwoMuted: {
+    position: 'absolute',
+    right: 62,
+    top: 34,
+    width: 9,
+    height: 104,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    transform: [{ rotate: '20deg' }],
+  },
+  featureTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  featureIconBadge: {
     width: 46,
     height: 46,
-    borderRadius: 23,
-    backgroundColor: 'rgba(225, 29, 46, 0.24)',
-  },
-  featureImageFrame: {
-    width: 38,
-    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    borderRadius: 13,
-    backgroundColor: 'rgba(7, 8, 12, 0.82)',
+    borderColor: 'rgba(255, 255, 255, 0.28)',
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
   },
-  featureImageText: {
-    color: wineColor,
-    fontSize: 15,
-    fontWeight: '900',
+  featureIconBadgeAi: {
+    borderColor: 'rgba(225, 29, 46, 0.5)',
+    backgroundColor: 'rgba(225, 29, 46, 0.18)',
   },
-  machineGuideCopy: {
-    flex: 1,
-    paddingRight: 14,
+  featureIconGlyph: {
+    position: 'absolute',
+    opacity: 0,
   },
-  machineGuideTitle: {
-    color: textColor,
-    fontSize: 18,
-    fontWeight: '900',
+  featureArrow: {
+    display: 'none',
+    width: 0,
+    height: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
   },
-  machineGuideBody: {
-    color: mutedColor,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 19,
-    marginTop: 5,
+  featureArrowText: {
+    position: 'absolute',
+    opacity: 0,
   },
-  machineGuideAction: {
-    overflow: 'hidden',
-    borderRadius: 999,
-    backgroundColor: accentColor,
+  featureSignLarge: {
+    width: 24,
+    height: 24,
+    marginRight: -2,
+    display: 'none',
+  },
+  featureSignSmall: {
+    width: 18,
+    height: 22,
+    marginLeft: -2,
+    display: 'none',
+  },
+  featureDotSign: {
+    width: 12,
+    height: 12,
+    marginRight: 2,
+    display: 'none',
+  },
+  featureArrowSign: {
+    width: 19,
+    height: 19,
+  },
+  featureBadgeText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: '900',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+  },
+  featureKicker: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  featureKickerAi: {
+    color: '#FF8088',
+  },
+  featureTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 21,
+    marginTop: 6,
+  },
+  featureBody: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+    marginTop: 6,
   },
   activityCard: {
     position: 'relative',
@@ -1706,18 +2036,18 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   voucherCard: {
-    minHeight: 104,
+    width: 290,
+    minHeight: 120,
     flexDirection: 'row',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 24,
+    borderColor: premiumColors.glassBorder,
+    borderRadius: 22,
     backgroundColor: surfaceColor,
-    marginBottom: 10,
     ...premiumShadow,
   },
   voucherTear: {
-    width: 10,
+    width: 8,
     backgroundColor: accentColor,
   },
   voucherContent: {

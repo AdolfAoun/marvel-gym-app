@@ -1,14 +1,20 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { premiumColors } from '@/constants/premiumTheme';
+import { premiumColors, premiumGradients } from '@/constants/premiumTheme';
 
 type PremiumScreenBackgroundProps = {
   children: ReactNode;
   bottomInset?: boolean;
 };
 
+/**
+ * App-wide premium backdrop: a layered charcoal gradient with a soft top light
+ * and a single subtle red horizon glow. Deliberately calm so screen content
+ * sits on top with depth instead of competing with decorative shapes.
+ */
 export function PremiumScreenBackground({
   children,
   bottomInset = true,
@@ -17,11 +23,30 @@ export function PremiumScreenBackground({
     <SafeAreaView
       edges={bottomInset ? ['left', 'right', 'bottom'] : ['left', 'right']}
       style={styles.safeArea}>
-      <View pointerEvents="none" style={styles.redGlowTop} />
-      <View pointerEvents="none" style={styles.redGlowBottom} />
-      <View pointerEvents="none" style={styles.grid} />
-      <View pointerEvents="none" style={styles.diagonalOne} />
-      <View pointerEvents="none" style={styles.diagonalTwo} />
+      {/* Base charcoal depth */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={premiumGradients.screen}
+        locations={[0, 0.5, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      {/* Soft cool light reflecting from the top-left */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(255, 255, 255, 0.05)', 'transparent']}
+        start={{ x: 0.1, y: 0 }}
+        end={{ x: 0.7, y: 0.42 }}
+        style={styles.topLight}
+      />
+      {/* Quiet red horizon glow rising from the bottom — accent, not a spotlight */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={['transparent', 'rgba(177, 18, 38, 0.14)']}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={styles.redHorizon}
+      />
+      <View pointerEvents="none" style={styles.vignette} />
       {children}
     </SafeAreaView>
   );
@@ -33,52 +58,24 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: premiumColors.background,
   },
-  redGlowTop: {
+  topLight: {
     position: 'absolute',
-    right: -120,
-    top: -86,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: 'rgba(177, 18, 38, 0.22)',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 420,
   },
-  redGlowBottom: {
-    position: 'absolute',
-    left: -150,
-    bottom: 40,
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    backgroundColor: 'rgba(177, 18, 38, 0.12)',
-  },
-  grid: {
+  redHorizon: {
     position: 'absolute',
     left: 0,
     right: 0,
-    top: 0,
-    height: 320,
-    borderBottomWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.035)',
-    backgroundColor: 'rgba(255, 255, 255, 0.018)',
+    bottom: 0,
+    height: 360,
   },
-  diagonalOne: {
-    position: 'absolute',
-    right: 40,
-    top: 72,
-    width: 2,
-    height: 260,
+  vignette: {
+    ...StyleSheet.absoluteFillObject,
     borderRadius: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    transform: [{ rotate: '28deg' }],
-  },
-  diagonalTwo: {
-    position: 'absolute',
-    left: 34,
-    top: 190,
-    width: 1,
-    height: 260,
-    borderRadius: 1,
-    backgroundColor: 'rgba(177, 18, 38, 0.22)',
-    transform: [{ rotate: '28deg' }],
+    borderColor: 'rgba(0, 0, 0, 0.28)',
+    borderWidth: 0,
   },
 });

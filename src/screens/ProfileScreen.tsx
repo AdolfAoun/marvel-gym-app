@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
@@ -15,7 +16,12 @@ import {
 } from 'react-native';
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
-import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
+import { MarvelMarks } from '@/components/PremiumUI';
+import {
+  premiumColors,
+  premiumGradients,
+  premiumShadow,
+} from '@/constants/premiumTheme';
 import {
   authService,
   avatarService,
@@ -333,7 +339,13 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
-        <View style={styles.profileTop}>
+        <LinearGradient
+          colors={premiumGradients.redPanel}
+          start={{ x: 0.1, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          style={styles.profileTop}>
+          <View pointerEvents="none" style={styles.profileGloss} />
+          <MarvelMarks variant="corner" color="#FFFFFF" />
           <Pressable
             onPress={() => setIsPhotoSheetVisible(true)}
             style={({ pressed }) => [styles.avatar, pressed && styles.buttonPressed]}>
@@ -361,7 +373,7 @@ export default function ProfileScreen() {
             {member.firstName} {member.lastName}
           </Text>
           <Text style={styles.phoneText}>{member.phone || 'Member profile'}</Text>
-        </View>
+        </LinearGradient>
 
         <View style={styles.actionRow}>
           <Pressable
@@ -669,16 +681,38 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   profileTop: {
+    position: 'relative',
+    overflow: 'hidden',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderRadius: 26,
-    backgroundColor: 'rgba(18, 20, 28, 0.72)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderRadius: 28,
     marginBottom: 10,
     paddingHorizontal: 20,
-    paddingTop: 22,
-    paddingBottom: 20,
-    ...premiumShadow,
+    paddingTop: 24,
+    paddingBottom: 22,
+    shadowColor: premiumColors.red,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.4,
+    shadowRadius: 26,
+    elevation: 10,
+  },
+  profileGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '46%',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  profileSheen: {
+    position: 'absolute',
+    top: -80,
+    right: -60,
+    width: 220,
+    height: 220,
+    borderRadius: 130,
+    backgroundColor: 'rgba(255, 120, 130, 0.2)',
   },
   avatar: {
     width: 108,
@@ -686,17 +720,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.55)',
     borderRadius: 54,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(0, 0, 0, 0.22)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 6,
   },
   avatarImage: {
     width: '100%',
     height: '100%',
   },
   avatarText: {
-    color: accentColor,
+    color: '#FFFFFF',
     fontSize: 34,
     fontWeight: '900',
   },
@@ -705,25 +744,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.055)',
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
     marginTop: 12,
     paddingHorizontal: 14,
   },
   photoButtonText: {
-    color: accentColor,
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '900',
   },
   nameText: {
-    color: premiumColors.text,
+    color: '#FFFFFF',
     fontSize: 26,
     fontWeight: '900',
     marginTop: 14,
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   phoneText: {
-    color: premiumColors.textMuted,
+    color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 14,
     fontWeight: '800',
     marginTop: 5,

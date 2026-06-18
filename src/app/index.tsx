@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
@@ -52,11 +53,41 @@ export default function IndexRoute() {
         style={styles.backgroundImage}
         resizeMode="cover"
       />
-      <View pointerEvents="none" style={styles.backgroundVeil} />
-      <View pointerEvents="none" style={styles.redGlowOne} />
-      <View pointerEvents="none" style={styles.redGlowTwo} />
-      <View pointerEvents="none" style={styles.darkBladeOne} />
-      <View pointerEvents="none" style={styles.darkBladeTwo} />
+      <LinearGradient
+        pointerEvents="none"
+        colors={[
+          'rgba(3, 3, 5, 0.22)',
+          'rgba(3, 3, 5, 0.38)',
+          'rgba(3, 3, 5, 0.82)',
+        ]}
+        locations={[0, 0.48, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(225, 29, 46, 0)', 'rgba(225, 29, 46, 0.18)', 'rgba(225, 29, 46, 0)']}
+        locations={[0, 0.5, 1]}
+        start={{ x: 0.05, y: 0.1 }}
+        end={{ x: 0.95, y: 0.9 }}
+        style={styles.redAtmosphere}
+      />
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(255, 255, 255, 0.055)', 'rgba(255, 255, 255, 0)']}
+        start={{ x: 0.18, y: 0 }}
+        end={{ x: 0.74, y: 0.48 }}
+        style={styles.topSheen}
+      />
+      <Image
+        source={require('@/assets/images/marvel-logo-startup-sign-slash.png')}
+        style={styles.signSlashAccent}
+        resizeMode="contain"
+      />
+      <Image
+        source={require('@/assets/images/marvel-logo-startup-sign-dot.png')}
+        style={styles.signDotAccent}
+        resizeMode="contain"
+      />
 
       <View style={styles.logoBlock}>
         <View style={styles.signRow}>
@@ -123,55 +154,39 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     height: '100%',
-    opacity: 0.62,
+    opacity: 0.82,
+    transform: [{ scale: 1.03 }],
   },
-  backgroundVeil: {
+  redAtmosphere: {
+    position: 'absolute',
+    left: -90,
+    right: -90,
+    bottom: 60,
+    height: 360,
+  },
+  topSheen: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(4, 4, 6, 0.26)',
-  },
-  redGlowOne: {
-    position: 'absolute',
-    top: -110,
-    right: -120,
-    width: 340,
-    height: 340,
-    borderRadius: 170,
-    backgroundColor: '#B11226',
-    opacity: 0.16,
-  },
-  redGlowTwo: {
-    position: 'absolute',
-    left: -150,
-    bottom: -130,
-    width: 380,
     height: 380,
-    borderRadius: 190,
-    backgroundColor: '#7F0A19',
-    opacity: 0.14,
   },
-  darkBladeOne: {
+  signSlashAccent: {
     position: 'absolute',
-    top: 40,
-    right: -72,
-    width: 118,
-    height: 540,
-    borderRadius: 34,
-    backgroundColor: 'rgba(255, 255, 255, 0.012)',
-    transform: [{ rotate: '24deg' }],
+    right: 42,
+    top: 110,
+    width: 42,
+    height: 76,
+    opacity: 0.12,
+    transform: [{ rotate: '19deg' }],
   },
-  darkBladeTwo: {
+  signDotAccent: {
     position: 'absolute',
-    left: -90,
-    bottom: 40,
-    width: 94,
-    height: 440,
-    borderRadius: 32,
-    backgroundColor: 'rgba(177, 18, 38, 0.045)',
-    transform: [{ rotate: '24deg' }],
+    right: 86,
+    top: 178,
+    width: 18,
+    height: 18,
+    opacity: 0.16,
   },
   logoBlock: {
     alignItems: 'center',
@@ -182,8 +197,8 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     shadowColor: '#B11226',
     shadowOffset: { width: 0, height: 22 },
-    shadowOpacity: 0.34,
-    shadowRadius: 26,
+    shadowOpacity: 0.22,
+    shadowRadius: 30,
     elevation: 6,
   },
   signRow: {
@@ -215,7 +230,7 @@ const styles = StyleSheet.create({
     height: 34,
   },
   startupLogo: {
-    width: 236,
-    height: 74,
+    width: 248,
+    height: 78,
   },
 });

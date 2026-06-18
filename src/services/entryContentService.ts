@@ -9,12 +9,12 @@ export type EntrySlide = {
 let entrySlides: EntrySlide[] = [
   {
     id: 'entry-photo-1',
-    image: require('../../assets/images/MarvelPhoto1.jpeg'),
+    image: require('../../assets/images/MarvelPhoto1.jpg'),
     label: 'Welcome Photo 1',
   },
   {
     id: 'entry-photo-2',
-    image: require('../../assets/images/MarvelPhoto2.png'),
+    image: require('../../assets/images/MarvelPhoto2.jpeg'),
     label: 'Welcome Photo 2',
   },
 ];

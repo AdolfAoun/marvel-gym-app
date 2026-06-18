@@ -12,8 +12,14 @@ import {
   View,
 } from 'react-native';
 
+import { LinearGradient } from 'expo-linear-gradient';
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
-import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
+import { MarvelMarks } from '@/components/PremiumUI';
+import {
+  premiumColors,
+  premiumGradients,
+  premiumShadow,
+} from '@/constants/premiumTheme';
 import { classService } from '@/services';
 import type { GymClass } from '@/types';
 
@@ -128,7 +134,13 @@ export default function ClassesScreen() {
     <PremiumScreenBackground>
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.heroCard}>
+        <LinearGradient
+          colors={premiumGradients.redPanel}
+          start={{ x: 0.1, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          style={styles.heroCard}>
+          <View pointerEvents="none" style={styles.heroGloss} />
+          <MarvelMarks variant="corner" color="#FFFFFF" />
           <Text style={styles.kicker}>Classes</Text>
           <Text style={styles.heroTitle}>Reserve your next session.</Text>
           <Text style={styles.heroBody}>
@@ -144,7 +156,7 @@ export default function ClassesScreen() {
               <Text style={styles.heroStatLabel}>reserved</Text>
             </View>
           </View>
-        </View>
+        </LinearGradient>
 
         <ScrollView
           horizontal
@@ -183,19 +195,19 @@ export default function ClassesScreen() {
           })}
         </ScrollView>
 
-        <View style={styles.scheduleCard}>
-          <View style={styles.sectionHeaderRow}>
-            <View>
-              <Text style={styles.cardLabel}>{selectedCategory}</Text>
-              <Text style={styles.sectionTitle}>{selectedDay} schedule</Text>
-            </View>
-            <Text style={styles.sectionHint}>{selectedClasses.length} classes</Text>
+        <View style={styles.sectionHeading}>
+          <View style={styles.accentBar} />
+          <View style={styles.sectionHeadingText}>
+            <Text style={styles.sectionEyebrow}>{selectedCategory}</Text>
+            <Text style={styles.sectionHeadingTitle}>{selectedDay} schedule</Text>
           </View>
+          <Text style={styles.sectionHint}>{selectedClasses.length} classes</Text>
+        </View>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.dayTabs}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.dayTabs}>
             {days.map((day) => {
               const isSelected = selectedDay === day;
               const count = classes.filter(
@@ -313,7 +325,6 @@ export default function ClassesScreen() {
               })
             )}
           </View>
-        </View>
       </ScrollView>
 
       <Modal transparent visible={Boolean(pendingClassAction)} animationType="fade">
@@ -399,28 +410,52 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: 26,
-    backgroundColor: 'rgba(18, 20, 28, 0.72)',
-    padding: 20,
+    padding: 22,
     marginBottom: 18,
-    ...premiumShadow,
+    shadowColor: premiumColors.red,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.4,
+    shadowRadius: 26,
+    elevation: 10,
+  },
+  heroGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  heroSheen: {
+    position: 'absolute',
+    top: -70,
+    right: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 120,
+    backgroundColor: 'rgba(255, 120, 130, 0.2)',
   },
   kicker: {
-    color: premiumColors.redBright,
+    color: 'rgba(255, 255, 255, 0.78)',
     fontSize: 12,
     fontWeight: '900',
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   heroTitle: {
-    color: premiumColors.text,
+    color: '#FFFFFF',
     fontSize: 30,
     fontWeight: '900',
     lineHeight: 36,
     marginTop: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   heroBody: {
-    color: premiumColors.textMuted,
+    color: 'rgba(255, 255, 255, 0.86)',
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 21,
@@ -434,18 +469,18 @@ const styles = StyleSheet.create({
   heroStatPill: {
     flex: 1,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.13)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.055)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     padding: 14,
   },
   heroStatValue: {
-    color: premiumColors.text,
+    color: '#FFFFFF',
     fontSize: 22,
     fontWeight: '900',
   },
   heroStatLabel: {
-    color: premiumColors.textMuted,
+    color: 'rgba(255, 255, 255, 0.82)',
     fontSize: 11,
     fontWeight: '900',
     marginTop: 2,
@@ -486,13 +521,33 @@ const styles = StyleSheet.create({
   categoryCountSelected: {
     color: premiumColors.redBright,
   },
-  scheduleCard: {
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 28,
-    backgroundColor: premiumColors.surface,
-    padding: 16,
-    ...premiumShadow,
+  sectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  accentBar: {
+    width: 4,
+    height: 36,
+    borderRadius: 3,
+    backgroundColor: premiumColors.redBright,
+  },
+  sectionHeadingText: {
+    flex: 1,
+  },
+  sectionEyebrow: {
+    color: premiumColors.redBright,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  sectionHeadingTitle: {
+    color: premiumColors.text,
+    fontSize: 21,
+    fontWeight: '900',
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -580,10 +635,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 15,
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
+    borderColor: premiumColors.glassBorder,
     borderRadius: 24,
-    backgroundColor: premiumColors.surfaceSoft,
-    padding: 13,
+    backgroundColor: premiumColors.surface,
+    padding: 14,
+    ...premiumShadow,
   },
   instructorImage: {
     width: 76,
@@ -591,10 +647,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: premiumColors.borderStrong,
-    borderRadius: 38,
+    borderWidth: 2,
+    borderColor: 'rgba(225, 29, 46, 0.55)',
+    borderRadius: 22,
     backgroundColor: premiumColors.surfaceSoft,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    elevation: 5,
   },
   instructorPhoto: {
     width: '100%',
@@ -671,12 +732,19 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   reserveButton: {
-    minHeight: 42,
+    minHeight: 46,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 16,
     backgroundColor: premiumColors.red,
     marginTop: 14,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    elevation: 5,
   },
   cancelButton: {
     borderWidth: 1,

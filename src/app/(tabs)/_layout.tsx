@@ -1,8 +1,10 @@
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Tabs, useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import type { SFSymbol } from 'expo-symbols';
 import { useCallback, useEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { premiumColors } from '@/constants/premiumTheme';
 import { avatarService, memberService } from '@/services';
@@ -13,21 +15,40 @@ const inactiveColor = premiumColors.textMuted;
 
 function TabIcon({
   fallback,
+  focused,
   name,
   color,
 }: {
   fallback: string;
+  focused?: boolean;
   name: SFSymbol;
   color: string;
 }) {
+  const isFocused = focused ?? (color === accentColor || color === '#FFFFFF');
+
   return (
-    <SymbolView
-      name={name}
-      size={22}
-      tintColor={color}
-      weight="bold"
-      fallback={<Text style={[styles.tabFallbackIcon, { color }]}>{fallback}</Text>}
-    />
+    <View style={[styles.tabIconBubble, isFocused && styles.tabIconBubbleActive]}>
+      {isFocused ? (
+        <LinearGradient
+          pointerEvents="none"
+          colors={[
+            'rgba(255, 255, 255, 0.28)',
+            'rgba(255, 255, 255, 0.12)',
+            'rgba(255, 255, 255, 0.05)',
+          ]}
+          locations={[0, 0.42, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
+      {isFocused ? <View pointerEvents="none" style={styles.tabIconReflection} /> : null}
+      <SymbolView
+        name={name}
+        size={23}
+        tintColor={color}
+        weight="bold"
+        fallback={<Text style={[styles.tabFallbackIcon, { color }]}>{fallback}</Text>}
+      />
+    </View>
   );
 }
 
@@ -75,11 +96,37 @@ function ProfileHeaderButton() {
   );
 }
 
+function TabBarBackground() {
+  return (
+    <View style={styles.tabBarBackground}>
+      <BlurView
+        intensity={82}
+        tint="dark"
+        experimentalBlurMethod="dimezisBlurView"
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        colors={[
+          'rgba(255, 255, 255, 0.18)',
+          'rgba(20, 22, 28, 0.22)',
+          'rgba(3, 4, 7, 0.24)',
+        ]}
+        locations={[0, 0.42, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.tabBarTopLight} />
+    </View>
+  );
+}
+
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
         headerBackground: () => null,
+        tabBarBackground: () => <TabBarBackground />,
         headerRight: () => <ProfileHeaderButton />,
         headerRightContainerStyle: {
           paddingRight: 20,
@@ -98,30 +145,42 @@ export default function TabsLayout() {
           fontSize: 18,
           fontWeight: '900',
         },
-        tabBarActiveTintColor: accentColor,
+        tabBarActiveTintColor: '#FFFFFF',
         tabBarInactiveTintColor: inactiveColor,
+        tabBarShowLabel: false,
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '800',
+          fontWeight: '900',
           letterSpacing: 0,
+        },
+        tabBarActiveBackgroundColor: 'transparent',
+        tabBarInactiveBackgroundColor: 'transparent',
+        tabBarItemStyle: {
+          borderRadius: 999,
+          marginHorizontal: 1,
+          marginVertical: 6,
+          paddingVertical: 0,
+        },
+        tabBarIconStyle: {
+          marginTop: 0,
         },
         tabBarStyle: {
           position: 'absolute',
-          left: 16,
-          right: 16,
-          bottom: 12,
-          height: 64,
-          borderColor: premiumColors.border,
-          borderRadius: 24,
+          left: 54,
+          right: 54,
+          bottom: 18,
+          height: 52,
+          borderColor: 'rgba(255, 255, 255, 0.2)',
+          borderRadius: 999,
           borderTopWidth: 1,
-          backgroundColor: 'rgba(8, 10, 15, 0.94)',
-          paddingTop: 6,
-          paddingBottom: 8,
+          backgroundColor: 'transparent',
+          paddingTop: 3,
+          paddingBottom: 3,
           shadowColor: '#000000',
-          shadowOffset: { width: 0, height: -8 },
-          shadowOpacity: 0.06,
-          shadowRadius: 18,
-          elevation: 8,
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.2,
+          shadowRadius: 22,
+          elevation: 9,
           overflow: 'hidden',
         },
       }}>
@@ -129,8 +188,8 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => (
-            <TabIcon color={color} fallback="⌂" name="house.fill" />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon color={color} fallback="⌂" focused={focused} name="house.fill" />
           ),
         }}
       />
@@ -138,8 +197,13 @@ export default function TabsLayout() {
         name="classes"
         options={{
           title: 'Classes',
-          tabBarIcon: ({ color }) => (
-            <TabIcon color={color} fallback="C" name="figure.strengthtraining.traditional" />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon
+              color={color}
+              fallback="C"
+              focused={focused}
+              name="figure.strengthtraining.traditional"
+            />
           ),
         }}
       />
@@ -148,8 +212,8 @@ export default function TabsLayout() {
         options={{
           title: 'Gym Shop',
           tabBarLabel: 'Shop',
-          tabBarIcon: ({ color }) => (
-            <TabIcon color={color} fallback="◆" name="bag.fill" />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon color={color} fallback="◆" focused={focused} name="bag.fill" />
           ),
         }}
       />
@@ -157,8 +221,8 @@ export default function TabsLayout() {
         name="journey"
         options={{
           title: 'Journey',
-          tabBarIcon: ({ color }) => (
-            <TabIcon color={color} fallback="↗" name="figure.run" />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon color={color} fallback="↗" focused={focused} name="figure.run" />
           ),
         }}
       />
@@ -167,8 +231,13 @@ export default function TabsLayout() {
         options={{
           href: null,
           title: 'Help',
-          tabBarIcon: ({ color }) => (
-            <TabIcon color={color} fallback="?" name="questionmark.circle.fill" />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon
+              color={color}
+              fallback="?"
+              focused={focused}
+              name="questionmark.circle.fill"
+            />
           ),
         }}
       />
@@ -177,24 +246,63 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
+  tabBarBackground: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+    borderRadius: 999,
+  },
+  tabBarTopLight: {
+    position: 'absolute',
+    top: 0,
+    left: 18,
+    right: 18,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.24)',
+  },
   tabFallbackIcon: {
     fontSize: 18,
     fontWeight: '900',
+  },
+  tabIconBubble: {
+    width: 46,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderRadius: 999,
+  },
+  tabIconBubbleActive: {
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.28)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+  },
+  tabIconReflection: {
+    position: 'absolute',
+    top: 4,
+    left: 9,
+    right: 9,
+    height: 9,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
   },
   profileButton: {
     width: 38,
     height: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: premiumColors.borderStrong,
+    borderWidth: 0,
+    borderColor: 'transparent',
     borderRadius: 19,
-    backgroundColor: premiumColors.surface,
-    shadowColor: '#000000',
+    backgroundColor: 'transparent',
+    shadowColor: premiumColors.redBright,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 0,
     overflow: 'hidden',
   },
   profileButtonImage: {

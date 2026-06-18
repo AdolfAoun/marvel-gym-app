@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -13,7 +14,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
-import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
+import { MarvelMarks } from '@/components/PremiumUI';
+import {
+  premiumColors,
+  premiumGradients,
+  premiumShadow,
+} from '@/constants/premiumTheme';
 import { machineGuideService } from '@/services';
 import type { MachineGuide } from '@/types';
 
@@ -83,8 +89,13 @@ export default function MachineGuideScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.heroCard}>
-          <View pointerEvents="none" style={styles.heroGlow} />
+        <LinearGradient
+          colors={premiumGradients.redPanel}
+          start={{ x: 0.1, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          style={styles.heroCard}>
+          <View pointerEvents="none" style={styles.heroGloss} />
+          <MarvelMarks variant="corner" color="#FFFFFF" />
           <Text style={styles.kicker}>Equipment Guide</Text>
           <Text style={styles.heroTitle}>Machine Guide</Text>
           <Text style={styles.heroBody}>
@@ -93,11 +104,16 @@ export default function MachineGuideScreen() {
           <View style={styles.aiPill}>
             <Text style={styles.aiPillText}>AI Coach Coming Soon</Text>
           </View>
-        </View>
+        </LinearGradient>
 
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Muscle groups</Text>
-          <View style={styles.categoryGrid}>
+        <View style={styles.sectionHeading}>
+          <View style={styles.accentBar} />
+          <View style={styles.sectionHeadingText}>
+            <Text style={styles.sectionEyebrow}>Target</Text>
+            <Text style={styles.sectionHeadingTitle}>Muscle groups</Text>
+          </View>
+        </View>
+        <View style={styles.categoryGrid}>
             {availableGroups.map((group) => {
               const isSelected = selectedGroup === group;
               const count = guides.filter(
@@ -130,12 +146,12 @@ export default function MachineGuideScreen() {
               );
             })}
           </View>
-        </View>
 
-        <View style={styles.sectionHeaderRow}>
-          <View>
-            <Text style={styles.cardLabel}>Machines</Text>
-            <Text style={styles.sectionTitle}>{selectedGroup}</Text>
+        <View style={styles.sectionHeading}>
+          <View style={styles.accentBar} />
+          <View style={styles.sectionHeadingText}>
+            <Text style={styles.sectionEyebrow}>Machines</Text>
+            <Text style={styles.sectionHeadingTitle}>{selectedGroup}</Text>
           </View>
           <Text style={styles.sectionHint}>{selectedGuides.length} available</Text>
         </View>
@@ -252,27 +268,38 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: premiumColors.borderStrong,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: 28,
-    backgroundColor: premiumColors.surfaceAlt,
-    padding: 20,
+    padding: 22,
     marginBottom: 18,
-    ...premiumShadow,
+    shadowColor: premiumColors.red,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.4,
+    shadowRadius: 26,
+    elevation: 10,
+  },
+  heroGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   heroGlow: {
     position: 'absolute',
-    right: -78,
-    top: -82,
-    width: 210,
-    height: 210,
-    borderRadius: 105,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    right: -60,
+    top: -70,
+    width: 200,
+    height: 200,
+    borderRadius: 120,
+    backgroundColor: 'rgba(255, 120, 130, 0.22)',
   },
   kicker: {
-    color: '#F7D6DC',
+    color: 'rgba(255, 255, 255, 0.78)',
     fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 0,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   heroTitle: {
@@ -281,6 +308,9 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 37,
     marginTop: 6,
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   heroBody: {
     color: '#FCE7EA',
@@ -312,6 +342,34 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 18,
     ...premiumShadow,
+  },
+  sectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  accentBar: {
+    width: 4,
+    height: 36,
+    borderRadius: 3,
+    backgroundColor: premiumColors.redBright,
+  },
+  sectionHeadingText: {
+    flex: 1,
+  },
+  sectionEyebrow: {
+    color: premiumColors.redBright,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  sectionHeadingTitle: {
+    color: textColor,
+    fontSize: 21,
+    fontWeight: '900',
   },
   cardLabel: {
     color: accentColor,
