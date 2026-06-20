@@ -26,8 +26,9 @@ import type {
   Achievement,
   AttendanceDay,
   JourneyHistoryRecord,
+  JourneyMetricKey,
+  JourneyMetrics,
   JourneyProfile,
-  JourneyStatKey,
   JourneyStats,
   Member,
   WorkoutSession,
@@ -43,12 +44,6 @@ const mutedColor = premiumColors.textMuted;
 type TimerState = 'idle' | 'running' | 'paused';
 
 const journeyTimerStorageKey = 'marvel-gym:journey-workout-timer';
-const journeyDashboardStatKeys: JourneyStatKey[] = [
-  'averageWorkoutDuration',
-  'visitsThisMonth',
-  'estimatedCaloriesBurned',
-  'visitsThisWeek',
-];
 
 type StoredTimerState = {
   elapsedSeconds: number;
@@ -93,14 +88,6 @@ function formatHistoryRange(historyRecord: JourneyHistoryRecord) {
   )}`;
 }
 
-function hasJourneyStatValue(stats: JourneyStats, statKey: JourneyStatKey) {
-  if (statKey === 'averageWorkoutDuration') {
-    return Number.parseInt(stats.averageWorkoutDuration, 10) > 0;
-  }
-
-  return stats[statKey] > 0;
-}
-
 async function saveStoredTimerState(timer: StoredTimerState) {
   await AsyncStorage.setItem(journeyTimerStorageKey, JSON.stringify(timer));
 }
@@ -139,10 +126,15 @@ export default function JourneyScreen() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [lastCalories, setLastCalories] = useState(0);
   const [pendingVisitDate, setPendingVisitDate] = useState('');
-  const [pendingResetKey, setPendingResetKey] = useState<JourneyStatKey>();
-  const [isPendingResetAll, setIsPendingResetAll] = useState(false);
-  const [undoableResetKeys, setUndoableResetKeys] = useState<JourneyStatKey[]>([]);
-  const [isAllResetUndoable, setIsAllResetUndoable] = useState(false);
+  const [metrics, setMetrics] = useState<JourneyMetrics>();
+  const [pendingMetricResetKey, setPendingMetricResetKey] =
+    useState<JourneyMetricKey>();
+  const [isPendingMetricResetAll, setIsPendingMetricResetAll] = useState(false);
+  const [undoableMetricKeys, setUndoableMetricKeys] = useState<
+    JourneyMetricKey[]
+  >([]);
+  const [isAllMetricResetUndoable, setIsAllMetricResetUndoable] =
+    useState(false);
   const [pendingTimerSeconds, setPendingTimerSeconds] = useState(0);
   const [isHistoryVisible, setIsHistoryVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -158,6 +150,7 @@ export default function JourneyScreen() {
         sessions,
         history,
         journeyStats,
+        journeyMetrics,
         nextAchievements,
         storedTimer,
       ] = await Promise.all([
@@ -167,6 +160,7 @@ export default function JourneyScreen() {
         journeyService.getWorkoutSessions(),
         journeyService.getJourneyHistory(),
         journeyService.getJourneyStats(),
+        journeyService.getJourneyMetrics(),
         journeyService.getAchievements(),
         getStoredTimerState(),
       ]);
@@ -178,6 +172,7 @@ export default function JourneyScreen() {
       setWorkoutSessions(sessions);
       setHistoryRecords(history);
       setStats(journeyStats);
+      setMetrics(journeyMetrics);
       setAchievements(nextAchievements);
 
       if (storedTimer?.state === 'running' && storedTimer.startedAt) {
@@ -205,12 +200,14 @@ export default function JourneyScreen() {
       let isActive = true;
 
       const syncJourney = async () => {
-        const [attendance, sessions, history, journeyStats] = await Promise.all([
-          journeyService.getAttendanceDays(),
-          journeyService.getWorkoutSessions(),
-          journeyService.getJourneyHistory(),
-          journeyService.getJourneyStats(),
-        ]);
+        const [attendance, sessions, history, journeyStats, journeyMetrics] =
+          await Promise.all([
+            journeyService.getAttendanceDays(),
+            journeyService.getWorkoutSessions(),
+            journeyService.getJourneyHistory(),
+            journeyService.getJourneyStats(),
+            journeyService.getJourneyMetrics(),
+          ]);
 
         if (!isActive) {
           return;
@@ -220,6 +217,7 @@ export default function JourneyScreen() {
         setWorkoutSessions(sessions);
         setHistoryRecords(history);
         setStats(journeyStats);
+        setMetrics(journeyMetrics);
         setSelectedMonthIndex(new Date().getMonth());
       };
 
@@ -298,6 +296,12 @@ export default function JourneyScreen() {
         )
       : 0;
 
+  const refreshMetrics = async () => {
+    const nextMetrics = await journeyService.getJourneyMetrics();
+
+    setMetrics(nextMetrics);
+  };
+
   const refreshStats = async () => {
     const nextStats = await journeyService.getJourneyStats();
 
@@ -330,6 +334,7 @@ export default function JourneyScreen() {
     setAttendanceDays(nextAttendance);
     setPendingVisitDate('');
     await refreshStats();
+    await refreshMetrics();
   };
 
   const handleStartTimer = () => {
@@ -391,6 +396,7 @@ export default function JourneyScreen() {
     pausedElapsedRef.current = 0;
     await clearStoredTimerState();
     await refreshStats();
+    await refreshMetrics();
   };
 
   const discardWorkoutTime = () => {
@@ -421,61 +427,67 @@ export default function JourneyScreen() {
     });
   };
 
-  const confirmResetStat = async () => {
-    if (!pendingResetKey && !isPendingResetAll) {
+  const confirmResetMetric = async () => {
+    if (!pendingMetricResetKey && !isPendingMetricResetAll) {
       return;
     }
 
-    const nextStats = isPendingResetAll
-      ? await journeyService.resetAllJourneyStats()
-      : await journeyService.resetJourneyStat(pendingResetKey as JourneyStatKey);
+    const nextMetrics = isPendingMetricResetAll
+      ? await journeyService.resetAllJourneyMetrics()
+      : await journeyService.resetJourneyMetric(
+          pendingMetricResetKey as JourneyMetricKey,
+        );
 
-    setStats(nextStats);
-    if (isPendingResetAll) {
-      setIsAllResetUndoable(true);
-      setUndoableResetKeys([]);
-    } else if (pendingResetKey) {
-      setIsAllResetUndoable(false);
-      setUndoableResetKeys((current) => [
-        pendingResetKey,
-        ...current.filter((key) => key !== pendingResetKey),
+    setMetrics(nextMetrics);
+    if (isPendingMetricResetAll) {
+      setIsAllMetricResetUndoable(true);
+      setUndoableMetricKeys([]);
+    } else if (pendingMetricResetKey) {
+      setIsAllMetricResetUndoable(false);
+      setUndoableMetricKeys((current) => [
+        pendingMetricResetKey,
+        ...current.filter((key) => key !== pendingMetricResetKey),
       ]);
     }
-    setPendingResetKey(undefined);
-    setIsPendingResetAll(false);
+    setPendingMetricResetKey(undefined);
+    setIsPendingMetricResetAll(false);
   };
 
-  const handleUndoReset = async (statKey: JourneyStatKey) => {
-    const nextStats = await journeyService.undoResetJourneyStat(statKey);
+  const handleUndoMetric = async (metricKey: JourneyMetricKey) => {
+    const nextMetrics = await journeyService.undoResetJourneyMetric(metricKey);
 
-    setStats(nextStats);
-    setUndoableResetKeys((current) => current.filter((key) => key !== statKey));
+    setMetrics(nextMetrics);
+    setUndoableMetricKeys((current) =>
+      current.filter((key) => key !== metricKey),
+    );
     await refreshJourneyHistory();
   };
 
-  const handleUndoResetAll = async () => {
-    const nextStats = await journeyService.undoResetAllJourneyStats();
+  const handleUndoMetricAll = async () => {
+    const nextMetrics = await journeyService.undoResetAllJourneyMetrics();
 
-    setStats(nextStats);
-    setIsAllResetUndoable(false);
+    setMetrics(nextMetrics);
+    setIsAllMetricResetUndoable(false);
     await refreshJourneyHistory();
   };
 
-  const handleSaveReset = async (statKey: JourneyStatKey) => {
-    const nextHistory = await journeyService.saveJourneyReset(statKey);
+  const handleSaveMetric = async (metricKey: JourneyMetricKey) => {
+    const nextHistory = await journeyService.saveJourneyMetricReset(metricKey);
 
     setHistoryRecords(nextHistory);
-    setUndoableResetKeys((current) => current.filter((key) => key !== statKey));
+    setUndoableMetricKeys((current) =>
+      current.filter((key) => key !== metricKey),
+    );
   };
 
-  const handleSaveResetAll = async () => {
-    const nextHistory = await journeyService.saveAllJourneyReset();
+  const handleSaveMetricAll = async () => {
+    const nextHistory = await journeyService.saveAllJourneyMetricReset();
 
     setHistoryRecords(nextHistory);
-    setIsAllResetUndoable(false);
+    setIsAllMetricResetUndoable(false);
   };
 
-  if (isLoading || !profile || !stats) {
+  if (isLoading || !profile || !stats || !metrics) {
     return (
       <PremiumScreenBackground>
         <StatusBar style="light" />
@@ -487,9 +499,32 @@ export default function JourneyScreen() {
     );
   }
 
-  const canResetAll = journeyDashboardStatKeys.some((statKey) =>
-    hasJourneyStatValue(stats, statKey),
-  );
+  const metricCards: {
+    key: JourneyMetricKey;
+    label: string;
+    value: string | number;
+  }[] = [
+    {
+      key: 'averageMonthlyVisits',
+      label: 'Average monthly visits',
+      value: metrics.averageMonthlyVisits,
+    },
+    {
+      key: 'totalVisits',
+      label: 'Total visits',
+      value: metrics.totalVisits,
+    },
+    {
+      key: 'averageCaloriesBurned',
+      label: 'Average calories burned',
+      value: metrics.averageCaloriesBurned,
+    },
+    {
+      key: 'averageWorkoutDuration',
+      label: 'Average workout duration',
+      value: metrics.averageWorkoutDuration,
+    },
+  ];
 
   return (
     <PremiumScreenBackground>
@@ -515,11 +550,11 @@ export default function JourneyScreen() {
           <View style={styles.heroStatsRow}>
             <View style={styles.heroStatPill}>
               <Text style={styles.heroStatValue}>{selectedMonthVisitCount}</Text>
-              <Text style={styles.heroStatLabel}>{selectedMonth?.month ?? 'Month'} visits</Text>
+              <Text style={styles.heroStatLabel}>this month&apos;s visits</Text>
             </View>
             <View style={styles.heroStatPill}>
               <Text style={styles.heroStatValue}>{selectedMonthAverageCalories}</Text>
-              <Text style={styles.heroStatLabel}>avg calories/session</Text>
+              <Text style={styles.heroStatLabel}>this month&apos;s calories/session</Text>
             </View>
           </View>
         </LinearGradient>
@@ -601,12 +636,12 @@ export default function JourneyScreen() {
         <View style={styles.statsHeaderRow}>
           <View style={styles.dashboardTitleBlock}>
             <Text style={styles.cardLabel}>Dashboard</Text>
-            <Text style={styles.sectionTitle}>{selectedMonth?.month ?? 'Selected month'} metrics</Text>
+            <Text style={styles.sectionTitle}>All-time metrics</Text>
             <View style={styles.resetAllStack}>
-              {isAllResetUndoable ? (
+              {isAllMetricResetUndoable ? (
                 <>
                   <Pressable
-                    onPress={handleSaveResetAll}
+                    onPress={handleSaveMetricAll}
                     style={({ pressed }) => [
                       styles.resetAllSaveButton,
                       pressed && styles.buttonPressed,
@@ -614,33 +649,26 @@ export default function JourneyScreen() {
                     <Text style={styles.statSaveText}>Save</Text>
                   </Pressable>
                   <Pressable
-                    onPress={handleUndoResetAll}
+                    onPress={handleUndoMetricAll}
                     style={({ pressed }) => [
                       styles.resetAllButton,
                       styles.statResetButtonUndo,
                       pressed && styles.buttonPressed,
                     ]}>
-                    <Text style={[styles.resetAllButtonText, styles.statResetTextUndo]}>
+                    <Text
+                      style={[styles.resetAllButtonText, styles.statResetTextUndo]}>
                       Undo Reset
                     </Text>
                   </Pressable>
                 </>
               ) : (
                 <Pressable
-                  disabled={!canResetAll}
-                  onPress={() => setIsPendingResetAll(true)}
+                  onPress={() => setIsPendingMetricResetAll(true)}
                   style={({ pressed }) => [
                     styles.resetAllButton,
-                    !canResetAll && styles.statResetButtonDisabled,
-                    pressed && canResetAll && styles.buttonPressed,
+                    pressed && styles.buttonPressed,
                   ]}>
-                  <Text
-                    style={[
-                      styles.resetAllButtonText,
-                      !canResetAll && styles.statResetTextDisabled,
-                    ]}>
-                    Reset All
-                  </Text>
+                  <Text style={styles.resetAllButtonText}>Reset All</Text>
                 </Pressable>
               )}
             </View>
@@ -655,79 +683,50 @@ export default function JourneyScreen() {
           </Pressable>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.statsRail}>
-          {[
-            {
-              key: 'visitsThisMonth' as const,
-              label: 'Monthly Visits',
-              value: stats.visitsThisMonth,
-            },
-            {
-              key: 'visitsThisWeek' as const,
-              label: 'Weekly Visits',
-              value: stats.visitsThisWeek,
-            },
-            {
-              key: 'estimatedCaloriesBurned' as const,
-              label: 'Avg Calories',
-              value: stats.estimatedCaloriesBurned,
-            },
-            {
-              key: 'averageWorkoutDuration' as const,
-              label: 'Avg Workout Duration',
-              value: stats.averageWorkoutDuration,
-            },
-          ].map((stat) => {
-            const canReset = hasJourneyStatValue(stats, stat.key);
-            const canUndoReset = undoableResetKeys.includes(stat.key);
+        <View style={styles.metricGrid}>
+          {metricCards.map((metric) => {
+            const canUndo = undoableMetricKeys.includes(metric.key);
 
             return (
-              <View key={stat.key} style={styles.statCard}>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <View style={styles.statFooterRow}>
-                  <Text style={styles.statLabel}>{stat.label}</Text>
-                  <View style={styles.statActionStack}>
-                    <Pressable
-                      disabled={!canReset && !canUndoReset}
-                      onPress={() =>
-                        canUndoReset
-                          ? handleUndoReset(stat.key)
-                          : setPendingResetKey(stat.key)
-                      }
-                      style={({ pressed }) => [
-                        styles.statResetButton,
-                        canUndoReset && styles.statResetButtonUndo,
-                        !canReset && !canUndoReset && styles.statResetButtonDisabled,
-                        pressed && (canReset || canUndoReset) && styles.buttonPressed,
+              <View key={metric.key} style={styles.metricTile}>
+                <View pointerEvents="none" style={styles.metricTileGloss} />
+                <Text style={styles.metricValue}>{metric.value}</Text>
+                <Text style={styles.metricLabel}>{metric.label}</Text>
+                <View style={styles.metricActionRow}>
+                  <Pressable
+                    onPress={() =>
+                      canUndo
+                        ? handleUndoMetric(metric.key)
+                        : setPendingMetricResetKey(metric.key)
+                    }
+                    style={({ pressed }) => [
+                      styles.statResetButton,
+                      canUndo && styles.statResetButtonUndo,
+                      pressed && styles.buttonPressed,
+                    ]}>
+                    <Text
+                      style={[
+                        styles.statResetText,
+                        canUndo && styles.statResetTextUndo,
                       ]}>
-                      <Text
-                        style={[
-                          styles.statResetText,
-                          canUndoReset && styles.statResetTextUndo,
-                          !canReset && !canUndoReset && styles.statResetTextDisabled,
-                        ]}>
-                        {canUndoReset ? 'Undo Reset' : 'Reset'}
-                      </Text>
+                      {canUndo ? 'Undo Reset' : 'Reset'}
+                    </Text>
+                  </Pressable>
+                  {canUndo ? (
+                    <Pressable
+                      onPress={() => handleSaveMetric(metric.key)}
+                      style={({ pressed }) => [
+                        styles.statSaveButton,
+                        pressed && styles.buttonPressed,
+                      ]}>
+                      <Text style={styles.statSaveText}>Save</Text>
                     </Pressable>
-                    {canUndoReset ? (
-                      <Pressable
-                        onPress={() => handleSaveReset(stat.key)}
-                        style={({ pressed }) => [
-                          styles.statSaveButton,
-                          pressed && styles.buttonPressed,
-                        ]}>
-                        <Text style={styles.statSaveText}>Save</Text>
-                      </Pressable>
-                    ) : null}
-                  </View>
+                  ) : null}
                 </View>
               </View>
             );
           })}
-        </ScrollView>
+        </View>
 
         <View style={styles.card}>
           <View style={styles.sectionHeaderRow}>
@@ -789,42 +788,6 @@ export default function JourneyScreen() {
               </View>
             </View>
           ) : null}
-        </View>
-
-        <View style={styles.milestoneCard}>
-          <View style={styles.sectionHeaderRow}>
-            <View>
-              <Text style={styles.cardLabel}>Achievements</Text>
-              <Text style={styles.sectionTitle}>Training milestones</Text>
-            </View>
-            <Text style={styles.sectionHint}>Motivation</Text>
-          </View>
-          <View style={styles.milestoneGrid}>
-            <View style={styles.milestoneTile}>
-              <Text style={styles.milestoneValue}>{stats.consecutiveStreak}</Text>
-              <Text style={styles.milestoneLabel}>Longest streak</Text>
-            </View>
-            <View style={styles.milestoneTile}>
-              <Text style={styles.milestoneValue}>
-                {Number.parseInt(stats.averageWorkoutDuration, 10) >= 60
-                  ? 'Done'
-                  : 'Next'}
-              </Text>
-              <Text style={styles.milestoneLabel}>1-hour workout</Text>
-            </View>
-            <View style={styles.milestoneTile}>
-              <Text style={styles.milestoneValue}>
-                {Math.min(stats.visitsThisMonth, 12)}/12
-              </Text>
-              <Text style={styles.milestoneLabel}>Monthly attendance goal</Text>
-            </View>
-            <View style={styles.milestoneTile}>
-              <Text style={styles.milestoneValue}>
-                {stats.estimatedCaloriesBurned >= 1000 ? 'On' : 'Build'}
-              </Text>
-              <Text style={styles.milestoneLabel}>Calories milestone</Text>
-            </View>
-          </View>
         </View>
 
         <View style={styles.card}>
@@ -940,31 +903,30 @@ export default function JourneyScreen() {
 
       <Modal
         transparent
-        visible={Boolean(pendingResetKey) || isPendingResetAll}
+        visible={Boolean(pendingMetricResetKey) || isPendingMetricResetAll}
         animationType="fade">
         <View style={styles.centerModalOverlay}>
           <Pressable
             style={styles.modalBackdrop}
             onPress={() => {
-              setPendingResetKey(undefined);
-              setIsPendingResetAll(false);
+              setPendingMetricResetKey(undefined);
+              setIsPendingMetricResetAll(false);
             }}
           />
           <View style={styles.confirmCard}>
             <Text style={styles.modalKicker}>Journey</Text>
             <Text style={styles.confirmTitle}>
-              {isPendingResetAll ? 'Reset all stats?' : 'Reset this stat?'}
+              {isPendingMetricResetAll ? 'Reset all metrics?' : 'Reset this metric?'}
             </Text>
             <Text style={styles.confirmBody}>
-              {isPendingResetAll
-                ? 'Older progress will stop counting in this active dashboard period.'
-                : 'Older history will stop counting in this active dashboard number.'}
+              Resetting starts a fresh count from now. Your previous total is kept
+              and can be saved to History so you can always look back at it.
             </Text>
             <View style={styles.confirmRow}>
               <Pressable
                 onPress={() => {
-                  setPendingResetKey(undefined);
-                  setIsPendingResetAll(false);
+                  setPendingMetricResetKey(undefined);
+                  setIsPendingMetricResetAll(false);
                 }}
                 style={({ pressed }) => [
                   styles.confirmSecondary,
@@ -973,7 +935,7 @@ export default function JourneyScreen() {
                 <Text style={styles.confirmSecondaryText}>Cancel</Text>
               </Pressable>
               <Pressable
-                onPress={confirmResetStat}
+                onPress={confirmResetMetric}
                 style={({ pressed }) => [
                   styles.confirmPrimary,
                   pressed && styles.buttonPressed,
@@ -1320,6 +1282,58 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingRight: 4,
     marginBottom: 16,
+  },
+  metricGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  metricTile: {
+    position: 'relative',
+    overflow: 'hidden',
+    flexBasis: '47%',
+    flexGrow: 1,
+    minHeight: 148,
+    justifyContent: 'flex-start',
+    borderWidth: 1,
+    borderColor: premiumColors.glassBorder,
+    borderRadius: 22,
+    backgroundColor: surfaceColor,
+    padding: 16,
+    shadowColor: premiumColors.red,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.2,
+    shadowRadius: 22,
+    elevation: 8,
+  },
+  metricActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginTop: 'auto',
+    paddingTop: 12,
+  },
+  metricTileGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 16,
+    right: 16,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  metricValue: {
+    color: premiumColors.redBright,
+    fontSize: 30,
+    fontWeight: '900',
+    letterSpacing: 0,
+  },
+  metricLabel: {
+    color: mutedColor,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+    marginTop: 10,
   },
   statsHeaderRow: {
     flexDirection: 'row',

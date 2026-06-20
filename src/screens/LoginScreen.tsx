@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -6,22 +7,22 @@ import {
   ActivityIndicator,
   Animated,
   Image,
-  Keyboard,
-  Linking,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
+import { premiumColors, premiumGradients } from '@/constants/premiumTheme';
 import { authService, entryContentService } from '@/services';
 
-const accentColor = '#B11226';
-const defaultBackgroundPhoto = require('@/assets/images/prototype-back-pose-background.png');
+const accentColor = premiumColors.redBright;
 
 function formatLebanesePhone(value: string) {
   const digits = value.replace(/\D/g, '').slice(0, 8);
@@ -41,21 +42,14 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isContactOpen, setIsContactOpen] = useState(false);
-  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [identifierMessage, setIdentifierMessage] = useState('');
   const [passwordMessage, setPasswordMessage] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
-  const [backgroundPhoto, setBackgroundPhoto] =
-    useState<ImageSourcePropType>(defaultBackgroundPhoto);
+  const [backgroundPhoto, setBackgroundPhoto] = useState<ImageSourcePropType>();
   const feedbackOpacity = useRef(new Animated.Value(0)).current;
-  const contactRaysProgress = useRef(new Animated.Value(0)).current;
-  const keyboardLift = useRef(new Animated.Value(0)).current;
-  const phoneInputRef = useRef<TextInput>(null);
-  const emailInputRef = useRef<TextInput>(null);
-  const passwordInputRef = useRef<TextInput>(null);
-  const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
 
   useEffect(() => {
     const loadSignInWallpaper = async () => {
@@ -66,65 +60,6 @@ export default function LoginScreen() {
 
     loadSignInWallpaper();
   }, []);
-
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSubscription = Keyboard.addListener(showEvent, () => {
-      setIsKeyboardVisible(true);
-    });
-    const hideSubscription = Keyboard.addListener(hideEvent, () => {
-      setIsKeyboardVisible(false);
-      setIsPasswordFocused(false);
-    });
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, []);
-
-  useEffect(() => {
-    Animated.timing(keyboardLift, {
-      toValue: isPasswordFocused && isKeyboardVisible ? -51 : 0,
-      duration: isPasswordFocused && isKeyboardVisible ? 220 : 180,
-      useNativeDriver: true,
-    }).start();
-  }, [isKeyboardVisible, isPasswordFocused, keyboardLift]);
-
-  const setContactHubOpen = (open: boolean) => {
-    setIsContactOpen(open);
-    Animated.spring(contactRaysProgress, {
-      toValue: open ? 1 : 0,
-      useNativeDriver: true,
-      friction: 8,
-      tension: 90,
-    }).start();
-  };
-
-  const closeContactHub = () => {
-    if (isContactOpen) {
-      setContactHubOpen(false);
-    }
-  };
-
-  const clearInputFocus = () => {
-    phoneInputRef.current?.blur();
-    emailInputRef.current?.blur();
-    passwordInputRef.current?.blur();
-    Keyboard.dismiss();
-    keyboardLift.stopAnimation();
-    keyboardLift.setValue(0);
-    setIsPasswordFocused(false);
-    setIsKeyboardVisible(false);
-  };
-
-  const handleContactHubPress = () => {
-    const shouldOpen = !isContactOpen;
-
-    clearInputFocus();
-    setContactHubOpen(shouldOpen);
-  };
 
   const hideFeedback = () => {
     Animated.timing(feedbackOpacity, {
@@ -162,10 +97,10 @@ export default function LoginScreen() {
     if (params.created === '1') {
       showFeedback('Account created successfully. Please log in.');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.created]);
 
   const handleLogin = async () => {
-    closeContactHub();
     clearFeedback();
     setIdentifierMessage('');
     setPasswordMessage('');
@@ -214,97 +149,55 @@ export default function LoginScreen() {
     }
   };
 
-  const handleContactOption = async (url: string) => {
-    setContactHubOpen(false);
-
-    try {
-      await Linking.openURL(url);
-    } catch {
-      showFeedback('Unable to open contact option.');
-    }
-  };
-
-  const contactRayScale = contactRaysProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.82, 1],
-  });
-  const whatsappRayStyle = {
-    opacity: contactRaysProgress,
-    transform: [
-      { scale: contactRayScale },
-      {
-        translateX: contactRaysProgress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [18, 0],
-        }),
-      },
-    ],
-  };
-  const callRayStyle = {
-    opacity: contactRaysProgress,
-    transform: [
-      { scale: contactRayScale },
-      {
-        translateY: contactRaysProgress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [-18, 0],
-        }),
-      },
-    ],
-  };
-
   return (
-    <View style={styles.safeArea}>
+    <PremiumScreenBackground>
       <StatusBar style="light" />
-      <View style={styles.phoneFrame}>
+      {backgroundPhoto ? (
         <Image
           source={backgroundPhoto}
-          style={styles.backgroundPhoto}
+          style={styles.heroPhoto}
           resizeMode="cover"
         />
-        <View pointerEvents="none" style={styles.backgroundPhotoVeil} />
-        <View pointerEvents="none" style={styles.backgroundVignette} />
-        <View pointerEvents="none" style={styles.backgroundRedWash} />
-        <View pointerEvents="none" style={styles.bgRedGlowTop} />
-        <View pointerEvents="none" style={styles.bgRedGlowBottom} />
-        <View pointerEvents="none" style={styles.bgGrid} />
-        <View pointerEvents="none" style={styles.bgDiagonalOne} />
-        <View pointerEvents="none" style={styles.bgDiagonalTwo} />
+      ) : null}
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(7, 8, 12, 0.4)', 'rgba(7, 8, 12, 0.86)', '#070203']}
+        locations={[0, 0.55, 1]}
+        style={styles.heroFade}
+      />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.flex}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+          <View style={styles.brandBlock}>
+            <Image
+              source={require('@/assets/images/marvel-logo-transparent.png')}
+              style={styles.brandLogo}
+              resizeMode="contain"
+            />
+          </View>
 
-        <SafeAreaView style={styles.contentSafeArea}>
-          <Animated.View
-            style={[
-              styles.keyboardLiftLayer,
-              {
-                transform: [{ translateY: keyboardLift }],
-              },
-            ]}>
-            <Pressable
-              onPress={() => {
-                closeContactHub();
-                clearInputFocus();
-              }}
-              style={styles.fixedContent}>
-          <View style={styles.loginCard}>
-            <View style={styles.cardGloss} />
-            <View style={styles.loginCardHeader}>
-              <Text style={styles.loginTitle}>Sign in</Text>
-            </View>
+          <View style={styles.card}>
+            <View pointerEvents="none" style={styles.cardGloss} />
+            <Text style={styles.kicker}>Member access</Text>
+            <Text style={styles.title}>Sign in</Text>
+
             <View style={styles.inputGroup}>
-              <View style={styles.loginModeHeader}>
+              <View style={styles.modeHeader}>
                 <Text style={styles.label}>
-                  {loginMode === 'phone' ? 'Phone Number' : 'Email'}
+                  {loginMode === 'phone' ? 'Phone number' : 'Email'}
                 </Text>
                 <Pressable
-                  onPress={(event) => {
-                    event.stopPropagation();
-                    closeContactHub();
+                  hitSlop={8}
+                  onPress={() => {
                     setLoginMode((mode) => (mode === 'phone' ? 'email' : 'phone'));
                     setIdentifierMessage('');
                     setPasswordMessage('');
                     clearFeedback();
-                  }}
-                  hitSlop={8}>
+                  }}>
                   <Text style={styles.modeToggleText}>
                     {loginMode === 'phone' ? 'Use email instead' : 'Use phone instead'}
                   </Text>
@@ -317,404 +210,166 @@ export default function LoginScreen() {
                     <Text style={styles.countryCodeText}>+961</Text>
                   </View>
                   <TextInput
-                    ref={phoneInputRef}
                     value={formatLebanesePhone(phoneNumber)}
                     onChangeText={(value) =>
                       setPhoneNumber(value.replace(/\D/g, '').slice(0, 8))
                     }
                     placeholder="70 123 456"
-                    placeholderTextColor="#667282"
+                    placeholderTextColor={premiumColors.textFaint}
                     autoCapitalize="none"
                     autoCorrect={false}
                     keyboardType="number-pad"
                     textContentType="telephoneNumber"
-                    onFocus={() => {
-                      closeContactHub();
-                      setIsPasswordFocused(false);
-                    }}
                     selectionColor={accentColor}
                     style={styles.phoneInput}
                   />
                 </View>
               ) : (
                 <TextInput
-                  ref={emailInputRef}
                   value={email}
                   onChangeText={setEmail}
                   placeholder="member@marvelgym.com"
-                  placeholderTextColor="#667282"
+                  placeholderTextColor={premiumColors.textFaint}
                   autoCapitalize="none"
                   autoCorrect={false}
                   autoComplete="email"
                   keyboardType="email-address"
                   textContentType="emailAddress"
-                  onFocus={() => {
-                    closeContactHub();
-                    setIsPasswordFocused(false);
-                  }}
                   selectionColor={accentColor}
                   style={styles.input}
                 />
               )}
 
-              <View style={styles.identifierMessageArea}>
-                {identifierMessage.length > 0 && (
-                  <Text style={styles.identifierMessageText}>{identifierMessage}</Text>
-                )}
-              </View>
+              {identifierMessage.length > 0 ? (
+                <Text style={styles.errorText}>{identifierMessage}</Text>
+              ) : null}
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Password</Text>
               <View style={styles.passwordRow}>
                 <TextInput
-                  ref={passwordInputRef}
                   value={password}
                   onChangeText={setPassword}
                   placeholder="Enter your password"
-                  placeholderTextColor="#667282"
+                  placeholderTextColor={premiumColors.textFaint}
                   autoCapitalize="none"
                   autoCorrect={false}
                   secureTextEntry={!isPasswordVisible}
                   textContentType="password"
-                  onFocus={() => {
-                    closeContactHub();
-                    setIsPasswordFocused(true);
-                  }}
-                  onBlur={() => setIsPasswordFocused(false)}
                   selectionColor={accentColor}
                   style={styles.passwordInput}
                 />
                 <Pressable
-                  onPress={() => {
-                    closeContactHub();
-                    setIsPasswordVisible((value) => !value);
-                  }}
                   hitSlop={10}
+                  onPress={() => setIsPasswordVisible((value) => !value)}
                   style={styles.passwordToggle}>
                   <Text style={styles.passwordToggleText}>
                     {isPasswordVisible ? 'Hide' : 'Show'}
                   </Text>
                 </Pressable>
               </View>
-              <View style={styles.passwordMessageArea}>
-                {passwordMessage.length > 0 && (
-                  <Text style={styles.passwordMessageText}>{passwordMessage}</Text>
-                )}
-              </View>
+              {passwordMessage.length > 0 ? (
+                <Text style={styles.errorText}>{passwordMessage}</Text>
+              ) : null}
             </View>
 
-            <View style={styles.actionStack}>
-              <Pressable
-                onPress={(event) => {
-                  event.stopPropagation();
-                  closeContactHub();
-                  showFeedback('Password reset mail sent');
-                }}
-                style={styles.forgotButton}>
-                <Text style={styles.linkText}>Forgot password?</Text>
-              </Pressable>
+            <Pressable
+              onPress={() => showFeedback('Password reset mail sent')}
+              style={styles.forgotButton}>
+              <Text style={styles.linkText}>Forgot password?</Text>
+            </Pressable>
 
-              {feedbackMessage.length > 0 && (
-                <Animated.View
-                  pointerEvents="none"
-                  style={[styles.formFeedback, { opacity: feedbackOpacity }]}>
-                  <Text style={styles.formFeedbackText}>{feedbackMessage}</Text>
-                </Animated.View>
-              )}
+            {feedbackMessage.length > 0 ? (
+              <Animated.View
+                pointerEvents="none"
+                style={[styles.formFeedback, { opacity: feedbackOpacity }]}>
+                <Text style={styles.formFeedbackText}>{feedbackMessage}</Text>
+              </Animated.View>
+            ) : null}
 
-              <Pressable
-                disabled={isSubmitting}
-                onPress={(event) => {
-                  event.stopPropagation();
-                  handleLogin();
-                }}
-                style={({ pressed }) => [
-                  styles.loginButton,
-                  (pressed || isSubmitting) && styles.loginButtonPressed,
-                ]}>
+            <Pressable
+              disabled={isSubmitting}
+              onPress={handleLogin}
+              style={({ pressed }) => [
+                styles.loginButtonWrap,
+                (pressed || isSubmitting) && styles.buttonPressed,
+              ]}>
+              <LinearGradient
+                colors={premiumGradients.redButton}
+                start={{ x: 0.1, y: 0 }}
+                end={{ x: 0.9, y: 1 }}
+                style={styles.loginButton}>
                 {isSubmitting ? (
-                  <ActivityIndicator color="#031018" />
+                  <ActivityIndicator color="#FFFFFF" />
                 ) : (
                   <Text style={styles.loginButtonText}>Sign In</Text>
                 )}
-              </Pressable>
-            </View>
+              </LinearGradient>
+            </Pressable>
           </View>
 
-          <Pressable
-            onPress={(event) => {
-              event.stopPropagation();
-              closeContactHub();
-            }}
-            style={styles.bottomActions}>
-            <Text style={styles.accountPromptText}>Don't have an account?</Text>
-
+          <View style={styles.bottomActions}>
+            <Text style={styles.accountPromptText}>Don&apos;t have an account?</Text>
             <Pressable
-              onPress={(event) => {
-                event.stopPropagation();
-                closeContactHub();
-                router.push('/create-account');
-            }}>
+              hitSlop={8}
+              onPress={() => router.push('/create-account')}>
               <Text style={styles.bottomActionText}>Create Account</Text>
             </Pressable>
-          </Pressable>
-            </Pressable>
-          </Animated.View>
-        </SafeAreaView>
-      </View>
-    </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </PremiumScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
-    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-start',
-    backgroundColor: '#000000',
-  },
-  phoneFrame: {
-    flex: 1,
-    width: '100%',
-    maxWidth: Platform.OS === 'web' ? 414 : undefined,
-    overflow: 'hidden',
-    backgroundColor: '#030407',
-    borderColor: Platform.OS === 'web' ? '#1d2733' : 'transparent',
-    borderRadius: Platform.OS === 'web' ? 34 : 0,
-    borderWidth: Platform.OS === 'web' ? 1 : 0,
-    marginVertical: Platform.OS === 'web' ? 22 : 0,
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 24 },
-    shadowOpacity: Platform.OS === 'web' ? 0.2 : 0,
-    shadowRadius: 42,
-  },
-  backgroundPhoto: {
-    position: 'absolute',
-    top: -18,
-    left: -28,
-    right: -28,
-    bottom: -18,
-    zIndex: 0,
-    width: '114%',
-    height: '106%',
-    opacity: 0.34,
-    transform: [{ scale: 1.04 }],
-  },
-  backgroundPhotoVeil: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 0,
-    backgroundColor: 'rgba(2, 3, 6, 0.58)',
-  },
-  backgroundVignette: {
-    position: 'absolute',
-    zIndex: 0,
-    top: -80,
-    left: -70,
-    right: -70,
-    bottom: -90,
-    borderRadius: 90,
-    borderWidth: 54,
-    borderColor: 'rgba(0, 0, 0, 0.48)',
-  },
-  backgroundRedWash: {
-    position: 'absolute',
-    zIndex: 0,
-    left: -110,
-    right: -110,
-    bottom: -150,
-    height: 430,
-    borderRadius: 220,
-    backgroundColor: 'rgba(177, 18, 38, 0.11)',
-    transform: [{ rotate: '-8deg' }],
-  },
-  contentSafeArea: {
+  flex: {
     flex: 1,
   },
-  bgRedGlowTop: {
+  heroPhoto: {
     position: 'absolute',
-    zIndex: 0,
-    right: -120,
-    top: -90,
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    backgroundColor: 'rgba(177, 18, 38, 0.22)',
-  },
-  bgRedGlowBottom: {
-    position: 'absolute',
-    zIndex: 0,
-    left: -150,
-    bottom: -40,
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    backgroundColor: 'rgba(177, 18, 38, 0.12)',
-  },
-  bgGrid: {
-    position: 'absolute',
-    zIndex: 0,
+    top: 0,
     left: 0,
     right: 0,
+    height: '52%',
+    opacity: 0.4,
+  },
+  heroFade: {
+    position: 'absolute',
     top: 0,
-    height: 320,
-    borderBottomWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.035)',
-    backgroundColor: 'rgba(255, 255, 255, 0.018)',
+    left: 0,
+    right: 0,
+    height: '58%',
   },
-  bgDiagonalOne: {
-    position: 'absolute',
-    zIndex: 0,
-    right: 40,
-    top: 90,
-    width: 2,
-    height: 300,
-    borderRadius: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    transform: [{ rotate: '28deg' }],
-  },
-  bgDiagonalTwo: {
-    position: 'absolute',
-    zIndex: 0,
-    left: 34,
-    top: 220,
-    width: 1,
-    height: 300,
-    borderRadius: 1,
-    backgroundColor: 'rgba(177, 18, 38, 0.22)',
-    transform: [{ rotate: '28deg' }],
-  },
-  contactHubLayer: {
-  position: 'absolute',
-  top: 57,
-  right: 0,
-  zIndex: 20,
-  width: 40,
-  height: 210,
-},
-
-contactHubGlow: {
-  position: 'absolute',
-  top: 17,
-  right: -135,
-  zIndex: 0,
-  width: 193,
-  height: 130,
-  borderRadius: 121,
-  backgroundColor: accentColor,
-  opacity: 0.14,
-  shadowColor: accentColor,
-  shadowOffset: { width: 0, height: 12 },
-  shadowOpacity: 0.34,
-  shadowRadius: 36,
-},
-
-contactHub: {
-  position: 'absolute',
-  top: 22,
-  right: -112,
-  zIndex: 2,
-  width: 165,
-  height: 120,
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderWidth: 1,
-  borderColor: 'rgba(225, 29, 46, 0.34)',
-  borderRadius: 104,
-  backgroundColor: 'rgba(225, 29, 46, 0.32)',
-  shadowColor: accentColor,
-  shadowOffset: { width: 0, height: 10 },
-  shadowOpacity: 0.3,
-  shadowRadius: 22,
-  elevation: 8,
-},
-
-contactHubOpen: {
-  borderColor: 'rgba(225, 29, 46, 0.62)',
-  backgroundColor: 'rgba(225, 29, 46, 0.42)',
-},
-
-contactHubText: {
-  color: '#ffffff',
-  fontSize: 11,
-  fontWeight: '900',
-  letterSpacing: 0,
-  lineHeight: 14,
-  marginRight: 107,
-  maxWidth: 58,
-  textAlign: 'center',
-},
-
-whatsappRay: {
-  top: 40,
-  right: 95,
-},
-
-callRay: {
-  top: 55,
-  right: 78,
-},
-  contactRay: {
-    position: 'absolute',
-    zIndex: 3,
-  },
-  contactRayButton: {
-    width: 70,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.56)',
-    borderRadius: 14,
-    backgroundColor: 'rgba(8, 8, 9, 0.08)',
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.34,
-    shadowRadius: 16,
-    elevation: 7,
-  },
-  callRayButton: {
-    width: 52,
-  },
-  contactRayText: {
-    color: '#f8fafc',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0,
-  },
-  contactPressed: {
-    opacity: 0.8,
-  },
-  keyboardLiftLayer: {
-    zIndex: 2,
-    flex: 1,
-  },
-  fixedContent: {
-    zIndex: 2,
-    flex: 1,
+  content: {
+    flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'web' ? 36 : 26,
-    paddingBottom: 24,
-    transform: [{ translateY: Platform.OS === 'web' ? 22 : 30 }],
+    paddingVertical: 40,
   },
-  loginCard: {
+  brandBlock: {
+    alignItems: 'center',
+    marginBottom: 22,
+  },
+  brandLogo: {
+    width: 150,
+    height: 92,
+  },
+  card: {
     position: 'relative',
-    gap: 11,
-    flexShrink: 0,
-    minHeight: 348,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: 30,
-    backgroundColor: 'rgba(8, 9, 13, 0.88)',
-    paddingHorizontal: 21,
-    paddingVertical: 21,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 24 },
-    shadowOpacity: 0.56,
-    shadowRadius: 36,
-    elevation: 10,
+    backgroundColor: 'rgba(14, 12, 16, 0.82)',
+    paddingHorizontal: 22,
+    paddingVertical: 24,
+    shadowColor: premiumColors.red,
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.3,
+    shadowRadius: 32,
+    elevation: 12,
   },
   cardGloss: {
     position: 'absolute',
@@ -722,104 +377,57 @@ callRay: {
     left: 22,
     right: 22,
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+    backgroundColor: 'rgba(255, 255, 255, 0.26)',
   },
-  loginCardHeader: {
-    marginBottom: 2,
-  },
-  loginTitle: {
-    color: '#FFFFFF',
-    fontSize: 27,
+  kicker: {
+    color: premiumColors.redBright,
+    fontSize: 11,
     fontWeight: '900',
-    lineHeight: 32,
-    marginTop: 2,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
   },
-  formFeedback: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 70,
-    zIndex: 10,
-    alignItems: 'center',
-    alignSelf: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.4)',
-    borderRadius: 999,
-    backgroundColor: 'rgba(12, 12, 14, 0.96)',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.24,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  formFeedbackText: {
-    color: '#f8fafc',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0,
-    lineHeight: 16,
-    textAlign: 'center',
+  title: {
+    color: '#FFFFFF',
+    fontSize: 30,
+    fontWeight: '900',
+    lineHeight: 35,
+    marginTop: 4,
+    marginBottom: 18,
   },
   inputGroup: {
-    gap: 4,
+    marginBottom: 14,
   },
-  loginModeHeader: {
+  modeHeader: {
     minHeight: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
+    marginBottom: 8,
   },
   label: {
-    color: '#EDF2F7',
+    color: premiumColors.text,
     fontSize: 13,
     fontWeight: '800',
-    letterSpacing: 0,
   },
   modeToggleText: {
-    color: '#FF5A6A',
+    color: premiumColors.redBright,
     fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 0,
   },
   input: {
     minHeight: 56,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 18,
-    backgroundColor: 'rgba(3, 5, 10, 0.48)',
-    color: '#f8fafc',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    color: premiumColors.text,
     fontSize: 16,
+    fontWeight: '700',
     paddingHorizontal: 16,
-  },
-  identifierMessageArea: {
-    minHeight: 14,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  identifierMessageText: {
-    color: '#f2b8bf',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0,
-    lineHeight: 14,
-  },
-  passwordMessageArea: {
-    minHeight: 16,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  passwordMessageText: {
-    color: '#f2b8bf',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0,
-    lineHeight: 14,
   },
   phoneRow: {
-    minHeight: 54,
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
@@ -829,26 +437,26 @@ callRay: {
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 18,
-    backgroundColor: 'rgba(3, 5, 10, 0.54)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     paddingHorizontal: 14,
   },
   countryCodeText: {
-    color: '#f8fafc',
+    color: premiumColors.text,
     fontSize: 15,
     fontWeight: '900',
-    letterSpacing: 0,
   },
   phoneInput: {
     minHeight: 56,
     flex: 1,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 18,
-    backgroundColor: 'rgba(3, 5, 10, 0.48)',
-    color: '#f8fafc',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    color: premiumColors.text,
     fontSize: 16,
+    fontWeight: '700',
     paddingHorizontal: 16,
   },
   passwordRow: {
@@ -856,14 +464,15 @@ callRay: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 18,
-    backgroundColor: 'rgba(3, 5, 10, 0.48)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
   passwordInput: {
     flex: 1,
-    color: '#f8fafc',
+    color: premiumColors.text,
     fontSize: 16,
+    fontWeight: '700',
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
@@ -873,60 +482,86 @@ callRay: {
     paddingHorizontal: 16,
   },
   passwordToggleText: {
-    color: '#FF5A6A',
+    color: premiumColors.redBright,
     fontSize: 14,
     fontWeight: '900',
+  },
+  errorText: {
+    color: '#F2B8BF',
+    fontSize: 11,
+    fontWeight: '800',
+    lineHeight: 15,
+    marginTop: 7,
+    paddingHorizontal: 4,
   },
   forgotButton: {
     minHeight: 24,
     alignSelf: 'flex-end',
     justifyContent: 'center',
-  },
-  actionStack: {
-    position: 'relative',
-    gap: 6,
+    marginBottom: 6,
   },
   linkText: {
-    color: '#FF5A6A',
-    fontSize: 14,
+    color: premiumColors.redBright,
+    fontSize: 13,
     fontWeight: '900',
+  },
+  formFeedback: {
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(225, 29, 46, 0.4)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(12, 12, 14, 0.96)',
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  formFeedbackText: {
+    color: '#F8FAFC',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 16,
+    textAlign: 'center',
+  },
+  loginButtonWrap: {
+    borderRadius: 20,
+    marginTop: 4,
+    shadowColor: accentColor,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.4,
+    shadowRadius: 22,
+    elevation: 8,
   },
   loginButton: {
     minHeight: 58,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 120, 130, 0.5)',
     borderRadius: 20,
-    backgroundColor: accentColor,
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 5,
-  },
-  loginButtonPressed: {
-    opacity: 0.84,
   },
   loginButtonText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '900',
-    letterSpacing: 0,
+  },
+  buttonPressed: {
+    opacity: 0.84,
   },
   bottomActions: {
-    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
-    marginTop: 22,
+    gap: 10,
+    marginTop: 24,
   },
   accountPromptText: {
-    color: '#A8B2C0',
+    color: premiumColors.textMuted,
     fontSize: 14,
     fontWeight: '800',
   },
   bottomActionText: {
-    color: '#f8fafc',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '900',
   },

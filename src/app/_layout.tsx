@@ -1,11 +1,29 @@
+import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 
 import { premiumColors } from '@/constants/premiumTheme';
 
 const accentColor = premiumColors.redBright;
 
+// Dark navigation theme so the navigator container, cards, and scene
+// backgrounds are always the Marvel Gym charcoal — never white during a load
+// or a screen transition.
+const marvelNavTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    primary: premiumColors.redBright,
+    background: premiumColors.background,
+    card: premiumColors.background,
+    text: premiumColors.text,
+    border: 'transparent',
+    notification: premiumColors.redBright,
+  },
+};
+
 export default function RootLayout() {
   return (
+    <ThemeProvider value={marvelNavTheme}>
     <Stack
       screenOptions={{
         headerBackButtonDisplayMode: 'minimal',
@@ -13,6 +31,7 @@ export default function RootLayout() {
         headerShown: false,
         headerTitle: '',
         title: '',
+        contentStyle: { backgroundColor: premiumColors.background },
       }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="welcome" />
@@ -87,5 +106,6 @@ export default function RootLayout() {
         }}
       />
     </Stack>
+    </ThemeProvider>
   );
 }

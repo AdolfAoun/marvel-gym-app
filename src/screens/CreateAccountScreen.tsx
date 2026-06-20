@@ -1,9 +1,11 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -12,16 +14,14 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
+import { premiumColors, premiumGradients } from '@/constants/premiumTheme';
 import { authService } from '@/services';
 import type { RegisterMemberInput } from '@/services';
 
-const accentColor = '#B11226';
-const genderOptions: RegisterMemberInput['gender'][] = [
-  'Male',
-  'Female',
-];
+const accentColor = premiumColors.redBright;
+const genderOptions: RegisterMemberInput['gender'][] = ['Male', 'Female'];
 
 type FormErrors = Partial<
   Record<
@@ -220,354 +220,272 @@ export default function CreateAccountScreen() {
   };
 
   return (
-    <View style={styles.safeArea}>
+    <PremiumScreenBackground>
       <StatusBar style="light" />
-      <View style={styles.phoneFrame}>
-        <View pointerEvents="none" style={styles.backgroundLayer}>
-          <Image
-            source={require('@/assets/images/prototype-three-finger-back-pose-background.png')}
-            style={styles.backgroundImage}
-            resizeMode="cover"
-          />
-          <View style={styles.backgroundVeil} />
-          <View style={styles.backgroundFade} />
-        </View>
-        <View pointerEvents="none" style={styles.redGlow} />
-        <View pointerEvents="none" style={styles.blade} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.flex}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+          <View style={styles.brandBlock}>
+            <Image
+              source={require('@/assets/images/marvel-logo-transparent.png')}
+              style={styles.brandLogo}
+              resizeMode="contain"
+            />
+            <Text style={styles.brandSubtitle}>Create your account</Text>
+          </View>
 
-        <SafeAreaView style={styles.contentSafeArea}>
-          <ScrollView
-            contentContainerStyle={styles.content}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}>
-            <View style={styles.brandBlock}>
-              <Image
-                source={require('@/assets/images/marvel-logo-transparent.png')}
-                style={styles.brandLogo}
-                resizeMode="contain"
-              />
-              <View style={styles.brandCopy}>
-                <Text style={styles.brandTitle}>MARVEL GYM</Text>
-                <Text style={styles.brandSubtitle}>Create your account</Text>
+          <View style={styles.card}>
+            <View pointerEvents="none" style={styles.cardGloss} />
+            <Text style={styles.kicker}>Member registration</Text>
+            <Text style={styles.title}>Create Account</Text>
+
+            <View style={styles.row}>
+              <View style={styles.halfInputGroup}>
+                <Text style={styles.label}>First name</Text>
+                <TextInput
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  placeholder="Tony"
+                  placeholderTextColor={premiumColors.textFaint}
+                  autoCapitalize="words"
+                  selectionColor={accentColor}
+                  style={styles.input}
+                />
+                {errors.firstName ? (
+                  <Text style={styles.errorText}>{errors.firstName}</Text>
+                ) : null}
+              </View>
+
+              <View style={styles.halfInputGroup}>
+                <Text style={styles.label}>Family name</Text>
+                <TextInput
+                  value={lastName}
+                  onChangeText={setLastName}
+                  placeholder="Stark"
+                  placeholderTextColor={premiumColors.textFaint}
+                  autoCapitalize="words"
+                  selectionColor={accentColor}
+                  style={styles.input}
+                />
+                {errors.lastName ? (
+                  <Text style={styles.errorText}>{errors.lastName}</Text>
+                ) : null}
               </View>
             </View>
 
-            <View style={styles.card}>
-              <Text style={styles.kicker}>Member registration</Text>
-              <Text style={styles.title}>Create Account</Text>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder="member@marvelgym.com"
+                placeholderTextColor={premiumColors.textFaint}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                selectionColor={accentColor}
+                style={styles.input}
+              />
+              {errors.email ? (
+                <Text style={styles.errorText}>{errors.email}</Text>
+              ) : null}
+            </View>
 
-              <View style={styles.row}>
-                <View style={styles.halfInputGroup}>
-                  <Text style={styles.label}>First name</Text>
-                  <TextInput
-                    value={firstName}
-                    onChangeText={setFirstName}
-                    placeholder="Tony"
-                    placeholderTextColor="#667282"
-                    autoCapitalize="words"
-                    selectionColor={accentColor}
-                    style={styles.input}
-                  />
-                  {errors.firstName ? (
-                    <Text style={styles.errorText}>{errors.firstName}</Text>
-                  ) : null}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Phone number</Text>
+              <View style={styles.phoneRow}>
+                <View style={styles.countryCodeBox}>
+                  <Text style={styles.countryCodeText}>+961</Text>
                 </View>
-
-                <View style={styles.halfInputGroup}>
-                  <Text style={styles.label}>Family name</Text>
-                  <TextInput
-                    value={lastName}
-                    onChangeText={setLastName}
-                    placeholder="Stark"
-                    placeholderTextColor="#667282"
-                    autoCapitalize="words"
-                    selectionColor={accentColor}
-                    style={styles.input}
-                  />
-                  {errors.lastName ? (
-                    <Text style={styles.errorText}>{errors.lastName}</Text>
-                  ) : null}
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Email</Text>
                 <TextInput
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="member@marvelgym.com"
-                  placeholderTextColor="#667282"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="email-address"
-                  selectionColor={accentColor}
-                  style={styles.input}
-                />
-                {errors.email ? (
-                  <Text style={styles.errorText}>{errors.email}</Text>
-                ) : null}
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Phone number</Text>
-                <View style={styles.phoneRow}>
-                  <View style={styles.countryCodeBox}>
-                    <Text style={styles.countryCodeText}>+961</Text>
-                  </View>
-                  <TextInput
-                    value={formatLebanesePhone(phone)}
-                    onChangeText={(value) =>
-                      setPhone(value.replace(/\D/g, '').slice(0, 8))
-                    }
-                    placeholder="70 123 456"
-                    placeholderTextColor="#667282"
-                    keyboardType="number-pad"
-                    selectionColor={accentColor}
-                    style={styles.phoneInput}
-                  />
-                </View>
-                {errors.phone ? (
-                  <Text style={styles.errorText}>{errors.phone}</Text>
-                ) : null}
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Date of birth</Text>
-                <TextInput
-                  value={dateOfBirth}
-                  onChangeText={(value) => setDateOfBirth(formatDateInput(value))}
-                  placeholder="DD/MM/YYYY"
-                  placeholderTextColor="#667282"
+                  value={formatLebanesePhone(phone)}
+                  onChangeText={(value) =>
+                    setPhone(value.replace(/\D/g, '').slice(0, 8))
+                  }
+                  placeholder="70 123 456"
+                  placeholderTextColor={premiumColors.textFaint}
                   keyboardType="number-pad"
                   selectionColor={accentColor}
-                  style={styles.input}
+                  style={styles.phoneInput}
                 />
-                {errors.dateOfBirth ? (
-                  <Text style={styles.errorText}>{errors.dateOfBirth}</Text>
-                ) : null}
               </View>
+              {errors.phone ? (
+                <Text style={styles.errorText}>{errors.phone}</Text>
+              ) : null}
+            </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Gender</Text>
-                <View style={styles.genderGrid}>
-                  {genderOptions.map((option) => {
-                    const isSelected = gender === option;
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Date of birth</Text>
+              <TextInput
+                value={dateOfBirth}
+                onChangeText={(value) => setDateOfBirth(formatDateInput(value))}
+                placeholder="DD/MM/YYYY"
+                placeholderTextColor={premiumColors.textFaint}
+                keyboardType="number-pad"
+                selectionColor={accentColor}
+                style={styles.input}
+              />
+              {errors.dateOfBirth ? (
+                <Text style={styles.errorText}>{errors.dateOfBirth}</Text>
+              ) : null}
+            </View>
 
-                    return (
-                      <Pressable
-                        key={option}
-                        onPress={() => setGender(option)}
-                        style={({ pressed }) => [
-                          styles.genderOption,
-                          isSelected && styles.genderOptionSelected,
-                          pressed && styles.buttonPressed,
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Gender</Text>
+              <View style={styles.genderGrid}>
+                {genderOptions.map((option) => {
+                  const isSelected = gender === option;
+
+                  return (
+                    <Pressable
+                      key={option}
+                      onPress={() => setGender(option)}
+                      style={({ pressed }) => [
+                        styles.genderOption,
+                        isSelected && styles.genderOptionSelected,
+                        pressed && styles.buttonPressed,
+                      ]}>
+                      <Text
+                        style={[
+                          styles.genderOptionText,
+                          isSelected && styles.genderOptionTextSelected,
                         ]}>
-                        <Text
-                          style={[
-                            styles.genderOptionText,
-                            isSelected && styles.genderOptionTextSelected,
-                          ]}>
-                          {option}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                {errors.gender ? (
-                  <Text style={styles.errorText}>{errors.gender}</Text>
-                ) : null}
+                        {option}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
+              {errors.gender ? (
+                <Text style={styles.errorText}>{errors.gender}</Text>
+              ) : null}
+            </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Password</Text>
-                <TextInput
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="Example: Gym@1"
-                  placeholderTextColor="#667282"
-                  secureTextEntry
-                  selectionColor={accentColor}
-                  style={styles.input}
-                />
-                {errors.password ? (
-                  <Text style={styles.errorText}>{errors.password}</Text>
-                ) : null}
-                <Text style={styles.passwordGuidance}>
-                  Use at least 5 characters with one letter, one number, and one special sign.
-                </Text>
-              </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Example: Gym@1"
+                placeholderTextColor={premiumColors.textFaint}
+                secureTextEntry
+                selectionColor={accentColor}
+                style={styles.input}
+              />
+              {errors.password ? (
+                <Text style={styles.errorText}>{errors.password}</Text>
+              ) : null}
+              <Text style={styles.passwordGuidance}>
+                Use at least 5 characters with one letter, one number, and one
+                special sign.
+              </Text>
+            </View>
 
-              <Pressable
-                disabled={isSubmitting}
-                onPress={handleCreateAccount}
-                style={({ pressed }) => [
-                  styles.primaryButton,
-                  (pressed || isSubmitting) && styles.buttonPressed,
-                ]}>
+            <Pressable
+              disabled={isSubmitting}
+              onPress={handleCreateAccount}
+              style={({ pressed }) => [
+                styles.primaryButtonWrap,
+                (pressed || isSubmitting) && styles.buttonPressed,
+              ]}>
+              <LinearGradient
+                colors={premiumGradients.redButton}
+                start={{ x: 0.1, y: 0 }}
+                end={{ x: 0.9, y: 1 }}
+                style={styles.primaryButton}>
                 {isSubmitting ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
                   <Text style={styles.primaryButtonText}>Create Account</Text>
                 )}
-              </Pressable>
-              {submitError ? (
-                <Text style={styles.submitErrorText}>{submitError}</Text>
-              ) : null}
-            </View>
-
-            <Pressable
-              onPress={() => router.back()}
-              style={({ pressed }) => [
-                styles.backButton,
-                pressed && styles.buttonPressed,
-              ]}>
-              <Text style={styles.backButtonText}>Back to Sign In</Text>
+              </LinearGradient>
             </Pressable>
-          </ScrollView>
-        </SafeAreaView>
-      </View>
-    </View>
+            {submitError ? (
+              <Text style={styles.submitErrorText}>{submitError}</Text>
+            ) : null}
+          </View>
+
+          <Pressable
+            onPress={() => router.back()}
+            style={({ pressed }) => [
+              styles.backButton,
+              pressed && styles.buttonPressed,
+            ]}>
+            <Text style={styles.backButtonText}>Back to Sign In</Text>
+          </Pressable>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </PremiumScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
-    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-start',
-    backgroundColor: '#000000',
-  },
-  phoneFrame: {
-    flex: 1,
-    width: '100%',
-    maxWidth: Platform.OS === 'web' ? 414 : undefined,
-    overflow: 'hidden',
-    backgroundColor: '#06070A',
-    borderColor: Platform.OS === 'web' ? '#1d2733' : 'transparent',
-    borderRadius: Platform.OS === 'web' ? 34 : 0,
-    borderWidth: Platform.OS === 'web' ? 1 : 0,
-    marginVertical: Platform.OS === 'web' ? 22 : 0,
-  },
-  backgroundLayer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    overflow: 'hidden',
-  },
-  backgroundImage: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-    opacity: 0.42,
-  },
-  backgroundVeil: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.42)',
-  },
-  backgroundFade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 150,
-    backgroundColor: 'rgba(0, 0, 0, 0.92)',
-  },
-  redGlow: {
-    position: 'absolute',
-    top: -72,
-    right: -72,
-    width: 188,
-    height: 188,
-    borderRadius: 94,
-    backgroundColor: '#5A0711',
-    opacity: 0.22,
-  },
-  blade: {
-    position: 'absolute',
-    top: 64,
-    right: -68,
-    width: 92,
-    height: 520,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    transform: [{ rotate: '24deg' }],
-  },
-  contentSafeArea: {
+  flex: {
     flex: 1,
   },
   content: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 34,
-    paddingBottom: 28,
+    paddingTop: 40,
+    paddingBottom: 36,
   },
   brandBlock: {
-    zIndex: 2,
-    minHeight: 86,
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    marginBottom: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    marginBottom: 18,
   },
   brandLogo: {
-    width: 88,
-    height: 68,
-  },
-  brandCopy: {
-    flex: 1,
-  },
-  brandTitle: {
-    color: '#FFFFFF',
-    fontSize: 21,
-    fontWeight: '900',
-    letterSpacing: 2,
+    width: 132,
+    height: 80,
   },
   brandSubtitle: {
-    color: '#F7D6DC',
-    fontSize: 10,
+    color: premiumColors.redBright,
+    fontSize: 11,
     fontWeight: '900',
-    marginTop: 4,
+    letterSpacing: 1.4,
+    marginTop: 2,
     textTransform: 'uppercase',
   },
   card: {
-    zIndex: 2,
+    position: 'relative',
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: 30,
-    backgroundColor: 'rgba(12, 13, 17, 0.9)',
+    backgroundColor: 'rgba(14, 12, 16, 0.82)',
     paddingHorizontal: 20,
-    paddingVertical: 21,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 24 },
-    shadowOpacity: 0.46,
+    paddingVertical: 22,
+    shadowColor: premiumColors.red,
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.3,
     shadowRadius: 32,
-    elevation: 10,
+    elevation: 12,
+  },
+  cardGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 22,
+    right: 22,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.26)',
   },
   kicker: {
-    color: '#F7D6DC',
+    color: premiumColors.redBright,
     fontSize: 11,
     fontWeight: '900',
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
   title: {
     color: '#FFFFFF',
-    fontSize: 27,
+    fontSize: 28,
     fontWeight: '900',
-    lineHeight: 32,
-    marginTop: 2,
-    marginBottom: 14,
+    lineHeight: 33,
+    marginTop: 4,
+    marginBottom: 16,
   },
   row: {
     flexDirection: 'row',
@@ -581,7 +499,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   label: {
-    color: '#EDF2F7',
+    color: premiumColors.text,
     fontSize: 12,
     fontWeight: '900',
     marginBottom: 8,
@@ -589,12 +507,12 @@ const styles = StyleSheet.create({
   input: {
     minHeight: 54,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.13)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.075)',
-    color: '#F8FAFC',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    color: premiumColors.text,
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     paddingHorizontal: 14,
   },
   phoneRow: {
@@ -608,13 +526,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.13)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 18,
     backgroundColor: 'rgba(255, 255, 255, 0.09)',
     paddingHorizontal: 14,
   },
   countryCodeText: {
-    color: '#F8FAFC',
+    color: premiumColors.text,
     fontSize: 15,
     fontWeight: '900',
   },
@@ -622,36 +540,41 @@ const styles = StyleSheet.create({
     minHeight: 54,
     flex: 1,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.13)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.075)',
-    color: '#F8FAFC',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    color: premiumColors.text,
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     paddingHorizontal: 14,
   },
   genderGrid: {
     flexDirection: 'row',
-    gap: 8,
-    alignSelf: 'flex-start',
+    gap: 10,
+    alignSelf: 'stretch',
   },
   genderOption: {
-    minHeight: 42,
+    flex: 1,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.13)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.075)',
-    paddingHorizontal: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
   genderOptionSelected: {
-    borderColor: 'rgba(225, 29, 46, 0.58)',
+    borderColor: 'rgba(225, 29, 46, 0.6)',
     backgroundColor: 'rgba(177, 18, 38, 0.32)',
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 4,
   },
   genderOptionText: {
-    color: '#D8DEE8',
-    fontSize: 11,
+    color: premiumColors.textMuted,
+    fontSize: 13,
     fontWeight: '900',
   },
   genderOptionTextSelected: {
@@ -665,7 +588,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   passwordGuidance: {
-    color: '#A8B2C0',
+    color: premiumColors.textMuted,
     fontSize: 10,
     fontWeight: '700',
     lineHeight: 15,
@@ -679,18 +602,23 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: 'center',
   },
+  primaryButtonWrap: {
+    borderRadius: 20,
+    marginTop: 4,
+    shadowColor: accentColor,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.4,
+    shadowRadius: 22,
+    elevation: 8,
+  },
   primaryButton: {
     minHeight: 56,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 120, 130, 0.5)',
     borderRadius: 20,
-    backgroundColor: accentColor,
-    marginTop: 2,
-    shadowColor: accentColor,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.32,
-    shadowRadius: 20,
-    elevation: 5,
   },
   primaryButtonText: {
     color: '#FFFFFF',
@@ -698,18 +626,17 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   backButton: {
-    zIndex: 2,
     minHeight: 46,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 14,
+    marginTop: 16,
   },
   backButtonText: {
-    color: '#F8FAFC',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '900',
   },
   buttonPressed: {
-    opacity: 0.78,
+    opacity: 0.8,
   },
 });

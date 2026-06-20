@@ -7,6 +7,8 @@ import type {
   Achievement,
   AttendanceDay,
   JourneyHistoryRecord,
+  JourneyMetricKey,
+  JourneyMetrics,
   JourneyProfile,
   JourneyStatKey,
   JourneyStats,
@@ -384,6 +386,226 @@ export const formatJourneyHistoryRange = (
   )}`;
 };
 
+// ---------------------------------------------------------------------------
+// All-time metrics with reset/undo/save history (parallel to the period stats).
+// Resetting a metric advances its baseline date so older data stops counting,
+// while the pre-reset snapshot is preserved and can be saved to history.
+// ---------------------------------------------------------------------------
+
+const initialMetricStart = '2026-01-01T00:00:00.000Z';
+const journeyMetricKeys: JourneyMetricKey[] = [
+  'averageMonthlyVisits',
+  'totalVisits',
+  'averageCaloriesBurned',
+  'averageWorkoutDuration',
+];
+let metricPeriodStarts: Record<JourneyMetricKey, string> = {
+  averageMonthlyVisits: initialMetricStart,
+  totalVisits: initialMetricStart,
+  averageCaloriesBurned: initialMetricStart,
+  averageWorkoutDuration: initialMetricStart,
+};
+let metricResetSnapshots: {
+  historyRecord: JourneyHistoryRecord;
+  previousStarts: Partial<Record<JourneyMetricKey, string>>;
+  metricKeys: JourneyMetricKey[];
+}[] = [];
+
+function getMetricSummary(metrics: JourneyMetrics) {
+  return [
+    `Avg monthly visits: ${metrics.averageMonthlyVisits}`,
+    `Total visits: ${metrics.totalVisits}`,
+    `Avg calories: ${metrics.averageCaloriesBurned}`,
+    `Avg duration: ${metrics.averageWorkoutDuration}`,
+  ].join('\n');
+}
+
+export const getJourneyMetrics = async (): Promise<JourneyMetrics> => {
+  const totalVisitDays = attendanceRecords.filter(
+    (day) => day.hasVisit && isOnOrAfter(day.date, metricPeriodStarts.totalVisits),
+  );
+  const monthlyVisitDays = attendanceRecords.filter(
+    (day) =>
+      day.hasVisit &&
+      isOnOrAfter(day.date, metricPeriodStarts.averageMonthlyVisits),
+  );
+  const trackedMonths = new Set(
+    monthlyVisitDays.map((day) => day.date.slice(0, 7)),
+  );
+  const averageMonthlyVisits =
+    trackedMonths.size > 0 ? monthlyVisitDays.length / trackedMonths.size : 0;
+
+  const calorieSessions = workoutSessions.filter((session) =>
+    isOnOrAfter(session.endedAt, metricPeriodStarts.averageCaloriesBurned),
+  );
+  const durationSessions = workoutSessions.filter((session) =>
+    isOnOrAfter(session.endedAt, metricPeriodStarts.averageWorkoutDuration),
+  );
+  const averageCaloriesBurned =
+    calorieSessions.length > 0
+      ? Math.round(
+          calorieSessions.reduce(
+            (total, session) => total + session.estimatedCaloriesBurned,
+            0,
+          ) / calorieSessions.length,
+        )
+      : 0;
+  const averageDurationSeconds =
+    durationSessions.length > 0
+      ? durationSessions.reduce(
+          (total, session) => total + session.durationSeconds,
+          0,
+        ) / durationSessions.length
+      : 0;
+
+  return {
+    averageMonthlyVisits: Number.isInteger(averageMonthlyVisits)
+      ? `${averageMonthlyVisits}`
+      : averageMonthlyVisits.toFixed(1),
+    totalVisits: totalVisitDays.length,
+    averageCaloriesBurned,
+    averageWorkoutDuration: formatAverageDuration(averageDurationSeconds),
+  };
+};
+
+const resetJourneyMetrics = async (
+  metricKeys: JourneyMetricKey[],
+): Promise<JourneyMetrics> => {
+  const endedAt = new Date().toISOString();
+  const previousStarts = metricKeys.reduce<
+    Partial<Record<JourneyMetricKey, string>>
+  >(
+    (starts, metricKey) => ({
+      ...starts,
+      [metricKey]: metricPeriodStarts[metricKey],
+    }),
+    {},
+  );
+  const earliestPreviousStart =
+    metricKeys
+      .map((metricKey) => previousStarts[metricKey])
+      .filter(Boolean)
+      .sort()[0] ?? initialMetricStart;
+  const metricsBeforeReset = await getJourneyMetrics();
+  const historyRecord: JourneyHistoryRecord = {
+    id: `journey-metric-history-${Date.now().toString(36)}`,
+    statKey: metricKeys.length === 1 ? metricKeys[0] : 'all',
+    startedAt: earliestPreviousStart,
+    endedAt,
+    summary: getMetricSummary(metricsBeforeReset),
+  };
+
+  metricResetSnapshots = [
+    {
+      historyRecord,
+      previousStarts,
+      metricKeys,
+    },
+    ...metricResetSnapshots.filter(
+      (snapshot) =>
+        !snapshot.metricKeys.some((snapshotKey) =>
+          metricKeys.includes(snapshotKey),
+        ),
+    ),
+  ];
+  metricPeriodStarts = metricKeys.reduce(
+    (starts, metricKey) => ({
+      ...starts,
+      [metricKey]: endedAt,
+    }),
+    metricPeriodStarts,
+  );
+
+  return getJourneyMetrics();
+};
+
+export const resetJourneyMetric = async (
+  metricKey: JourneyMetricKey,
+): Promise<JourneyMetrics> => resetJourneyMetrics([metricKey]);
+
+export const resetAllJourneyMetrics = async (): Promise<JourneyMetrics> =>
+  resetJourneyMetrics(journeyMetricKeys);
+
+export const undoResetJourneyMetric = async (
+  metricKey: JourneyMetricKey,
+): Promise<JourneyMetrics> => {
+  const snapshot = metricResetSnapshots.find((item) =>
+    item.metricKeys.includes(metricKey),
+  );
+
+  if (!snapshot) {
+    return getJourneyMetrics();
+  }
+
+  metricPeriodStarts = {
+    ...metricPeriodStarts,
+    ...snapshot.previousStarts,
+  };
+  metricResetSnapshots = metricResetSnapshots.filter(
+    (item) => item !== snapshot,
+  );
+
+  return getJourneyMetrics();
+};
+
+export const undoResetAllJourneyMetrics = async (): Promise<JourneyMetrics> => {
+  const snapshot = metricResetSnapshots.find((item) =>
+    journeyMetricKeys.every((metricKey) => item.metricKeys.includes(metricKey)),
+  );
+
+  if (!snapshot) {
+    return getJourneyMetrics();
+  }
+
+  metricPeriodStarts = {
+    ...metricPeriodStarts,
+    ...snapshot.previousStarts,
+  };
+  metricResetSnapshots = metricResetSnapshots.filter(
+    (item) => item !== snapshot,
+  );
+
+  return getJourneyMetrics();
+};
+
+export const saveJourneyMetricReset = async (
+  metricKey: JourneyMetricKey,
+): Promise<JourneyHistoryRecord[]> => {
+  const snapshot = metricResetSnapshots.find((item) =>
+    item.metricKeys.includes(metricKey),
+  );
+
+  if (!snapshot) {
+    return historyRecords;
+  }
+
+  historyRecords = [snapshot.historyRecord, ...historyRecords];
+  metricResetSnapshots = metricResetSnapshots.filter(
+    (item) => item !== snapshot,
+  );
+
+  return historyRecords;
+};
+
+export const saveAllJourneyMetricReset = async (): Promise<
+  JourneyHistoryRecord[]
+> => {
+  const snapshot = metricResetSnapshots.find((item) =>
+    journeyMetricKeys.every((metricKey) => item.metricKeys.includes(metricKey)),
+  );
+
+  if (!snapshot) {
+    return historyRecords;
+  }
+
+  historyRecords = [snapshot.historyRecord, ...historyRecords];
+  metricResetSnapshots = metricResetSnapshots.filter(
+    (item) => item !== snapshot,
+  );
+
+  return historyRecords;
+};
+
 export const getAchievements = async (): Promise<Achievement[]> => {
   return achievements;
 };
@@ -405,5 +627,12 @@ export const journeyService = {
   getJourneyHistory,
   formatJourneyHistoryRange,
   getJourneyStats,
+  getJourneyMetrics,
+  resetJourneyMetric,
+  resetAllJourneyMetrics,
+  undoResetJourneyMetric,
+  undoResetAllJourneyMetrics,
+  saveJourneyMetricReset,
+  saveAllJourneyMetricReset,
   getAchievements,
 };

@@ -9,10 +9,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
+import { GlowingChips } from '@/components/GlowingChips';
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import { MarvelMarks } from '@/components/PremiumUI';
 import {
@@ -72,6 +74,7 @@ export default function ClassesScreen() {
   const [selectedCategory, setSelectedCategory] =
     useState<(typeof categories)[number]>('Fitness Classes');
   const [selectedDay, setSelectedDay] = useState('Wednesday');
+  const [searchQuery, setSearchQuery] = useState('');
   const [pendingClassAction, setPendingClassAction] = useState<{
     action: 'cancel' | 'reserve';
     gymClass: GymClass;
@@ -105,6 +108,25 @@ export default function ClassesScreen() {
     () => classes.filter((gymClass) => gymClass.isRegistered),
     [classes],
   );
+
+  const trimmedQuery = searchQuery.trim().toLowerCase();
+  const isSearching = trimmedQuery.length > 0;
+
+  const searchResults = useMemo(() => {
+    if (!isSearching) {
+      return [];
+    }
+
+    return classes
+      .filter(
+        (gymClass) =>
+          gymClass.title.toLowerCase().includes(trimmedQuery) ||
+          gymClass.instructorName.toLowerCase().includes(trimmedQuery),
+      )
+      .sort((first, second) => first.startTime.localeCompare(second.startTime));
+  }, [classes, isSearching, trimmedQuery]);
+
+  const displayedClasses = isSearching ? searchResults : selectedClasses;
 
   const handleReserve = async (classId: string) => {
     await classService.registerForClass(classId);
@@ -158,42 +180,56 @@ export default function ClassesScreen() {
           </View>
         </LinearGradient>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryTabs}>
-          {categories.map((category) => {
-            const isSelected = selectedCategory === category;
-            const count = classes.filter(
-              (gymClass) => gymClass.category === category,
-            ).length;
+        <View style={styles.searchBar}>
+          <Text style={styles.searchIcon}>⌕</Text>
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search classes by name"
+            placeholderTextColor={premiumColors.textFaint}
+            style={styles.searchInput}
+            returnKeyType="search"
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 ? (
+            <Pressable
+              hitSlop={10}
+              onPress={() => setSearchQuery('')}
+              style={({ pressed }) => [
+                styles.searchClear,
+                pressed && styles.buttonPressed,
+              ]}>
+              <Text style={styles.searchClearText}>✕</Text>
+            </Pressable>
+          ) : null}
+        </View>
 
-            return (
-              <Pressable
-                key={category}
-                onPress={() => setSelectedCategory(category)}
-                style={[
-                  styles.categoryTab,
-                  isSelected && styles.categoryTabSelected,
-                ]}>
-                <Text
-                  style={[
-                    styles.categoryTabText,
-                    isSelected && styles.categoryTabTextSelected,
-                  ]}>
-                  {category}
-                </Text>
-                <Text
-                  style={[
-                    styles.categoryCount,
-                    isSelected && styles.categoryCountSelected,
-                  ]}>
-                  {count} classes
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        {isSearching ? (
+          <View style={styles.sectionHeading}>
+            <View style={styles.accentBar} />
+            <View style={styles.sectionHeadingText}>
+              <Text style={styles.sectionEyebrow}>Search</Text>
+              <Text style={styles.sectionHeadingTitle}>Matching classes</Text>
+            </View>
+            <Text style={styles.sectionHint}>{searchResults.length} found</Text>
+          </View>
+        ) : null}
+
+        {!isSearching ? (
+        <>
+        <View style={styles.selectorRow}>
+          <GlowingChips
+            items={categories.map((category) => ({
+              key: category,
+              label: category,
+              sublabel: `${classes.filter((gymClass) => gymClass.category === category).length} classes`,
+            }))}
+            selectedKey={selectedCategory}
+            onSelect={(key) =>
+              setSelectedCategory(key as (typeof categories)[number])
+            }
+          />
+        </View>
 
         <View style={styles.sectionHeading}>
           <View style={styles.accentBar} />
@@ -204,52 +240,38 @@ export default function ClassesScreen() {
           <Text style={styles.sectionHint}>{selectedClasses.length} classes</Text>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.dayTabs}>
-            {days.map((day) => {
-              const isSelected = selectedDay === day;
-              const count = classes.filter(
+        <View style={styles.selectorRow}>
+          <GlowingChips
+            items={days.map((day) => ({
+              key: day,
+              label: day.slice(0, 3),
+              sublabel: `${classes.filter(
                 (gymClass) =>
                   gymClass.category === selectedCategory &&
                   getClassDay(gymClass.startTime) === day,
-              ).length;
-
-              return (
-                <Pressable
-                  key={day}
-                  onPress={() => setSelectedDay(day)}
-                  style={[styles.dayTab, isSelected && styles.dayTabSelected]}>
-                  <Text
-                    style={[
-                      styles.dayTabText,
-                      isSelected && styles.dayTabTextSelected,
-                    ]}>
-                    {day.slice(0, 3)}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.dayCount,
-                      isSelected && styles.dayCountSelected,
-                    ]}>
-                    {count} classes
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+              ).length} classes`,
+            }))}
+            selectedKey={selectedDay}
+            onSelect={setSelectedDay}
+          />
+        </View>
+        </>
+        ) : null}
 
           <View style={styles.classList}>
-            {selectedClasses.length === 0 ? (
+            {displayedClasses.length === 0 ? (
               <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>No classes scheduled</Text>
+                <Text style={styles.emptyTitle}>
+                  {isSearching ? 'No matching classes' : 'No classes scheduled'}
+                </Text>
                 <Text style={styles.emptyBody}>
-                  Choose another day or category to see available sessions.
+                  {isSearching
+                    ? 'Try a different class name or coach.'
+                    : 'Choose another day or category to see available sessions.'}
                 </Text>
               </View>
             ) : (
-              selectedClasses.map((gymClass) => {
+              displayedClasses.map((gymClass) => {
                 const isReserved = Boolean(gymClass.isRegistered);
                 const isFull = gymClass.status === 'Full' && !isReserved;
 
@@ -486,6 +508,51 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textTransform: 'uppercase',
   },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(225, 29, 46, 0.28)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    shadowColor: premiumColors.red,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+  searchIcon: {
+    color: premiumColors.redBright,
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  searchInput: {
+    flex: 1,
+    color: premiumColors.text,
+    fontSize: 14,
+    fontWeight: '700',
+    paddingVertical: 12,
+  },
+  searchClear: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  searchClearText: {
+    color: premiumColors.textMuted,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  selectorRow: {
+    marginBottom: 16,
+  },
   categoryTabs: {
     gap: 10,
     paddingBottom: 14,
@@ -504,6 +571,11 @@ const styles = StyleSheet.create({
   categoryTabSelected: {
     borderColor: premiumColors.red,
     backgroundColor: 'rgba(177, 18, 38, 0.16)',
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 5,
   },
   categoryTabText: {
     color: premiumColors.textMuted,
@@ -589,6 +661,11 @@ const styles = StyleSheet.create({
   dayTabSelected: {
     borderColor: premiumColors.red,
     backgroundColor: premiumColors.red,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 6,
   },
   dayTabText: {
     color: premiumColors.textMuted,

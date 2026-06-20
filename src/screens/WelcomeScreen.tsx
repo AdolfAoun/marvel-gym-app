@@ -20,13 +20,6 @@ import { entryContentService } from '@/services';
 import type { EntrySlide } from '@/services/entryContentService';
 
 const accentBright = '#E11D2E';
-const accentDeep = '#8F0D1B';
-const logoSigns = [
-  require('../../assets/images/marvel-logo-startup-sign-dot.png'),
-  require('../../assets/images/marvel-logo-startup-sign-x.png'),
-  require('../../assets/images/marvel-logo-startup-sign-slash.png'),
-  require('../../assets/images/marvel-logo-startup-sign-divide.png'),
-];
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -93,71 +86,26 @@ export default function WelcomeScreen() {
           style={styles.topVignette}
         />
 
-        {/* The photo stays full-screen and slowly turns into the red/black CTA base. */}
+        {/* One smooth bottom fade: clear image up top, heavy dark red at the base. */}
         <LinearGradient
           pointerEvents="none"
           colors={[
             'transparent',
-            'rgba(177, 18, 38, 0.1)',
-            'rgba(177, 18, 38, 0.34)',
-            'rgba(96, 6, 17, 0.76)',
+            'rgba(120, 11, 24, 0.32)',
+            'rgba(96, 7, 17, 0.74)',
+            'rgba(58, 3, 9, 0.97)',
           ]}
-          locations={[0, 0.34, 0.72, 1]}
-          style={styles.photoRedFade}
-        />
-
-        {/* Cinematic wash: no separate block, just a gradual Marvel red fade. */}
-        <LinearGradient
-          pointerEvents="none"
-          colors={[
-            'transparent',
-            'rgba(177, 18, 38, 0.22)',
-            'rgba(177, 18, 38, 0.72)',
-            'rgba(87, 5, 14, 0.98)',
-            '#070203',
-          ]}
-          locations={[0, 0.22, 0.5, 0.76, 1]}
-          style={styles.redWash}
-        />
-
-        {/* Soft bottom glow keeps the buttons alive without turning shiny/yellow. */}
-        <LinearGradient
-          pointerEvents="none"
-          colors={['transparent', 'rgba(255, 35, 55, 0.16)', 'transparent']}
-          locations={[0, 0.5, 1]}
+          locations={[0, 0.4, 0.72, 1]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
-          style={styles.redBloom}
+          style={styles.redFade}
         />
 
-        {/* All copy + CTAs sit over the photo */}
+        {/* CTAs sit over the photo */}
         <SafeAreaView
           edges={['bottom']}
           pointerEvents="box-none"
           style={styles.overlay}>
-          <View pointerEvents="none" style={styles.copyBlock}>
-            <View style={styles.signStrip}>
-              {logoSigns.map((sign, index) => (
-                <Image
-                  key={index}
-                  source={sign}
-                  resizeMode="contain"
-                  style={[
-                    styles.logoSign,
-                    index === 0 && styles.logoSignDot,
-                    index === 3 && styles.logoSignDivide,
-                  ]}
-                />
-              ))}
-            </View>
-            <Text style={styles.heroHeadline}>
-              READY FOR THE GYM{'\n'}IN YOUR POCKET?
-            </Text>
-            <Text style={styles.heroSubtitle}>
-              {"We've got you covered with workouts,\nvirtual tours, tutorials, and activity tracking."}
-            </Text>
-          </View>
-
           <View pointerEvents="none" style={styles.carouselDots}>
             {carouselSlides.map((_, index) => (
               <View
@@ -240,28 +188,12 @@ const styles = StyleSheet.create({
     right: 0,
     height: 160,
   },
-  redWash: {
+  redFade: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: '76%',
-  },
-  photoRedFade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: '30%',
-    height: '46%',
-  },
-  redBloom: {
-    position: 'absolute',
-    left: -70,
-    right: -70,
-    bottom: -120,
-    height: 300,
-    borderRadius: 240,
-    opacity: 0.42,
+    height: '56%',
   },
   overlay: {
     flex: 1,
@@ -269,52 +201,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     paddingBottom: Platform.OS === 'web' ? 24 : 18,
   },
-  copyBlock: {
-    marginBottom: 0,
-  },
-  signStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 18,
-  },
-  logoSign: {
-    width: 20,
-    height: 20,
-    opacity: 0.82,
-    tintColor: accentBright,
-  },
-  logoSignDot: {
-    width: 9,
-    height: 9,
-  },
-  logoSignDivide: {
-    width: 22,
-  },
-  heroHeadline: {
-    color: '#FFFFFF',
-    fontSize: 42,
-    fontWeight: '900',
-    fontStyle: 'italic',
-    letterSpacing: 0,
-    lineHeight: 52,
-    textShadowColor: 'rgba(0, 0, 0, 0.42)',
-    textShadowOffset: { width: 0, height: 3 },
-    textShadowRadius: 12,
-  },
-  heroSubtitle: {
-    color: 'rgba(255, 255, 255, 0.88)',
-    fontSize: 16,
-    fontWeight: '600',
-    lineHeight: 26,
-    marginTop: 20,
-    maxWidth: 350,
-  },
   carouselDots: {
     flexDirection: 'row',
     alignSelf: 'center',
     gap: 12,
-    marginTop: 26,
     marginBottom: 28,
   },
   carouselDot: {

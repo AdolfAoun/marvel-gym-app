@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GlowingChips } from '@/components/GlowingChips';
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import {
   premiumColors,
@@ -56,23 +57,9 @@ const voucherStatuses: VoucherStatus[] = ['Pending', 'Confirmed', 'Canceled'];
 const weeklyFreezePrice = FREEZE_WEEKLY_PRICE;
 const maxRenewMonths = 12;
 const minRenewMonths = 1;
-const homeWallpaperMarks = [
-  { symbol: 'x', top: 4, left: 14, size: 58, rotate: '-14deg', opacity: 0.035 },
-  { symbol: '+', top: 70, right: 26, size: 38, rotate: '10deg', opacity: 0.04 },
-  { symbol: '/', top: 142, left: 82, size: 62, rotate: '17deg', opacity: 0.03 },
-  { symbol: '=', top: 210, right: 44, size: 48, rotate: '-8deg', opacity: 0.035 },
-  { symbol: '+', top: 308, left: 24, size: 72, rotate: '12deg', opacity: 0.028 },
-  { symbol: 'x', top: 390, right: 18, size: 56, rotate: '15deg', opacity: 0.034 },
-  { symbol: '/', top: 520, left: 42, size: 44, rotate: '-18deg', opacity: 0.03 },
-  { symbol: '=', top: 640, right: 70, size: 64, rotate: '7deg', opacity: 0.032 },
-  { symbol: '+', top: 780, left: 112, size: 40, rotate: '-10deg', opacity: 0.036 },
-  { symbol: 'x', top: 910, right: 36, size: 76, rotate: '-15deg', opacity: 0.026 },
-  { symbol: '/', top: 1060, left: 18, size: 58, rotate: '18deg', opacity: 0.03 },
-  { symbol: '=', top: 1200, right: 20, size: 48, rotate: '-7deg', opacity: 0.032 },
-  { symbol: '+', top: 1360, left: 70, size: 68, rotate: '9deg', opacity: 0.025 },
-  { symbol: 'x', top: 1520, right: 92, size: 42, rotate: '13deg', opacity: 0.034 },
-  { symbol: '/', top: 1680, left: 122, size: 54, rotate: '-17deg', opacity: 0.028 },
-];
+
+const machineGuideSign = require('@/assets/images/marvel-logo-startup-sign-x.png');
+const aiHelpSign = require('@/assets/images/marvel-logo-startup-sign-divide.png');
 
 type MembershipModal = 'freeze' | 'renew';
 
@@ -577,25 +564,6 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        <View pointerEvents="none" style={styles.homeWallpaper}>
-          {homeWallpaperMarks.map((mark, index) => (
-            <Text
-              key={index}
-              style={[
-                styles.homeWallpaperMark,
-                {
-                  fontSize: mark.size,
-                  opacity: mark.opacity,
-                  top: mark.top,
-                  left: 'left' in mark ? mark.left : undefined,
-                  right: 'right' in mark ? mark.right : undefined,
-                  transform: [{ rotate: mark.rotate }],
-                },
-              ]}>
-              {mark.symbol}
-            </Text>
-          ))}
-        </View>
         <View style={styles.heroCard}>
           <View pointerEvents="none" style={styles.heroGloss} />
           <View style={styles.heroTopRow}>
@@ -719,9 +687,15 @@ export default function HomeScreen() {
               }}
               style={({ pressed }) => [
                 styles.actionChip,
+                styles.actionChipRenew,
                 pressed && styles.buttonPressed,
               ]}>
-              <View style={styles.actionIconWrap}>
+              <LinearGradient
+                pointerEvents="none"
+                colors={['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0)']}
+                style={styles.actionChipGloss}
+              />
+              <View style={[styles.actionIconWrap, styles.actionIconWrapRenew]}>
                 <Text style={styles.actionIcon}>↻</Text>
               </View>
               <Text style={styles.actionTitle}>Renew</Text>
@@ -730,20 +704,20 @@ export default function HomeScreen() {
 
             <Pressable
               onPress={() => {
-                if (isFrozen) {
-                  setSelectedFreezeWeeks(1);
-                  setMembershipModal('freeze');
-                  return;
-                }
-
                 setSelectedFreezeWeeks(1);
                 setMembershipModal('freeze');
               }}
               style={({ pressed }) => [
                 styles.actionChip,
+                styles.actionChipFreeze,
                 pressed && styles.buttonPressed,
               ]}>
-              <View style={styles.actionIconWrap}>
+              <LinearGradient
+                pointerEvents="none"
+                colors={['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0)']}
+                style={styles.actionChipGloss}
+              />
+              <View style={[styles.actionIconWrap, styles.actionIconWrapFreeze]}>
                 <Text style={styles.actionIcon}>❄</Text>
               </View>
               <Text style={styles.actionTitle}>Freeze</Text>
@@ -777,30 +751,14 @@ export default function HomeScreen() {
               end={{ x: 0.9, y: 1 }}
               style={StyleSheet.absoluteFill}
             />
-            <View pointerEvents="none" style={styles.featureSlashOne} />
-            <View pointerEvents="none" style={styles.featureSlashTwo} />
+            <Image
+              source={machineGuideSign}
+              style={styles.featureWatermark}
+              resizeMode="contain"
+            />
             <View style={styles.featureTopRow}>
               <View style={styles.featureIconBadge}>
                 <Text style={styles.featureBadgeText}>MG</Text>
-                <Image
-                  source={require('@/assets/images/marvel-logo-startup-sign-x.png')}
-                  style={styles.featureSignLarge}
-                  resizeMode="contain"
-                />
-                <Image
-                  source={require('@/assets/images/marvel-logo-startup-sign-slash.png')}
-                  style={styles.featureSignSmall}
-                  resizeMode="contain"
-                />
-                <Text style={styles.featureIconGlyph}>⛭</Text>
-              </View>
-              <View style={styles.featureArrow}>
-                <Image
-                  source={require('@/assets/images/marvel-logo-startup-sign-divide.png')}
-                  style={styles.featureArrowSign}
-                  resizeMode="contain"
-                />
-                <Text style={styles.featureArrowText}>→</Text>
               </View>
             </View>
             <Text style={styles.featureKicker}>Machine Guide</Text>
@@ -823,25 +781,14 @@ export default function HomeScreen() {
               end={{ x: 0.9, y: 1 }}
               style={StyleSheet.absoluteFill}
             />
-            <View pointerEvents="none" style={styles.featureSlashOneMuted} />
-            <View pointerEvents="none" style={styles.featureSlashTwoMuted} />
+            <Image
+              source={aiHelpSign}
+              style={[styles.featureWatermark, styles.featureWatermarkAi]}
+              resizeMode="contain"
+            />
             <View style={styles.featureTopRow}>
               <View style={[styles.featureIconBadge, styles.featureIconBadgeAi]}>
                 <Text style={styles.featureBadgeText}>?</Text>
-                <Image
-                  source={require('@/assets/images/marvel-logo-startup-sign-dot.png')}
-                  style={styles.featureDotSign}
-                  resizeMode="contain"
-                />
-                <Image
-                  source={require('@/assets/images/marvel-logo-startup-sign-divide.png')}
-                  style={styles.featureSignSmall}
-                  resizeMode="contain"
-                />
-                <Text style={styles.featureIconGlyph}>✦</Text>
-              </View>
-              <View style={styles.featureArrow}>
-                <Text style={styles.featureArrowText}>→</Text>
               </View>
             </View>
             <Text style={[styles.featureKicker, styles.featureKickerAi]}>
@@ -866,32 +813,16 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.activityPanel}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.daySelector}>
-            {activitySchedule.map((item) => {
-              const isSelected = item.id === selectedActivityDay?.id;
-
-              return (
-                <Pressable
-                  key={item.id}
-                  onPress={() => setSelectedActivityDayId(item.id)}
-                  style={[
-                    styles.dayChip,
-                    isSelected && styles.dayChipSelected,
-                  ]}>
-                  <Text
-                    style={[
-                      styles.dayChipText,
-                      isSelected && styles.dayChipTextSelected,
-                    ]}>
-                    {item.dayLabel.slice(0, 3)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+          <View style={styles.daySelector}>
+            <GlowingChips
+              items={activitySchedule.map((item) => ({
+                key: item.id,
+                label: item.dayLabel.slice(0, 3),
+              }))}
+              selectedKey={selectedActivityDay?.id ?? ''}
+              onSelect={setSelectedActivityDayId}
+            />
+          </View>
 
           <ScrollView
             horizontal
@@ -1313,23 +1244,6 @@ const styles = StyleSheet.create({
     paddingTop: 72,
     paddingBottom: 132,
   },
-  homeWallpaper: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 1860,
-    overflow: 'hidden',
-  },
-  homeWallpaperMark: {
-    position: 'absolute',
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontStyle: 'italic',
-    textShadowColor: 'rgba(225, 29, 46, 0.12)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 16,
-  },
   loadingState: {
     flex: 1,
     alignItems: 'center',
@@ -1345,16 +1259,16 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: 28,
-    backgroundColor: 'rgba(15, 17, 23, 0.74)',
+    backgroundColor: 'rgba(18, 20, 28, 0.66)',
     padding: 18,
     marginBottom: 22,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.22,
-    shadowRadius: 28,
-    elevation: 8,
+    shadowColor: premiumColors.red,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.3,
+    shadowRadius: 30,
+    elevation: 10,
   },
   heroGloss: {
     position: 'absolute',
@@ -1415,15 +1329,20 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   avatarBadge: {
-    width: 54,
-    height: 54,
+    width: 50,
+    height: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 0,
-    borderColor: 'transparent',
-    borderRadius: 27,
-    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.45)',
+    borderRadius: 25,
+    backgroundColor: 'rgba(10, 8, 12, 0.35)',
     overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 4,
   },
   avatarImage: {
     width: '100%',
@@ -1668,10 +1587,17 @@ const styles = StyleSheet.create({
   },
   activityPanel: {
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: 'rgba(18, 20, 28, 0.6)',
     padding: 14,
     marginBottom: 22,
+    shadowColor: premiumColors.red,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 22,
+    elevation: 6,
   },
   voucherRail: {
     gap: 12,
@@ -1687,6 +1613,8 @@ const styles = StyleSheet.create({
   },
   actionChip: {
     width: 150,
+    position: 'relative',
+    overflow: 'hidden',
     alignItems: 'flex-start',
     borderWidth: 1,
     borderColor: premiumColors.glassBorder,
@@ -1695,9 +1623,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 15,
   },
+  actionChipGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '52%',
+  },
   actionChipPrimary: {
     borderColor: 'rgba(225, 29, 46, 0.5)',
-    backgroundColor: 'rgba(177, 18, 38, 0.16)',
+    backgroundColor: 'rgba(177, 18, 38, 0.18)',
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 18,
+    elevation: 7,
+  },
+  actionChipRenew: {
+    borderColor: 'rgba(225, 29, 46, 0.28)',
+    backgroundColor: 'rgba(120, 15, 30, 0.22)',
+    shadowColor: premiumColors.red,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  actionChipFreeze: {
+    borderColor: 'rgba(96, 165, 250, 0.28)',
+    backgroundColor: 'rgba(30, 58, 92, 0.22)',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    elevation: 4,
   },
   actionIconWrap: {
     width: 36,
@@ -1710,6 +1668,12 @@ const styles = StyleSheet.create({
   },
   actionIconWrapPrimary: {
     backgroundColor: accentColor,
+  },
+  actionIconWrapRenew: {
+    backgroundColor: 'rgba(225, 29, 46, 0.85)',
+  },
+  actionIconWrapFreeze: {
+    backgroundColor: 'rgba(59, 130, 246, 0.7)',
   },
   actionIcon: {
     color: '#FFFFFF',
@@ -1764,47 +1728,29 @@ const styles = StyleSheet.create({
     borderColor: premiumColors.glassBorder,
     borderRadius: 24,
     padding: 16,
-    ...premiumShadow,
+    shadowColor: premiumColors.red,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.28,
+    shadowRadius: 24,
+    elevation: 9,
   },
   featurePressed: {
     opacity: 0.9,
     transform: [{ scale: 0.985 }],
   },
-  featureSlashOne: {
+  featureWatermark: {
     position: 'absolute',
-    right: 22,
-    top: -26,
-    width: 22,
-    height: 154,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    transform: [{ rotate: '20deg' }],
+    right: -14,
+    top: -10,
+    width: 92,
+    height: 92,
+    opacity: 0.16,
+    tintColor: '#FFFFFF',
+    transform: [{ rotate: '14deg' }],
   },
-  featureSlashTwo: {
-    position: 'absolute',
-    right: 58,
-    top: 22,
-    width: 10,
-    height: 112,
-    backgroundColor: 'rgba(225, 29, 46, 0.22)',
-    transform: [{ rotate: '20deg' }],
-  },
-  featureSlashOneMuted: {
-    position: 'absolute',
-    right: 24,
-    top: -20,
-    width: 18,
-    height: 150,
-    backgroundColor: 'rgba(225, 29, 46, 0.18)',
-    transform: [{ rotate: '20deg' }],
-  },
-  featureSlashTwoMuted: {
-    position: 'absolute',
-    right: 62,
-    top: 34,
-    width: 9,
-    height: 104,
-    backgroundColor: 'rgba(255, 255, 255, 0.09)',
-    transform: [{ rotate: '20deg' }],
+  featureWatermarkAi: {
+    opacity: 0.12,
+    tintColor: '#FF8088',
   },
   featureTopRow: {
     flexDirection: 'row',
@@ -1906,7 +1852,6 @@ const styles = StyleSheet.create({
     ...premiumShadow,
   },
   daySelector: {
-    gap: 8,
     paddingBottom: 14,
   },
   dayChip: {

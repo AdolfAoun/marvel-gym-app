@@ -65,28 +65,10 @@ export default function IndexRoute() {
       />
       <LinearGradient
         pointerEvents="none"
-        colors={['rgba(225, 29, 46, 0)', 'rgba(225, 29, 46, 0.18)', 'rgba(225, 29, 46, 0)']}
-        locations={[0, 0.5, 1]}
-        start={{ x: 0.05, y: 0.1 }}
-        end={{ x: 0.95, y: 0.9 }}
-        style={styles.redAtmosphere}
-      />
-      <LinearGradient
-        pointerEvents="none"
         colors={['rgba(255, 255, 255, 0.055)', 'rgba(255, 255, 255, 0)']}
         start={{ x: 0.18, y: 0 }}
         end={{ x: 0.74, y: 0.48 }}
         style={styles.topSheen}
-      />
-      <Image
-        source={require('@/assets/images/marvel-logo-startup-sign-slash.png')}
-        style={styles.signSlashAccent}
-        resizeMode="contain"
-      />
-      <Image
-        source={require('@/assets/images/marvel-logo-startup-sign-dot.png')}
-        style={styles.signDotAccent}
-        resizeMode="contain"
       />
 
       <View style={styles.logoBlock}>
@@ -157,36 +139,12 @@ const styles = StyleSheet.create({
     opacity: 0.82,
     transform: [{ scale: 1.03 }],
   },
-  redAtmosphere: {
-    position: 'absolute',
-    left: -90,
-    right: -90,
-    bottom: 60,
-    height: 360,
-  },
   topSheen: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     height: 380,
-  },
-  signSlashAccent: {
-    position: 'absolute',
-    right: 42,
-    top: 110,
-    width: 42,
-    height: 76,
-    opacity: 0.12,
-    transform: [{ rotate: '19deg' }],
-  },
-  signDotAccent: {
-    position: 'absolute',
-    right: 86,
-    top: 178,
-    width: 18,
-    height: 18,
-    opacity: 0.16,
   },
   logoBlock: {
     alignItems: 'center',

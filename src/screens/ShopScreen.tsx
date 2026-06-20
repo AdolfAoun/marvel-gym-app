@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 
+import { GlowingChips } from '@/components/GlowingChips';
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import { MarvelMarks } from '@/components/PremiumUI';
 import {
@@ -132,32 +132,16 @@ export default function ShopScreen() {
           </View>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryList}>
-          {categories.map((category) => {
-              const isSelected = selectedCategory === category;
-
-              return (
-                <Pressable
-                  key={category}
-                  onPress={() => setSelectedCategory(category)}
-                  style={[
-                    styles.categoryChip,
-                    isSelected && styles.categoryChipSelected,
-                  ]}>
-                  <Text
-                    style={[
-                      styles.categoryChipText,
-                      isSelected && styles.categoryChipTextSelected,
-                    ]}>
-                    {category}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+        <View style={styles.categoryList}>
+          <GlowingChips
+            items={categories.map((category) => ({
+              key: category,
+              label: category,
+            }))}
+            selectedKey={selectedCategory}
+            onSelect={(key) => setSelectedCategory(key as ProductCategory)}
+          />
+        </View>
 
         <View style={styles.sectionHeading}>
           <View style={styles.accentBar} />
@@ -167,34 +151,15 @@ export default function ShopScreen() {
             <Text style={styles.sortLabel}>{sortLabel}</Text>
           </View>
           <View style={styles.sortGroup}>
-            <Pressable
-              onPress={() => setSortMode('price-asc')}
-              style={[
-                styles.sortButton,
-                sortMode === 'price-asc' && styles.sortButtonSelected,
-              ]}>
-              <Text
-                style={[
-                  styles.sortButtonText,
-                  sortMode === 'price-asc' && styles.sortButtonTextSelected,
-                ]}>
-                Low
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setSortMode('price-desc')}
-              style={[
-                styles.sortButton,
-                sortMode === 'price-desc' && styles.sortButtonSelected,
-              ]}>
-              <Text
-                style={[
-                  styles.sortButtonText,
-                  sortMode === 'price-desc' && styles.sortButtonTextSelected,
-                ]}>
-                High
-              </Text>
-            </Pressable>
+            <GlowingChips
+              variant="segment"
+              items={[
+                { key: 'price-asc', label: 'Low' },
+                { key: 'price-desc', label: 'High' },
+              ]}
+              selectedKey={sortMode}
+              onSelect={(key) => setSortMode(key as SortMode)}
+            />
           </View>
         </View>
 
@@ -412,30 +377,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   categoryList: {
-    gap: 8,
     paddingBottom: 18,
-  },
-  categoryChip: {
-    minHeight: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
-    borderRadius: 999,
-    backgroundColor: premiumColors.surfaceSoft,
-    paddingHorizontal: 16,
-  },
-  categoryChipSelected: {
-    borderColor: accentColor,
-    backgroundColor: accentColor,
-  },
-  categoryChipText: {
-    color: wineColor,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  categoryChipTextSelected: {
-    color: '#FFFFFF',
   },
   productsHeader: {
     flexDirection: 'row',
@@ -453,28 +395,7 @@ const styles = StyleSheet.create({
   },
   sortGroup: {
     flexDirection: 'row',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.14)',
-    borderRadius: 999,
-    backgroundColor: premiumColors.surfaceSoft,
-  },
-  sortButton: {
-    minHeight: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  sortButtonSelected: {
-    backgroundColor: accentColor,
-  },
-  sortButtonText: {
-    color: wineColor,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  sortButtonTextSelected: {
-    color: '#FFFFFF',
+    width: 132,
   },
   productGrid: {
     flexDirection: 'row',

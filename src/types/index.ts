@@ -196,6 +196,19 @@ export type JourneyStatKey =
   | 'estimatedCaloriesBurned'
   | 'visitsThisWeek';
 
+export type JourneyMetricKey =
+  | 'averageMonthlyVisits'
+  | 'totalVisits'
+  | 'averageCaloriesBurned'
+  | 'averageWorkoutDuration';
+
+export type JourneyMetrics = {
+  averageMonthlyVisits: string;
+  totalVisits: number;
+  averageCaloriesBurned: number;
+  averageWorkoutDuration: string;
+};
+
 export type WorkoutSession = {
   id: string;
   startedAt: string;
@@ -206,7 +219,7 @@ export type WorkoutSession = {
 
 export type JourneyHistoryRecord = {
   id: string;
-  statKey: JourneyStatKey | 'all';
+  statKey: JourneyStatKey | JourneyMetricKey | 'all';
   startedAt: string;
   endedAt: string;
   summary: string;
