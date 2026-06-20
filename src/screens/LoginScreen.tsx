@@ -174,7 +174,7 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}>
           <View style={styles.brandBlock}>
             <Image
-              source={require('@/assets/images/marvel-logo-transparent.png')}
+              source={require('@/assets/images/marvel-logo-startup-wordmark.png')}
               style={styles.brandLogo}
               resizeMode="contain"
             />
@@ -350,11 +350,11 @@ const styles = StyleSheet.create({
   },
   brandBlock: {
     alignItems: 'center',
-    marginBottom: 22,
+    marginBottom: 26,
   },
   brandLogo: {
-    width: 150,
-    height: 92,
+    width: 220,
+    height: 70,
   },
   card: {
     position: 'relative',

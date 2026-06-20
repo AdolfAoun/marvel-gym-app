@@ -231,7 +231,7 @@ export default function CreateAccountScreen() {
           showsVerticalScrollIndicator={false}>
           <View style={styles.brandBlock}>
             <Image
-              source={require('@/assets/images/marvel-logo-transparent.png')}
+              source={require('@/assets/images/marvel-logo-startup-wordmark.png')}
               style={styles.brandLogo}
               resizeMode="contain"
             />
@@ -435,18 +435,18 @@ const styles = StyleSheet.create({
   },
   brandBlock: {
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 20,
   },
   brandLogo: {
-    width: 132,
-    height: 80,
+    width: 196,
+    height: 62,
   },
   brandSubtitle: {
     color: premiumColors.redBright,
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 1.4,
-    marginTop: 2,
+    marginTop: 8,
     textTransform: 'uppercase',
   },
   card: {

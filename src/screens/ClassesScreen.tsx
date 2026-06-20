@@ -222,7 +222,6 @@ export default function ClassesScreen() {
             items={categories.map((category) => ({
               key: category,
               label: category,
-              sublabel: `${classes.filter((gymClass) => gymClass.category === category).length} classes`,
             }))}
             selectedKey={selectedCategory}
             onSelect={(key) =>
@@ -245,11 +244,6 @@ export default function ClassesScreen() {
             items={days.map((day) => ({
               key: day,
               label: day.slice(0, 3),
-              sublabel: `${classes.filter(
-                (gymClass) =>
-                  gymClass.category === selectedCategory &&
-                  getClassDay(gymClass.startTime) === day,
-              ).length} classes`,
             }))}
             selectedKey={selectedDay}
             onSelect={setSelectedDay}
