@@ -23,6 +23,12 @@ import { premiumColors, premiumGradients } from '@/constants/premiumTheme';
 import { authService, entryContentService } from '@/services';
 
 const accentColor = premiumColors.redBright;
+const brandSigns = [
+  require('@/assets/images/marvel-logo-startup-sign-dot.png'),
+  require('@/assets/images/marvel-logo-startup-sign-x.png'),
+  require('@/assets/images/marvel-logo-startup-sign-slash.png'),
+  require('@/assets/images/marvel-logo-startup-sign-divide.png'),
+];
 
 function formatLebanesePhone(value: string) {
   const digits = value.replace(/\D/g, '').slice(0, 8);
@@ -173,6 +179,19 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           <View style={styles.brandBlock}>
+            <View style={styles.brandSigns}>
+              {brandSigns.map((source, index) => (
+                <Image
+                  key={index}
+                  source={source}
+                  resizeMode="contain"
+                  style={[
+                    styles.brandSign,
+                    index === 0 && styles.brandSignDot,
+                  ]}
+                />
+              ))}
+            </View>
             <Image
               source={require('@/assets/images/marvel-logo-startup-wordmark.png')}
               style={styles.brandLogo}
@@ -246,7 +265,7 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Password</Text>
+              <Text style={[styles.label, styles.passwordLabel]}>Password</Text>
               <View style={styles.passwordRow}>
                 <TextInput
                   value={password}
@@ -352,6 +371,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 26,
   },
+  brandSigns: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginBottom: 7,
+  },
+  brandSign: {
+    width: 16,
+    height: 16,
+    tintColor: premiumColors.redBright,
+  },
+  brandSignDot: {
+    width: 8,
+    height: 8,
+  },
   brandLogo: {
     width: 220,
     height: 70,
@@ -409,6 +443,9 @@ const styles = StyleSheet.create({
     color: premiumColors.text,
     fontSize: 13,
     fontWeight: '800',
+  },
+  passwordLabel: {
+    marginBottom: 5,
   },
   modeToggleText: {
     color: premiumColors.redBright,

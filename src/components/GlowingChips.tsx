@@ -19,6 +19,8 @@ export type GlowingChipItem = {
   key: string;
   label: string;
   sublabel?: string;
+  dotColor?: string;
+  trailingLabel?: string;
 };
 
 type ChipLayout = {
@@ -38,6 +40,7 @@ type GlowingChipsProps = {
   variant?: 'scroll' | 'segment';
   style?: StyleProp<ViewStyle>;
   chipStyle?: StyleProp<ViewStyle>;
+  unselectedChipStyle?: StyleProp<ViewStyle>;
   labelStyle?: StyleProp<TextStyle>;
 };
 
@@ -54,6 +57,7 @@ export function GlowingChips({
   variant = 'scroll',
   style,
   chipStyle,
+  unselectedChipStyle,
   labelStyle,
 }: GlowingChipsProps) {
   const [layouts, setLayouts] = useState<Record<string, ChipLayout>>({});
@@ -186,16 +190,27 @@ export function GlowingChips({
               styles.chip,
               isSegment && styles.chipSegment,
               chipStyle,
+              !isSelected && unselectedChipStyle,
               pressed && styles.chipPressed,
             ]}>
-            <Text
-              style={[
-                styles.label,
-                isSelected && styles.labelSelected,
-                labelStyle,
-              ]}>
-              {item.label}
-            </Text>
+            <View style={styles.chipContent}>
+              {item.dotColor ? (
+                <View style={[styles.chipDot, { backgroundColor: item.dotColor }]} />
+              ) : null}
+              <Text
+                style={[
+                  styles.label,
+                  isSelected && styles.labelSelected,
+                  labelStyle,
+                ]}>
+                {item.label}
+              </Text>
+              {item.trailingLabel ? (
+                <Text style={[styles.chipCount, isSelected && styles.chipCountSelected]}>
+                  {item.trailingLabel}
+                </Text>
+              ) : null}
+            </View>
             {item.sublabel ? (
               <Text
                 style={[
@@ -250,14 +265,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 3,
     bottom: 3,
+    overflow: 'hidden',
     borderRadius: 999,
-    backgroundColor: premiumColors.red,
+    backgroundColor: 'rgba(177, 18, 38, 0.92)',
     borderWidth: 1,
     borderColor: 'rgba(255, 140, 150, 0.55)',
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
     elevation: 0,
   },
   chip: {
@@ -273,6 +285,30 @@ const styles = StyleSheet.create({
   },
   chipPressed: {
     opacity: 0.85,
+  },
+  chipContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  chipDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+  },
+  chipCount: {
+    overflow: 'hidden',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    color: premiumColors.textMuted,
+    fontSize: 10,
+    fontWeight: '900',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  chipCountSelected: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    color: '#FFFFFF',
   },
   label: {
     color: premiumColors.textMuted,

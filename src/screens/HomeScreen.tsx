@@ -2,6 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -163,6 +164,22 @@ function getActivityColor(count: number) {
   }
 
   return '#00E5FF';
+}
+
+function getCrowdLevelLabel(count: number) {
+  if (count <= 40) {
+    return 'Low';
+  }
+
+  if (count <= 60) {
+    return 'Mid';
+  }
+
+  if (count <= 80) {
+    return 'High';
+  }
+
+  return 'Peak';
 }
 
 function getVoucherStatusColor(status: VoucherStatus) {
@@ -699,7 +716,7 @@ export default function HomeScreen() {
                 <Text style={styles.actionIcon}>↻</Text>
               </View>
               <Text style={styles.actionTitle}>Renew</Text>
-              <Text style={styles.actionCaption}>Add months</Text>
+              <Text style={styles.actionCaption}>Increase Validity</Text>
             </Pressable>
 
             <Pressable
@@ -758,7 +775,13 @@ export default function HomeScreen() {
             />
             <View style={styles.featureTopRow}>
               <View style={styles.featureIconBadge}>
-                <Text style={styles.featureBadgeText}>MG</Text>
+                <SymbolView
+                  name="dumbbell.fill"
+                  size={23}
+                  tintColor="#FFFFFF"
+                  weight="semibold"
+                  fallback={<Text style={styles.featureBadgeText}>D</Text>}
+                />
               </View>
             </View>
             <Text style={styles.featureKicker}>Machine Guide</Text>
@@ -788,7 +811,13 @@ export default function HomeScreen() {
             />
             <View style={styles.featureTopRow}>
               <View style={[styles.featureIconBadge, styles.featureIconBadgeAi]}>
-                <Text style={styles.featureBadgeText}>?</Text>
+                <SymbolView
+                  name="book.fill"
+                  size={22}
+                  tintColor="#FFFFFF"
+                  weight="semibold"
+                  fallback={<Text style={styles.featureBadgeText}>B</Text>}
+                />
               </View>
             </View>
             <Text style={[styles.featureKicker, styles.featureKickerAi]}>
@@ -830,7 +859,9 @@ export default function HomeScreen() {
             contentContainerStyle={styles.activityChart}>
             {selectedActivityDay?.levels.map((item) => (
               <View key={item.id} style={styles.activityColumn}>
-                <Text style={styles.activityValue}>{item.count}%</Text>
+                <Text style={styles.activityValue}>
+                  {getCrowdLevelLabel(item.count)}
+                </Text>
                 <View style={styles.activityTrack}>
                   <View
                     style={[
@@ -853,54 +884,27 @@ export default function HomeScreen() {
           <View style={styles.sectionHeading}>
             <View style={styles.accentBar} />
             <View style={styles.sectionHeadingText}>
-              <Text style={styles.sectionEyebrow}>Rewards</Text>
+              <Text style={styles.sectionEyebrow}>Payments</Text>
               <Text style={styles.sectionHeadingTitle}>Vouchers</Text>
             </View>
             <Text style={styles.sectionHint}>{vouchers.length} total</Text>
           </View>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.voucherTabs}>
-            {voucherStatuses.map((voucherStatus) => {
-              const isSelected = selectedVoucherStatus === voucherStatus;
-              const count = vouchers.filter(
-                (voucher) => voucher.status === voucherStatus,
-              ).length;
-
-              return (
-                <Pressable
-                  key={voucherStatus}
-                  onPress={() => setSelectedVoucherStatus(voucherStatus)}
-                  style={[
-                    styles.voucherTab,
-                    isSelected && styles.voucherTabSelected,
-                  ]}>
-                  <View
-                    style={[
-                      styles.voucherTabDot,
-                      { backgroundColor: getVoucherStatusColor(voucherStatus) },
-                    ]}
-                  />
-                  <Text
-                    style={[
-                      styles.voucherTabText,
-                      isSelected && styles.voucherTabTextSelected,
-                    ]}>
-                    {voucherStatus}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.voucherTabCount,
-                      isSelected && styles.voucherTabCountSelected,
-                    ]}>
-                    {count}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+          <View style={styles.voucherTabs}>
+            <GlowingChips
+              items={voucherStatuses.map((voucherStatus) => ({
+                key: voucherStatus,
+                label: voucherStatus,
+                dotColor: getVoucherStatusColor(voucherStatus),
+                trailingLabel: String(
+                  vouchers.filter((voucher) => voucher.status === voucherStatus).length,
+                ),
+              }))}
+              selectedKey={selectedVoucherStatus}
+              onSelect={(key) => setSelectedVoucherStatus(key as VoucherStatus)}
+              unselectedChipStyle={styles.voucherTabUnselected}
+            />
+          </View>
 
           {visibleVouchers.length === 0 ? (
             <Text style={styles.emptyVoucherText}>
@@ -1935,8 +1939,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   voucherTabs: {
-    gap: 8,
-    paddingBottom: 12,
+    paddingBottom: 14,
+  },
+  voucherTabUnselected: {
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.13)',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
   },
   voucherTab: {
     minHeight: 40,

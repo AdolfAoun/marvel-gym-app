@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   categoryList: {
-    paddingBottom: 18,
+    paddingBottom: 14,
   },
   productsHeader: {
     flexDirection: 'row',

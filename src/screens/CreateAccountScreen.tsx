@@ -22,6 +22,12 @@ import type { RegisterMemberInput } from '@/services';
 
 const accentColor = premiumColors.redBright;
 const genderOptions: RegisterMemberInput['gender'][] = ['Male', 'Female'];
+const brandSigns = [
+  require('@/assets/images/marvel-logo-startup-sign-dot.png'),
+  require('@/assets/images/marvel-logo-startup-sign-x.png'),
+  require('@/assets/images/marvel-logo-startup-sign-slash.png'),
+  require('@/assets/images/marvel-logo-startup-sign-divide.png'),
+];
 
 type FormErrors = Partial<
   Record<
@@ -230,6 +236,19 @@ export default function CreateAccountScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           <View style={styles.brandBlock}>
+            <View style={styles.brandSigns}>
+              {brandSigns.map((source, index) => (
+                <Image
+                  key={index}
+                  source={source}
+                  resizeMode="contain"
+                  style={[
+                    styles.brandSign,
+                    index === 0 && styles.brandSignDot,
+                  ]}
+                />
+              ))}
+            </View>
             <Image
               source={require('@/assets/images/marvel-logo-startup-wordmark.png')}
               style={styles.brandLogo}
@@ -430,12 +449,27 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 40,
+    paddingTop: 64,
     paddingBottom: 36,
   },
   brandBlock: {
     alignItems: 'center',
     marginBottom: 20,
+  },
+  brandSigns: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginBottom: 7,
+  },
+  brandSign: {
+    width: 16,
+    height: 16,
+    tintColor: premiumColors.redBright,
+  },
+  brandSignDot: {
+    width: 8,
+    height: 8,
   },
   brandLogo: {
     width: 196,
