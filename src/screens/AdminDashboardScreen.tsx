@@ -72,6 +72,12 @@ const adminGroups: AdminGroup[] = [
         statKey: 'vouchers',
       },
       {
+        description: 'Confirm or reject class registration requests from members.',
+        href: '/admin/class-registrations',
+        title: 'Class Registrations',
+        statKey: 'vouchers',
+      },
+      {
         description: 'Approve or reject student ID pricing requests.',
         href: '/admin/student-verification',
         title: 'Student Verification',

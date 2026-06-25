@@ -129,6 +129,29 @@ export const createShopVoucher = async (
   });
 };
 
+export const createClassVoucher = async (
+  className: string,
+  instructorName: string,
+  amount: number,
+): Promise<Voucher> => {
+  return createVoucher({
+    type: 'Class Reservation',
+    amount,
+    status: 'Pending',
+    description: `${className} with Coach ${instructorName} - Pending approval`,
+  });
+};
+
+export const getClassVouchers = async (): Promise<Voucher[]> => {
+  return voucherRecords.filter((voucher) => voucher.type === 'Class Reservation');
+};
+
+export const getAllClassVouchers = async (): Promise<Voucher[]> => {
+  return sortVouchers(
+    voucherRecords.filter((voucher) => voucher.type === 'Class Reservation'),
+  );
+};
+
 export const confirmShopVoucher = async (
   voucherId: string,
   pin: string,
@@ -200,10 +223,13 @@ export const voucherService = {
   getPendingVouchers,
   getVouchersByStatus,
   getShopVouchers,
+  getClassVouchers,
+  getAllClassVouchers,
   createVoucher,
   createMembershipRenewalVoucher,
   createMembershipFreezeVoucher,
   createShopVoucher,
+  createClassVoucher,
   confirmShopVoucher,
   confirmVoucher,
   cancelVoucher,

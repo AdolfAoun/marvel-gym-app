@@ -4,6 +4,8 @@ export type EntrySlide = {
   id: string;
   image: ImageSourcePropType;
   label?: string;
+  caption?: string;
+  captionSub?: string;
 };
 
 let entrySlides: EntrySlide[] = [
@@ -11,11 +13,15 @@ let entrySlides: EntrySlide[] = [
     id: 'entry-photo-1',
     image: require('../../assets/images/MarvelPhoto1.jpg'),
     label: 'Welcome Photo 1',
+    caption: 'Welcome to Marvel Gym',
+    captionSub: 'Where champions are made.',
   },
   {
     id: 'entry-photo-2',
-    image: require('../../assets/images/MarvelPhoto2.jpeg'),
+    image: require('../../assets/images/prototype-three-finger-back-pose-background.png'),
     label: 'Welcome Photo 2',
+    caption: 'Your journey starts here.',
+    captionSub: 'Elevate your performance. Every session counts.',
   },
 ];
 

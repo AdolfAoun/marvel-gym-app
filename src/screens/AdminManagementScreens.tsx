@@ -51,7 +51,14 @@ const statusOptions: MembershipStatus[] = [
   'Suspended',
   'Pending Approval',
 ];
-const productCategories: ProductCategory[] = ['Gym Equipment', 'Beverages', 'Snacks'];
+const productCategories: ProductCategory[] = [
+  'Supplements',
+  'Apparel',
+  'Equipment',
+  'Accessories',
+  'Nutrition',
+  'Beverages',
+];
 const classCategories: ClassCategory[] = [
   'Fitness Classes',
   'Martial Arts',
@@ -2183,3 +2190,100 @@ const styles = StyleSheet.create({
     opacity: 0.76,
   },
 });
+
+export function AdminClassRegistrationsScreen() {
+  const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [selectedStatus, setSelectedStatus] = useState<Voucher['status']>('Pending');
+  const [search, setSearch] = useState('');
+
+  const loadVouchers = useCallback(async () => {
+    setVouchers(await voucherService.getAllClassVouchers());
+  }, []);
+
+  useEffect(() => {
+    loadVouchers();
+  }, [loadVouchers]);
+
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredVouchers = vouchers.filter((v) => {
+    if (v.status !== selectedStatus) return false;
+    if (!normalizedSearch) return true;
+    return v.description.toLowerCase().includes(normalizedSearch);
+  });
+
+  const counts: Record<Voucher['status'], number> = {
+    Pending: vouchers.filter((v) => v.status === 'Pending').length,
+    Confirmed: vouchers.filter((v) => v.status === 'Confirmed').length,
+    Canceled: vouchers.filter((v) => v.status === 'Canceled').length,
+  };
+
+  return (
+    <AdminShell title="Class Registrations" subtitle="Review and confirm class booking requests.">
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Filter registrations</Text>
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search by class name or description"
+          placeholderTextColor={premiumColors.textFaint}
+          style={styles.searchInput}
+        />
+        <View style={styles.pillRow}>
+          {(['Pending', 'Confirmed', 'Canceled'] as Voucher['status'][]).map((status) => (
+            <Pressable
+              key={status}
+              onPress={() => setSelectedStatus(status)}
+              style={[styles.pill, selectedStatus === status && styles.pillSelected]}>
+              <Text style={[styles.pillText, selectedStatus === status && styles.pillTextSelected]}>
+                {status} ({counts[status]})
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>{selectedStatus} Registrations</Text>
+        {filteredVouchers.length === 0 ? (
+          <Text style={styles.helperText}>
+            {normalizedSearch
+              ? 'No registrations match this search.'
+              : `No ${selectedStatus.toLowerCase()} class registrations.`}
+          </Text>
+        ) : (
+          filteredVouchers.map((voucher) => (
+            <View key={voucher.id} style={styles.rowCard}>
+              <View style={styles.rowCopy}>
+                <StatusChip label={voucher.status} />
+                <Text style={styles.rowTitle}>{voucher.description}</Text>
+                <Text style={styles.helperText}>
+                  Submitted {formatDate(voucher.date)}
+                </Text>
+              </View>
+              {voucher.status === 'Pending' ? (
+                <View style={styles.actionStack}>
+                  <Pressable
+                    onPress={async () => {
+                      await voucherService.confirmVoucher(voucher.id);
+                      await loadVouchers();
+                    }}
+                    style={styles.tinyPrimary}>
+                    <Text style={styles.tinyPrimaryText}>Confirm</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={async () => {
+                      await voucherService.cancelVoucher(voucher.id);
+                      await loadVouchers();
+                    }}
+                    style={styles.tinySecondary}>
+                    <Text style={styles.tinySecondaryText}>Reject</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          ))
+        )}
+      </View>
+    </AdminShell>
+  );
+}

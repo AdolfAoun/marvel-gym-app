@@ -76,12 +76,19 @@ export type ClassCategory =
   | 'Gymnastics'
   | 'Extra Classes';
 
+export type ClassLevel =
+  | 'Beginner'
+  | 'Intermediate'
+  | 'Advanced'
+  | 'All Levels';
+
 export type GymClass = {
   id: string;
   title: string;
   description?: string;
   instructorName: string;
   instructorImageUrl?: string;
+  coverImageUrl?: string;
   startTime: string;
   endTime: string;
   price: number;
@@ -91,26 +98,41 @@ export type GymClass = {
   isRegistered?: boolean;
   capacity: number;
   enrolledCount: number;
+  caloriesBurned?: number;
+  level?: ClassLevel;
+  isPopular?: boolean;
   category: ClassCategory;
   location?: string;
   isActive: boolean;
 };
+
+export type ProductBadge = 'NEW' | 'SALE' | 'BESTSELLER';
 
 export type Product = {
   id: string;
   name: string;
   description?: string;
   price: number;
+  compareAtPrice?: number;
   currency: string;
   category?: ProductCategory;
   isAvailable: boolean;
   imageUrl?: string;
+  rating?: number;
+  reviewCount?: number;
+  badge?: ProductBadge;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 };
 
-export type ProductCategory = 'Gym Equipment' | 'Beverages' | 'Snacks';
+export type ProductCategory =
+  | 'Supplements'
+  | 'Apparel'
+  | 'Equipment'
+  | 'Accessories'
+  | 'Nutrition'
+  | 'Beverages';
 
 export type Payment = {
   id: string;
@@ -158,7 +180,8 @@ export type VoucherStatus = 'Pending' | 'Confirmed' | 'Canceled';
 export type VoucherType =
   | 'Membership Renewal'
   | 'Membership Freeze'
-  | 'Shop Reservation';
+  | 'Shop Reservation'
+  | 'Class Reservation';
 
 export type Voucher = {
   id: string;

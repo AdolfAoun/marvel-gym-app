@@ -4,6 +4,9 @@ import type {
   GymClass,
   NotificationType,
 } from '../types';
+import { createClassVoucher, cancelVoucher as cancelVoucherById } from './voucherService';
+
+const classVoucherMap = new Map<string, string>();
 
 type ScheduleCategory = ClassCategory;
 
@@ -118,17 +121,69 @@ function createIsoDate(day: ScheduleSeed['day'], time: string, durationMinutes =
   };
 }
 
+const unsplash = (id: string, w = 600) =>
+  `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}&q=80`;
+
+// Category cover art keeps each session visually grounded in its discipline.
+const categoryCovers: Record<ScheduleCategory, string[]> = {
+  'Fitness Classes': [
+    unsplash('1518611012118-696072aa579a'),
+    unsplash('1599058917765-a780eda07a3e'),
+    unsplash('1534438327276-14e5300c3a48'),
+  ],
+  'Martial Arts': [
+    unsplash('1594381898411-846e7d193883'),
+    unsplash('1549060279-7e168fcee0c2'),
+  ],
+  Gymnastics: [unsplash('1530021232320-687d8e3dba54'), unsplash('1571902943202-507ec2618e8f')],
+  'Extra Classes': [unsplash('1571902943202-507ec2618e8f'), unsplash('1571019613454-1cb2f99b2d8b')],
+};
+
+const coachAvatars = [
+  unsplash('1507003211169-0a1dd7228f2d', 200),
+  unsplash('1500648767791-00dcc994a43e', 200),
+  unsplash('1494790108377-be9c29b29330', 200),
+  unsplash('1599566150163-29194dcaad36', 200),
+];
+
+const categoryCalories: Record<ScheduleCategory, number> = {
+  'Fitness Classes': 520,
+  'Martial Arts': 610,
+  Gymnastics: 340,
+  'Extra Classes': 380,
+};
+
+function hashString(value: string) {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+function getClassLevel(seed: ScheduleSeed): GymClass['level'] {
+  if (seed.category === 'Martial Arts') return 'Advanced';
+  if (seed.category === 'Gymnastics' || seed.title.includes('Junior') || seed.title.includes('Kids'))
+    return 'Beginner';
+  if (seed.category === 'Extra Classes') return 'All Levels';
+  return hashString(seed.title) % 2 === 0 ? 'Intermediate' : 'All Levels';
+}
+
 function createClass(seed: ScheduleSeed, index: number): GymClass {
   const { startTime, endTime } = createIsoDate(seed.day, seed.time);
   const capacity =
     seed.category === 'Martial Arts' ? 16 : seed.category === 'Gymnastics' ? 10 : 18;
   const enrolledCount = Math.min(capacity - 1, 7 + (index % 8));
+  const covers = categoryCovers[seed.category];
+  const baseCalories = categoryCalories[seed.category];
 
   return {
     id: `class-${index.toString().padStart(3, '0')}`,
     title: seed.title,
     description: `${seed.category} session with Coach ${seed.coach}.`,
     instructorName: seed.coach,
+    instructorImageUrl: coachAvatars[hashString(seed.coach) % coachAvatars.length],
+    coverImageUrl: covers[index % covers.length],
     startTime,
     endTime,
     price: 0,
@@ -138,6 +193,9 @@ function createClass(seed: ScheduleSeed, index: number): GymClass {
     isRegistered: false,
     capacity,
     enrolledCount,
+    caloriesBurned: baseCalories + ((hashString(seed.title) % 8) - 4) * 10,
+    level: getClassLevel(seed),
+    isPopular: index % 7 === 0,
     category: seed.category,
     isActive: true,
   };
@@ -278,6 +336,8 @@ export const registerForClass = async (
 
   if (updatedClass) {
     latestClassUpdate = createClassUpdate(updatedClass, 'reserved');
+    const voucher = await createClassVoucher(updatedClass.title, updatedClass.instructorName, 0);
+    classVoucherMap.set(classId, voucher.id);
   }
 
   return updatedClass;
@@ -305,6 +365,11 @@ export const cancelClassRegistration = async (
 
   if (updatedClass) {
     latestClassUpdate = createClassUpdate(updatedClass, 'canceled');
+    const voucherId = classVoucherMap.get(classId);
+    if (voucherId) {
+      await cancelVoucherById(voucherId);
+      classVoucherMap.delete(classId);
+    }
   }
 
   return updatedClass;

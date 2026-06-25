@@ -18,7 +18,7 @@ export const getProducts = async (): Promise<Product[]> => {
 };
 
 export const getProductCategories = async (): Promise<ProductCategory[]> => {
-  return ['Gym Equipment', 'Beverages', 'Snacks'];
+  return ['Supplements', 'Apparel', 'Equipment', 'Accessories', 'Nutrition', 'Beverages'];
 };
 
 export const buyProduct = async (

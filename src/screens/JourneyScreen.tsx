@@ -20,6 +20,7 @@ import {
   premiumColors,
   premiumGradients,
   premiumShadow,
+  premiumGlow,
 } from '@/constants/premiumTheme';
 import { journeyService, memberService } from '@/services';
 import type {
@@ -36,8 +37,6 @@ import type {
 
 const accentColor = premiumColors.red;
 const wineColor = premiumColors.redBright;
-const backgroundColor = premiumColors.background;
-const surfaceColor = premiumColors.surface;
 const textColor = premiumColors.text;
 const mutedColor = premiumColors.textMuted;
 
@@ -52,24 +51,17 @@ type StoredTimerState = {
 };
 
 function formatDay(value: string) {
-  return new Intl.DateTimeFormat('en', {
-    day: '2-digit',
-  }).format(new Date(value));
+  return new Intl.DateTimeFormat('en', { day: '2-digit' }).format(new Date(value));
 }
 
 function formatMonth(value: string) {
-  return new Intl.DateTimeFormat('en', {
-    month: 'long',
-  }).format(new Date(value));
+  return new Intl.DateTimeFormat('en', { month: 'long' }).format(new Date(value));
 }
 
 function formatDuration(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
-
-  return `${minutes.toString().padStart(2, '0')}:${remainingSeconds
-    .toString()
-    .padStart(2, '0')}`;
+  return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
 function estimateCalories(durationSeconds: number) {
@@ -82,10 +74,7 @@ function formatHistoryRange(historyRecord: JourneyHistoryRecord) {
     month: 'short',
     year: 'numeric',
   });
-
-  return `${formatter.format(new Date(historyRecord.startedAt))} - ${formatter.format(
-    new Date(historyRecord.endedAt),
-  )}`;
+  return `${formatter.format(new Date(historyRecord.startedAt))} - ${formatter.format(new Date(historyRecord.endedAt))}`;
 }
 
 async function saveStoredTimerState(timer: StoredTimerState) {
@@ -98,11 +87,7 @@ async function clearStoredTimerState() {
 
 async function getStoredTimerState() {
   const storedValue = await AsyncStorage.getItem(journeyTimerStorageKey);
-
-  if (!storedValue) {
-    return undefined;
-  }
-
+  if (!storedValue) return undefined;
   try {
     return JSON.parse(storedValue) as StoredTimerState;
   } catch {
@@ -127,14 +112,10 @@ export default function JourneyScreen() {
   const [lastCalories, setLastCalories] = useState(0);
   const [pendingVisitDate, setPendingVisitDate] = useState('');
   const [metrics, setMetrics] = useState<JourneyMetrics>();
-  const [pendingMetricResetKey, setPendingMetricResetKey] =
-    useState<JourneyMetricKey>();
+  const [pendingMetricResetKey, setPendingMetricResetKey] = useState<JourneyMetricKey>();
   const [isPendingMetricResetAll, setIsPendingMetricResetAll] = useState(false);
-  const [undoableMetricKeys, setUndoableMetricKeys] = useState<
-    JourneyMetricKey[]
-  >([]);
-  const [isAllMetricResetUndoable, setIsAllMetricResetUndoable] =
-    useState(false);
+  const [undoableMetricKeys, setUndoableMetricKeys] = useState<JourneyMetricKey[]>([]);
+  const [isAllMetricResetUndoable, setIsAllMetricResetUndoable] = useState(false);
   const [pendingTimerSeconds, setPendingTimerSeconds] = useState(0);
   const [isHistoryVisible, setIsHistoryVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -209,9 +190,7 @@ export default function JourneyScreen() {
             journeyService.getJourneyMetrics(),
           ]);
 
-        if (!isActive) {
-          return;
-        }
+        if (!isActive) return;
 
         setAttendanceDays(attendance);
         setWorkoutSessions(sessions);
@@ -223,26 +202,16 @@ export default function JourneyScreen() {
 
       syncJourney();
 
-      return () => {
-        isActive = false;
-      };
+      return () => { isActive = false; };
     }, []),
   );
 
   useEffect(() => {
-    if (timerState !== 'running') {
-      return undefined;
-    }
+    if (timerState !== 'running') return undefined;
 
     const interval = setInterval(() => {
-      if (!timerStartedAtRef.current) {
-        return;
-      }
-
-      const liveSeconds = Math.floor(
-        (Date.now() - timerStartedAtRef.current) / 1000,
-      );
-
+      if (!timerStartedAtRef.current) return;
+      const liveSeconds = Math.floor((Date.now() - timerStartedAtRef.current) / 1000);
       setElapsedSeconds(pausedElapsedRef.current + liveSeconds);
     }, 250);
 
@@ -256,61 +225,46 @@ export default function JourneyScreen() {
 
   const attendanceByMonth = useMemo(() => {
     const groups: { month: string; days: AttendanceDay[] }[] = [];
-
     attendanceDays.forEach((day) => {
       const month = formatMonth(day.date);
       const group = groups.find((item) => item.month === month);
-
-      if (group) {
-        group.days.push(day);
-        return;
-      }
-
+      if (group) { group.days.push(day); return; }
       groups.push({ month, days: [day] });
     });
-
     return groups;
   }, [attendanceDays]);
+
   const activeMonthIndex = Math.min(
     Math.max(0, selectedMonthIndex),
     Math.max(0, attendanceByMonth.length - 1),
   );
   const selectedMonth = attendanceByMonth[activeMonthIndex];
   const selectedMonthKey = selectedMonth?.days[0]?.date.slice(0, 7) ?? '';
-  const selectedMonthVisitCount =
-    selectedMonth?.days.filter((day) => day.hasVisit).length ?? 0;
+  const selectedMonthVisitCount = selectedMonth?.days.filter((day) => day.hasVisit).length ?? 0;
   const selectedMonthSessions = useMemo(
-    () =>
-      workoutSessions.filter((session) =>
-        session.endedAt.startsWith(selectedMonthKey),
-      ),
+    () => workoutSessions.filter((session) => session.endedAt.startsWith(selectedMonthKey)),
     [selectedMonthKey, workoutSessions],
   );
   const selectedMonthAverageCalories =
     selectedMonthSessions.length > 0
       ? Math.round(
-          selectedMonthSessions.reduce(
-            (total, session) => total + session.estimatedCaloriesBurned,
-            0,
-          ) / selectedMonthSessions.length,
+          selectedMonthSessions.reduce((total, session) => total + session.estimatedCaloriesBurned, 0) /
+            selectedMonthSessions.length,
         )
       : 0;
 
   const refreshMetrics = async () => {
     const nextMetrics = await journeyService.getJourneyMetrics();
-
     setMetrics(nextMetrics);
   };
 
   const refreshStats = async () => {
     const nextStats = await journeyService.getJourneyStats();
-
     setStats(nextStats);
   };
 
   const refreshJourneyHistory = async () => {
     const nextHistory = await journeyService.getJourneyHistory();
-
     setHistoryRecords(nextHistory);
   };
 
@@ -318,19 +272,14 @@ export default function JourneyScreen() {
     const nextProfile = await journeyService.updateJourneyProfile({
       biography: biographyDraft.trim(),
     });
-
     setProfile(nextProfile);
     setBiographyDraft(nextProfile.biography);
     setIsEditingBio(false);
   };
 
   const confirmToggleVisit = async () => {
-    if (!pendingVisitDate) {
-      return;
-    }
-
+    if (!pendingVisitDate) return;
     const nextAttendance = await journeyService.toggleAttendanceDay(pendingVisitDate);
-
     setAttendanceDays(nextAttendance);
     setPendingVisitDate('');
     await refreshStats();
@@ -338,31 +287,21 @@ export default function JourneyScreen() {
   };
 
   const handleStartTimer = () => {
-    if (timerState === 'running') {
-      return;
-    }
-
+    if (timerState === 'running') return;
     const startedAt = Date.now();
-
     if (timerState === 'idle') {
       setElapsedSeconds(0);
       setLastCalories(0);
       pausedElapsedRef.current = 0;
     }
-
     timerStartedAtRef.current = startedAt;
     setTimerState('running');
-    saveStoredTimerState({
-      elapsedSeconds: pausedElapsedRef.current,
-      startedAt,
-      state: 'running',
-    });
+    saveStoredTimerState({ elapsedSeconds: pausedElapsedRef.current, startedAt, state: 'running' });
   };
 
   const handleEndWorkout = async () => {
     const liveElapsedSeconds = timerStartedAtRef.current
-      ? pausedElapsedRef.current +
-        Math.max(0, Math.round((Date.now() - timerStartedAtRef.current) / 1000))
+      ? pausedElapsedRef.current + Math.max(0, Math.round((Date.now() - timerStartedAtRef.current) / 1000))
       : elapsedSeconds;
 
     if (liveElapsedSeconds <= 0) {
@@ -378,15 +317,11 @@ export default function JourneyScreen() {
     setTimerState('paused');
     timerStartedAtRef.current = undefined;
     pausedElapsedRef.current = liveElapsedSeconds;
-    saveStoredTimerState({
-      elapsedSeconds: liveElapsedSeconds,
-      state: 'paused',
-    });
+    saveStoredTimerState({ elapsedSeconds: liveElapsedSeconds, state: 'paused' });
   };
 
   const confirmSaveWorkout = async () => {
     const session = await journeyService.completeWorkoutSession(pendingTimerSeconds);
-
     setLastCalories(session.estimatedCaloriesBurned);
     setWorkoutSessions((current) => [session, ...current]);
     setTimerState('idle');
@@ -409,34 +344,21 @@ export default function JourneyScreen() {
   };
 
   const handlePauseTimer = () => {
-    if (!timerStartedAtRef.current) {
-      return;
-    }
-
-    const liveSeconds = Math.floor(
-      (Date.now() - timerStartedAtRef.current) / 1000,
-    );
-
+    if (!timerStartedAtRef.current) return;
+    const liveSeconds = Math.floor((Date.now() - timerStartedAtRef.current) / 1000);
     pausedElapsedRef.current += liveSeconds;
     setElapsedSeconds(pausedElapsedRef.current);
     timerStartedAtRef.current = undefined;
     setTimerState('paused');
-    saveStoredTimerState({
-      elapsedSeconds: pausedElapsedRef.current,
-      state: 'paused',
-    });
+    saveStoredTimerState({ elapsedSeconds: pausedElapsedRef.current, state: 'paused' });
   };
 
   const confirmResetMetric = async () => {
-    if (!pendingMetricResetKey && !isPendingMetricResetAll) {
-      return;
-    }
+    if (!pendingMetricResetKey && !isPendingMetricResetAll) return;
 
     const nextMetrics = isPendingMetricResetAll
       ? await journeyService.resetAllJourneyMetrics()
-      : await journeyService.resetJourneyMetric(
-          pendingMetricResetKey as JourneyMetricKey,
-        );
+      : await journeyService.resetJourneyMetric(pendingMetricResetKey as JourneyMetricKey);
 
     setMetrics(nextMetrics);
     if (isPendingMetricResetAll) {
@@ -455,17 +377,13 @@ export default function JourneyScreen() {
 
   const handleUndoMetric = async (metricKey: JourneyMetricKey) => {
     const nextMetrics = await journeyService.undoResetJourneyMetric(metricKey);
-
     setMetrics(nextMetrics);
-    setUndoableMetricKeys((current) =>
-      current.filter((key) => key !== metricKey),
-    );
+    setUndoableMetricKeys((current) => current.filter((key) => key !== metricKey));
     await refreshJourneyHistory();
   };
 
   const handleUndoMetricAll = async () => {
     const nextMetrics = await journeyService.undoResetAllJourneyMetrics();
-
     setMetrics(nextMetrics);
     setIsAllMetricResetUndoable(false);
     await refreshJourneyHistory();
@@ -473,16 +391,12 @@ export default function JourneyScreen() {
 
   const handleSaveMetric = async (metricKey: JourneyMetricKey) => {
     const nextHistory = await journeyService.saveJourneyMetricReset(metricKey);
-
     setHistoryRecords(nextHistory);
-    setUndoableMetricKeys((current) =>
-      current.filter((key) => key !== metricKey),
-    );
+    setUndoableMetricKeys((current) => current.filter((key) => key !== metricKey));
   };
 
   const handleSaveMetricAll = async () => {
     const nextHistory = await journeyService.saveAllJourneyMetricReset();
-
     setHistoryRecords(nextHistory);
     setIsAllMetricResetUndoable(false);
   };
@@ -499,32 +413,14 @@ export default function JourneyScreen() {
     );
   }
 
-  const metricCards: {
-    key: JourneyMetricKey;
-    label: string;
-    value: string | number;
-  }[] = [
-    {
-      key: 'averageMonthlyVisits',
-      label: 'Average monthly visits',
-      value: metrics.averageMonthlyVisits,
-    },
-    {
-      key: 'totalVisits',
-      label: 'Total visits',
-      value: metrics.totalVisits,
-    },
-    {
-      key: 'averageCaloriesBurned',
-      label: 'Average calories burned',
-      value: metrics.averageCaloriesBurned,
-    },
-    {
-      key: 'averageWorkoutDuration',
-      label: 'Average workout duration',
-      value: metrics.averageWorkoutDuration,
-    },
+  const metricCards: { key: JourneyMetricKey; label: string; value: string | number }[] = [
+    { key: 'totalVisits', label: 'Total Visits', value: metrics.totalVisits },
+    { key: 'averageMonthlyVisits', label: 'Avg Monthly', value: metrics.averageMonthlyVisits },
+    { key: 'averageCaloriesBurned', label: 'Avg Calories', value: metrics.averageCaloriesBurned },
+    { key: 'averageWorkoutDuration', label: 'Avg Duration', value: metrics.averageWorkoutDuration },
   ];
+
+  const timerCalories = estimateCalories(elapsedSeconds);
 
   return (
     <PremiumScreenBackground>
@@ -533,6 +429,8 @@ export default function JourneyScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
+
+        {/* Hero Card */}
         <LinearGradient
           colors={premiumGradients.redPanel}
           start={{ x: 0.1, y: 0 }}
@@ -542,157 +440,76 @@ export default function JourneyScreen() {
           <MarvelMarks variant="corner" color="#FFFFFF" />
           <Text style={styles.kicker}>Journey</Text>
           <Text style={styles.heroTitle}>
-            {member?.firstName ?? 'Member'}'s Fitness Dashboard
+            {member?.firstName ?? 'Member'}&apos;s Dashboard
           </Text>
           <Text style={styles.heroBody}>
-            Tailor your plan with AI and track consistency through attendance and training time.
+            Track your consistency. Own your progress. Push your limits.
           </Text>
           <View style={styles.heroStatsRow}>
             <View style={styles.heroStatPill}>
               <Text style={styles.heroStatValue}>{selectedMonthVisitCount}</Text>
-              <Text style={styles.heroStatLabel}>this month&apos;s visits</Text>
+              <Text style={styles.heroStatLabel}>this month</Text>
             </View>
             <View style={styles.heroStatPill}>
               <Text style={styles.heroStatValue}>{selectedMonthAverageCalories}</Text>
-              <Text style={styles.heroStatLabel}>this month&apos;s calories/session</Text>
+              <Text style={styles.heroStatLabel}>cal / session</Text>
+            </View>
+            <View style={styles.heroStatPill}>
+              <Text style={styles.heroStatValue}>{stats.consecutiveStreak}</Text>
+              <Text style={styles.heroStatLabel}>day streak</Text>
             </View>
           </View>
         </LinearGradient>
 
-        <View style={styles.aiAssistantCard}>
-          <View style={styles.sectionHeaderRow}>
-            <View>
-              <Text style={styles.cardLabel}>AI Assistant</Text>
-              <Text style={styles.sectionTitle}>Tailored training plan help</Text>
-            </View>
+        {/* Metrics Rail */}
+        <View style={styles.sectionHeader}>
+          <View style={styles.accentBar} />
+          <View style={styles.sectionHeaderText}>
+            <Text style={styles.sectionEyebrow}>All-time</Text>
+            <Text style={styles.sectionTitle}>Performance Metrics</Text>
           </View>
-          <Text style={styles.aiAssistantBody}>
-            Your About Me and Training Note help tailor guidance around body type,
-            age, height, weight, gender, goals, ambitions, injuries, limitations,
-            and training preferences.
-          </Text>
-          <Pressable
-            onPress={() => undefined}
-            style={({ pressed }) => [
-              styles.aiChatButton,
-              pressed && styles.buttonPressed,
-            ]}>
-            <Text style={styles.aiChatButtonText}>Start Chat</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.timerCard}>
-          <View style={styles.sectionHeaderRow}>
-            <View>
-              <Text style={styles.cardLabel}>Workout Timer</Text>
-              <Text style={styles.sectionTitle}>Session clock</Text>
-            </View>
-            <Text style={styles.sectionHint}>Calories are estimated</Text>
-          </View>
-
-          <View style={styles.timerFace}>
-            <Text style={styles.timerValue}>{formatDuration(elapsedSeconds)}</Text>
-            <Text style={styles.timerCaption}>
-              Live calories: {estimateCalories(elapsedSeconds)}
-            </Text>
-          </View>
-
-          <View style={styles.timerButtons}>
-            <Pressable
-              onPress={handleStartTimer}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                pressed && styles.buttonPressed,
-              ]}>
-              <Text style={styles.primaryButtonText}>Start Timer</Text>
-            </Pressable>
-            <Pressable
-              onPress={handlePauseTimer}
-              disabled={timerState !== 'running'}
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                timerState !== 'running' && styles.disabledButton,
-                pressed && styles.buttonPressed,
-              ]}>
-              <Text style={styles.secondaryButtonText}>Pause</Text>
-            </Pressable>
-            <Pressable
-              onPress={handleEndWorkout}
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                pressed && styles.buttonPressed,
-              ]}>
-              <Text style={styles.secondaryButtonText}>Stop / End Workout</Text>
-            </Pressable>
-          </View>
-
-          {lastCalories > 0 && (
-            <Text style={styles.estimateText}>
-              {lastCalories} Calories Burned
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.statsHeaderRow}>
-          <View style={styles.dashboardTitleBlock}>
-            <Text style={styles.cardLabel}>Dashboard</Text>
-            <Text style={styles.sectionTitle}>All-time metrics</Text>
-            <View style={styles.resetAllStack}>
-              {isAllMetricResetUndoable ? (
-                <>
-                  <Pressable
-                    onPress={handleSaveMetricAll}
-                    style={({ pressed }) => [
-                      styles.resetAllSaveButton,
-                      pressed && styles.buttonPressed,
-                    ]}>
-                    <Text style={styles.statSaveText}>Save</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={handleUndoMetricAll}
-                    style={({ pressed }) => [
-                      styles.resetAllButton,
-                      styles.statResetButtonUndo,
-                      pressed && styles.buttonPressed,
-                    ]}>
-                    <Text
-                      style={[styles.resetAllButtonText, styles.statResetTextUndo]}>
-                      Undo Reset
-                    </Text>
-                  </Pressable>
-                </>
-              ) : (
+          <View style={styles.metricHeaderActions}>
+            {isAllMetricResetUndoable ? (
+              <>
                 <Pressable
-                  onPress={() => setIsPendingMetricResetAll(true)}
-                  style={({ pressed }) => [
-                    styles.resetAllButton,
-                    pressed && styles.buttonPressed,
-                  ]}>
-                  <Text style={styles.resetAllButtonText}>Reset All</Text>
+                  onPress={handleSaveMetricAll}
+                  style={({ pressed }) => [styles.tinyGreenButton, pressed && styles.buttonPressed]}>
+                  <Text style={styles.tinyGreenText}>Save</Text>
                 </Pressable>
-              )}
-            </View>
+                <Pressable
+                  onPress={handleUndoMetricAll}
+                  style={({ pressed }) => [styles.tinyUndoButton, pressed && styles.buttonPressed]}>
+                  <Text style={styles.tinyUndoText}>Undo</Text>
+                </Pressable>
+              </>
+            ) : (
+              <Pressable
+                onPress={() => setIsPendingMetricResetAll(true)}
+                style={({ pressed }) => [styles.tinyResetButton, pressed && styles.buttonPressed]}>
+                <Text style={styles.tinyResetText}>Reset All</Text>
+              </Pressable>
+            )}
+            <Pressable
+              onPress={() => setIsHistoryVisible(true)}
+              style={({ pressed }) => [styles.historyButton, pressed && styles.buttonPressed]}>
+              <Text style={styles.historyButtonText}>History</Text>
+            </Pressable>
           </View>
-          <Pressable
-            onPress={() => setIsHistoryVisible(true)}
-            style={({ pressed }) => [
-              styles.historyButton,
-              pressed && styles.buttonPressed,
-            ]}>
-            <Text style={styles.historyButtonText}>History</Text>
-          </Pressable>
         </View>
 
-        <View style={styles.metricGrid}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.metricsRail}>
           {metricCards.map((metric) => {
             const canUndo = undoableMetricKeys.includes(metric.key);
-
             return (
-              <View key={metric.key} style={styles.metricTile}>
-                <View pointerEvents="none" style={styles.metricTileGloss} />
+              <View key={metric.key} style={styles.metricCard}>
+                <View pointerEvents="none" style={styles.metricCardGloss} />
+                <View style={styles.metricAccent} />
                 <Text style={styles.metricValue}>{metric.value}</Text>
                 <Text style={styles.metricLabel}>{metric.label}</Text>
-                <View style={styles.metricActionRow}>
+                <View style={styles.metricActions}>
                   <Pressable
                     onPress={() =>
                       canUndo
@@ -700,72 +517,71 @@ export default function JourneyScreen() {
                         : setPendingMetricResetKey(metric.key)
                     }
                     style={({ pressed }) => [
-                      styles.statResetButton,
-                      canUndo && styles.statResetButtonUndo,
+                      styles.metricResetButton,
+                      canUndo && styles.metricUndoButton,
                       pressed && styles.buttonPressed,
                     ]}>
-                    <Text
-                      style={[
-                        styles.statResetText,
-                        canUndo && styles.statResetTextUndo,
-                      ]}>
-                      {canUndo ? 'Undo Reset' : 'Reset'}
+                    <Text style={[styles.metricResetText, canUndo && styles.metricUndoText]}>
+                      {canUndo ? 'Undo' : 'Reset'}
                     </Text>
                   </Pressable>
                   {canUndo ? (
                     <Pressable
                       onPress={() => handleSaveMetric(metric.key)}
-                      style={({ pressed }) => [
-                        styles.statSaveButton,
-                        pressed && styles.buttonPressed,
-                      ]}>
-                      <Text style={styles.statSaveText}>Save</Text>
+                      style={({ pressed }) => [styles.metricSaveButton, pressed && styles.buttonPressed]}>
+                      <Text style={styles.metricSaveText}>Save</Text>
                     </Pressable>
                   ) : null}
                 </View>
               </View>
             );
           })}
-        </View>
+        </ScrollView>
 
+        {/* Attendance Calendar */}
         <View style={styles.card}>
-          <View style={styles.sectionHeaderRow}>
+          <View style={styles.cardHeaderRow}>
             <View>
               <Text style={styles.cardLabel}>Attendance Calendar</Text>
-              <Text style={styles.sectionTitle}>2026 visits</Text>
+              <Text style={styles.cardTitle}>2026 visits</Text>
             </View>
-            <Text style={styles.sectionHint}>Tap to toggle</Text>
+            <Text style={styles.cardHint}>Tap day to toggle</Text>
           </View>
 
           {selectedMonth ? (
-            <View style={styles.monthBlock}>
+            <View>
               <View style={styles.monthSwitcher}>
                 <Pressable
                   disabled={activeMonthIndex === 0}
-                  onPress={() =>
-                    setSelectedMonthIndex((value) => Math.max(0, value - 1))
-                  }
+                  onPress={() => setSelectedMonthIndex((v) => Math.max(0, v - 1))}
                   style={[
                     styles.monthArrowButton,
                     activeMonthIndex === 0 && styles.monthArrowButtonDisabled,
                   ]}>
-                  <Text style={styles.monthArrowText}>{'<'}</Text>
+                  <Text style={styles.monthArrowText}>{'‹'}</Text>
                 </Pressable>
                 <Text style={styles.monthTitle}>{selectedMonth.month}</Text>
                 <Pressable
                   disabled={activeMonthIndex === attendanceByMonth.length - 1}
                   onPress={() =>
-                    setSelectedMonthIndex((value) =>
-                      Math.min(attendanceByMonth.length - 1, value + 1),
-                    )
+                    setSelectedMonthIndex((v) => Math.min(attendanceByMonth.length - 1, v + 1))
                   }
                   style={[
                     styles.monthArrowButton,
-                    activeMonthIndex === attendanceByMonth.length - 1 &&
-                      styles.monthArrowButtonDisabled,
+                    activeMonthIndex === attendanceByMonth.length - 1 && styles.monthArrowButtonDisabled,
                   ]}>
-                  <Text style={styles.monthArrowText}>{'>'}</Text>
+                  <Text style={styles.monthArrowText}>{'›'}</Text>
                 </Pressable>
+              </View>
+              <View style={styles.calendarLegendRow}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: premiumColors.red }]} />
+                  <Text style={styles.legendText}>Attended</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: premiumColors.surfaceSoft }]} />
+                  <Text style={styles.legendText}>Not attended</Text>
+                </View>
               </View>
               <View style={styles.calendarGrid}>
                 {selectedMonth.days.map((day) => (
@@ -786,71 +602,168 @@ export default function JourneyScreen() {
                   </Pressable>
                 ))}
               </View>
+              <View style={styles.calendarStatsRow}>
+                <View style={styles.calendarStatChip}>
+                  <Text style={styles.calendarStatValue}>{selectedMonthVisitCount}</Text>
+                  <Text style={styles.calendarStatLabel}>visits</Text>
+                </View>
+                <View style={styles.calendarStatChip}>
+                  <Text style={styles.calendarStatValue}>{selectedMonthAverageCalories}</Text>
+                  <Text style={styles.calendarStatLabel}>avg kcal</Text>
+                </View>
+                <View style={styles.calendarStatChip}>
+                  <Text style={styles.calendarStatValue}>{selectedMonthSessions.length}</Text>
+                  <Text style={styles.calendarStatLabel}>sessions</Text>
+                </View>
+              </View>
             </View>
           ) : null}
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.sectionHeaderRow}>
+        {/* Workout Timer */}
+        <View style={styles.timerCard}>
+          <View pointerEvents="none" style={styles.timerCardGlow} />
+          <View style={styles.cardHeaderRow}>
             <View>
-              <Text style={styles.cardLabel}>Badges</Text>
-              <Text style={styles.sectionTitle}>Consistency badges</Text>
+              <Text style={styles.cardLabel}>Workout Timer</Text>
+              <Text style={styles.cardTitle}>Session clock</Text>
             </View>
-            <Text style={styles.sectionHint}>{unlockedCount} unlocked</Text>
+            <Text style={styles.cardHint}>
+              {timerState === 'running' ? 'Running' : timerState === 'paused' ? 'Paused' : 'Ready'}
+            </Text>
           </View>
 
-          <View style={styles.achievementList}>
-            {achievements.map((achievement) => (
-              <View
-                key={achievement.id}
-                style={[
-                  styles.achievementCard,
-                  !achievement.isUnlocked && styles.achievementLocked,
-                ]}>
-                <View
-                  style={[
-                    styles.achievementIcon,
-                    achievement.isUnlocked && styles.achievementIconUnlocked,
-                  ]}>
-                  <Text
-                    style={[
-                      styles.achievementIconText,
-                      achievement.isUnlocked && styles.achievementIconTextUnlocked,
-                    ]}>
-                    {achievement.isUnlocked ? 'OK' : '--'}
-                  </Text>
-                </View>
-                <View style={styles.achievementCopy}>
-                  <Text style={styles.achievementTitle}>{achievement.title}</Text>
-                  <Text style={styles.achievementBody}>
-                    {achievement.description}
-                  </Text>
-                </View>
+          <View style={styles.timerDisplayRow}>
+            <View style={styles.timerCircleWrap}>
+              <View style={styles.timerCircleBackground} />
+              <View style={styles.timerCircleInner}>
+                <Text style={styles.timerValue}>{formatDuration(elapsedSeconds)}</Text>
+                <Text style={styles.timerSubLabel}>
+                  {timerState === 'running' ? 'Active' : 'Paused'}
+                </Text>
               </View>
-            ))}
+            </View>
+            <View style={styles.timerStats}>
+              <View style={styles.timerStatCard}>
+                <Text style={styles.timerStatValue}>{timerCalories}</Text>
+                <Text style={styles.timerStatLabel}>Live kcal</Text>
+              </View>
+              {lastCalories > 0 && (
+                <View style={[styles.timerStatCard, styles.timerStatCardGreen]}>
+                  <Text style={[styles.timerStatValue, { color: premiumColors.success }]}>{lastCalories}</Text>
+                  <Text style={styles.timerStatLabel}>Last session</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.timerButtonRow}>
+            <Pressable
+              onPress={handleStartTimer}
+              disabled={timerState === 'running'}
+              style={({ pressed }) => [
+                styles.timerPrimaryButton,
+                timerState === 'running' && styles.timerButtonDimmed,
+                pressed && timerState !== 'running' && styles.buttonPressed,
+              ]}>
+              <Text style={styles.timerPrimaryText}>
+                {timerState === 'paused' ? 'Resume' : 'Start'}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={handlePauseTimer}
+              disabled={timerState !== 'running'}
+              style={({ pressed }) => [
+                styles.timerSecondaryButton,
+                timerState !== 'running' && styles.timerButtonDimmed,
+                pressed && timerState === 'running' && styles.buttonPressed,
+              ]}>
+              <Text style={styles.timerSecondaryText}>Pause</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleEndWorkout}
+              style={({ pressed }) => [
+                styles.timerSecondaryButton,
+                pressed && styles.buttonPressed,
+              ]}>
+              <Text style={styles.timerSecondaryText}>End</Text>
+            </Pressable>
           </View>
         </View>
 
+        {/* Achievements & Badges */}
+        <View style={styles.sectionHeader}>
+          <View style={styles.accentBar} />
+          <View style={styles.sectionHeaderText}>
+            <Text style={styles.sectionEyebrow}>Consistency</Text>
+            <Text style={styles.sectionTitle}>Achievements & Badges</Text>
+          </View>
+          <Text style={styles.sectionHintPill}>
+            {unlockedCount}/{achievements.length}
+          </Text>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.achievementsRail}>
+          {achievements.map((achievement) => (
+            <View
+              key={achievement.id}
+              style={[
+                styles.achievementCard,
+                achievement.isUnlocked && styles.achievementCardUnlocked,
+              ]}>
+              <View
+                style={[
+                  styles.achievementIcon,
+                  achievement.isUnlocked && styles.achievementIconUnlocked,
+                ]}>
+                <Text style={styles.achievementIconText}>
+                  {achievement.isUnlocked ? '✓' : '–'}
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.achievementTitle,
+                  achievement.isUnlocked && styles.achievementTitleUnlocked,
+                ]}>
+                {achievement.title}
+              </Text>
+              <Text style={styles.achievementDesc}>{achievement.description}</Text>
+            </View>
+          ))}
+        </ScrollView>
+
+        {/* AI Assistant */}
+        <View style={styles.aiCard}>
+          <View pointerEvents="none" style={styles.aiCardGlow} />
+          <Text style={styles.cardLabel}>AI Assistant</Text>
+          <Text style={styles.cardTitle}>Tailored training guidance</Text>
+          <Text style={styles.aiBody}>
+            Your About Me and Training Note help tailor AI guidance around your body type, goals, injuries, and preferences.
+          </Text>
+          <Pressable
+            onPress={() => undefined}
+            style={({ pressed }) => [styles.aiButton, pressed && styles.buttonPressed]}>
+            <Text style={styles.aiButtonText}>Start Chat</Text>
+          </Pressable>
+        </View>
+
+        {/* About Me / Training Note */}
         <View style={styles.card}>
-          <View style={styles.sectionHeaderRow}>
-            <View>
+          <View style={styles.cardHeaderRow}>
+            <View style={{ flex: 1 }}>
               <Text style={styles.cardLabel}>About Me</Text>
-              <Text style={styles.sectionTitle}>Training note</Text>
-              <Text style={styles.trainingNoteSubtitle}>
-                Edit About Me below to improve your tailored plan.
+              <Text style={styles.cardTitle}>Training note</Text>
+              <Text style={styles.cardSubtitle}>
+                Edit to improve your tailored AI plan.
               </Text>
             </View>
             <Pressable
-              onPress={() =>
-                isEditingBio ? handleSaveBiography() : setIsEditingBio(true)
-              }
-              style={({ pressed }) => [
-                styles.smallButton,
-                pressed && styles.buttonPressed,
-              ]}>
-              <Text style={styles.smallButtonText}>
-                {isEditingBio ? 'Save' : 'Edit'}
-              </Text>
+              onPress={() => (isEditingBio ? handleSaveBiography() : setIsEditingBio(true))}
+              style={({ pressed }) => [styles.editButton, pressed && styles.buttonPressed]}>
+              <Text style={styles.editButtonText}>{isEditingBio ? 'Save' : 'Edit'}</Text>
             </Pressable>
           </View>
 
@@ -870,6 +783,8 @@ export default function JourneyScreen() {
         </View>
       </ScrollView>
 
+      {/* Modals */}
+
       <Modal transparent visible={Boolean(pendingVisitDate)} animationType="fade">
         <View style={styles.centerModalOverlay}>
           <Pressable style={styles.modalBackdrop} onPress={() => setPendingVisitDate('')} />
@@ -882,18 +797,12 @@ export default function JourneyScreen() {
             <View style={styles.confirmRow}>
               <Pressable
                 onPress={() => setPendingVisitDate('')}
-                style={({ pressed }) => [
-                  styles.confirmSecondary,
-                  pressed && styles.buttonPressed,
-                ]}>
+                style={({ pressed }) => [styles.confirmSecondary, pressed && styles.buttonPressed]}>
                 <Text style={styles.confirmSecondaryText}>Cancel</Text>
               </Pressable>
               <Pressable
                 onPress={confirmToggleVisit}
-                style={({ pressed }) => [
-                  styles.confirmPrimary,
-                  pressed && styles.buttonPressed,
-                ]}>
+                style={({ pressed }) => [styles.confirmPrimary, pressed && styles.buttonPressed]}>
                 <Text style={styles.confirmPrimaryText}>Confirm</Text>
               </Pressable>
             </View>
@@ -919,8 +828,7 @@ export default function JourneyScreen() {
               {isPendingMetricResetAll ? 'Reset all metrics?' : 'Reset this metric?'}
             </Text>
             <Text style={styles.confirmBody}>
-              Resetting starts a fresh count from now. Your previous total is kept
-              and can be saved to History so you can always look back at it.
+              Resetting starts a fresh count from now. Your previous total is kept and can be saved to History.
             </Text>
             <View style={styles.confirmRow}>
               <Pressable
@@ -928,18 +836,12 @@ export default function JourneyScreen() {
                   setPendingMetricResetKey(undefined);
                   setIsPendingMetricResetAll(false);
                 }}
-                style={({ pressed }) => [
-                  styles.confirmSecondary,
-                  pressed && styles.buttonPressed,
-                ]}>
+                style={({ pressed }) => [styles.confirmSecondary, pressed && styles.buttonPressed]}>
                 <Text style={styles.confirmSecondaryText}>Cancel</Text>
               </Pressable>
               <Pressable
                 onPress={confirmResetMetric}
-                style={({ pressed }) => [
-                  styles.confirmPrimary,
-                  pressed && styles.buttonPressed,
-                ]}>
+                style={({ pressed }) => [styles.confirmPrimary, pressed && styles.buttonPressed]}>
                 <Text style={styles.confirmPrimaryText}>Reset</Text>
               </Pressable>
             </View>
@@ -949,10 +851,7 @@ export default function JourneyScreen() {
 
       <Modal transparent visible={isHistoryVisible} animationType="fade">
         <View style={styles.historyOverlay}>
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setIsHistoryVisible(false)}
-          />
+          <Pressable style={styles.modalBackdrop} onPress={() => setIsHistoryVisible(false)} />
           <View style={styles.historyPanel}>
             <View style={styles.historyTopBar}>
               <View>
@@ -961,18 +860,9 @@ export default function JourneyScreen() {
               </View>
               <Pressable
                 onPress={() => setIsHistoryVisible(false)}
-                style={({ pressed }) => [
-                  styles.historyIconClose,
-                  pressed && styles.buttonPressed,
-                ]}>
-                <Text style={styles.historyIconCloseText}>X</Text>
+                style={({ pressed }) => [styles.historyIconClose, pressed && styles.buttonPressed]}>
+                <Text style={styles.historyIconCloseText}>✕</Text>
               </Pressable>
-            </View>
-
-            <View style={styles.historyTabs}>
-              <View style={[styles.historyTab, styles.historyTabActive]}>
-                <Text style={styles.historyTabTextActive}>History</Text>
-              </View>
             </View>
 
             <Text style={styles.historyIntro}>
@@ -995,9 +885,7 @@ export default function JourneyScreen() {
                   <View key={record.id} style={styles.historyCard}>
                     <View style={styles.historyCardRail} />
                     <View style={styles.historyCardContent}>
-                      <Text style={styles.historyRange}>
-                        {formatHistoryRange(record)}
-                      </Text>
+                      <Text style={styles.historyRange}>{formatHistoryRange(record)}</Text>
                       <Text style={styles.historySummary}>{record.summary}</Text>
                     </View>
                   </View>
@@ -1019,18 +907,12 @@ export default function JourneyScreen() {
             <View style={styles.confirmRow}>
               <Pressable
                 onPress={discardWorkoutTime}
-                style={({ pressed }) => [
-                  styles.confirmSecondary,
-                  pressed && styles.buttonPressed,
-                ]}>
+                style={({ pressed }) => [styles.confirmSecondary, pressed && styles.buttonPressed]}>
                 <Text style={styles.confirmSecondaryText}>Do Not Save</Text>
               </Pressable>
               <Pressable
                 onPress={confirmSaveWorkout}
-                style={({ pressed }) => [
-                  styles.confirmPrimary,
-                  pressed && styles.buttonPressed,
-                ]}>
+                style={({ pressed }) => [styles.confirmPrimary, pressed && styles.buttonPressed]}>
                 <Text style={styles.confirmPrimaryText}>Save</Text>
               </Pressable>
             </View>
@@ -1042,10 +924,6 @@ export default function JourneyScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor,
-  },
   content: {
     paddingHorizontal: 20,
     paddingTop: 72,
@@ -1069,7 +947,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: 26,
     padding: 22,
-    marginBottom: 16,
+    marginBottom: 20,
     shadowColor: premiumColors.red,
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.4,
@@ -1084,15 +962,6 @@ const styles = StyleSheet.create({
     height: '50%',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
-  heroSheen: {
-    position: 'absolute',
-    top: -70,
-    right: -50,
-    width: 200,
-    height: 200,
-    borderRadius: 120,
-    backgroundColor: 'rgba(255, 120, 130, 0.2)',
-  },
   kicker: {
     color: 'rgba(255, 255, 255, 0.78)',
     fontSize: 12,
@@ -1102,26 +971,22 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: '#FFFFFF',
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: '900',
-    letterSpacing: 0,
-    lineHeight: 35,
+    lineHeight: 33,
     marginTop: 6,
-    textShadowColor: 'rgba(0, 0, 0, 0.25)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
   },
   heroBody: {
     color: 'rgba(255, 255, 255, 0.86)',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     lineHeight: 20,
-    marginTop: 10,
+    marginTop: 8,
   },
   heroStatsRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 22,
+    gap: 10,
+    marginTop: 18,
   },
   heroStatPill: {
     flex: 1,
@@ -1129,192 +994,145 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    padding: 15,
+    padding: 12,
   },
   heroStatValue: {
     color: '#FFFFFF',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
   },
   heroStatLabel: {
     color: 'rgba(255, 255, 255, 0.82)',
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 10,
+    fontWeight: '900',
     marginTop: 2,
     textTransform: 'uppercase',
   },
-  card: {
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 26,
-    backgroundColor: surfaceColor,
-    padding: 16,
-    marginBottom: 16,
-    ...premiumShadow,
-  },
-  timerCard: {
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 28,
-    backgroundColor: surfaceColor,
-    padding: 16,
-    marginBottom: 16,
-    ...premiumShadow,
-  },
-  aiAssistantCard: {
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.11)',
-    borderRadius: 26,
-    backgroundColor: 'rgba(18, 20, 28, 0.86)',
-    padding: 16,
-    marginBottom: 16,
-    ...premiumShadow,
-  },
-  aiAssistantBody: {
-    color: mutedColor,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 20,
-  },
-  aiChatButton: {
-    minHeight: 46,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 15,
-    backgroundColor: accentColor,
-    marginTop: 14,
-  },
-  aiChatButtonText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  sectionHeaderRow: {
+  sectionHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    alignItems: 'center',
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 14,
+    marginTop: 4,
   },
-  cardLabel: {
-    color: accentColor,
+  accentBar: {
+    width: 4,
+    height: 36,
+    borderRadius: 3,
+    backgroundColor: wineColor,
+  },
+  sectionHeaderText: {
+    flex: 1,
+  },
+  sectionEyebrow: {
+    color: wineColor,
     fontSize: 11,
     fontWeight: '900',
-    letterSpacing: 0,
-    marginBottom: 6,
+    letterSpacing: 1.2,
+    marginBottom: 2,
     textTransform: 'uppercase',
   },
   sectionTitle: {
     color: textColor,
-    fontSize: 18,
+    fontSize: 21,
     fontWeight: '900',
   },
-  sectionHint: {
-    color: mutedColor,
-    flexShrink: 1,
-    fontSize: 12,
-    fontWeight: '800',
-    textAlign: 'right',
-  },
-  timerFace: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  sectionHintPill: {
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.1)',
-    borderRadius: 26,
-    backgroundColor: premiumColors.surfaceSoft,
-    paddingVertical: 22,
-  },
-  timerValue: {
-    color: textColor,
-    fontSize: 54,
-    fontWeight: '900',
-    letterSpacing: 0,
-  },
-  timerCaption: {
-    color: mutedColor,
-    fontSize: 12,
-    fontWeight: '800',
-    marginTop: 4,
-  },
-  timerButtons: {
-    gap: 10,
-    marginTop: 14,
-  },
-  primaryButton: {
-    minHeight: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-    backgroundColor: accentColor,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  secondaryButton: {
-    minHeight: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.18)',
-    borderRadius: 16,
-    backgroundColor: premiumColors.surfaceSoft,
-  },
-  secondaryButtonText: {
+    borderColor: 'rgba(177, 18, 38, 0.3)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(177, 18, 38, 0.12)',
     color: wineColor,
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '900',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
-  disabledButton: {
-    opacity: 0.48,
-  },
-  estimateText: {
-    color: wineColor,
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 18,
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  statsRail: {
-    gap: 12,
-    paddingRight: 4,
-    marginBottom: 16,
-  },
-  metricGrid: {
+  metricHeaderActions: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 16,
+    alignItems: 'center',
+    gap: 8,
   },
-  metricTile: {
+  historyButton: {
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.2)',
+    borderRadius: 999,
+    backgroundColor: premiumColors.surfaceSoft,
+    paddingHorizontal: 12,
+  },
+  historyButtonText: {
+    color: wineColor,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  tinyResetButton: {
+    minHeight: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.34)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(177, 18, 38, 0.12)',
+    paddingHorizontal: 10,
+  },
+  tinyResetText: {
+    color: accentColor,
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  tinyUndoButton: {
+    minHeight: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.32)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    paddingHorizontal: 10,
+  },
+  tinyUndoText: {
+    color: '#F8C471',
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  tinyGreenButton: {
+    minHeight: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 999,
+    backgroundColor: '#16A34A',
+    paddingHorizontal: 10,
+  },
+  tinyGreenText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  metricsRail: {
+    gap: 12,
+    paddingBottom: 20,
+    paddingRight: 4,
+  },
+  metricCard: {
     position: 'relative',
     overflow: 'hidden',
-    flexBasis: '47%',
-    flexGrow: 1,
-    minHeight: 148,
-    justifyContent: 'flex-start',
+    width: 158,
+    minHeight: 160,
     borderWidth: 1,
     borderColor: premiumColors.glassBorder,
     borderRadius: 22,
-    backgroundColor: surfaceColor,
+    backgroundColor: premiumColors.surface,
     padding: 16,
-    shadowColor: premiumColors.red,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.2,
-    shadowRadius: 22,
-    elevation: 8,
+    justifyContent: 'flex-start',
+    ...premiumShadow,
   },
-  metricActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    marginTop: 'auto',
-    paddingTop: 12,
-  },
-  metricTileGloss: {
+  metricCardGloss: {
     position: 'absolute',
     top: 0,
     left: 16,
@@ -1322,8 +1140,15 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.18)',
   },
+  metricAccent: {
+    width: 26,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: premiumColors.redBright,
+    marginBottom: 14,
+  },
   metricValue: {
-    color: premiumColors.redBright,
+    color: '#FFFFFF',
     fontSize: 30,
     fontWeight: '900',
     letterSpacing: 0,
@@ -1333,100 +1158,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     lineHeight: 17,
+    marginTop: 6,
+    flex: 1,
+  },
+  metricActions: {
+    flexDirection: 'row',
+    gap: 6,
     marginTop: 10,
   },
-  statsHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 14,
-    marginBottom: 12,
-  },
-  dashboardTitleBlock: {
-    flex: 1,
-    alignItems: 'flex-start',
-  },
-  historyButton: {
-    minHeight: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.2)',
-    borderRadius: 999,
-    backgroundColor: premiumColors.surfaceSoft,
-    paddingHorizontal: 16,
-  },
-  historyButtonText: {
-    color: wineColor,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  resetAllStack: {
-    minHeight: 30,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 10,
-  },
-  resetAllButton: {
-    minHeight: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.34)',
-    borderRadius: 999,
-    backgroundColor: 'rgba(177, 18, 38, 0.12)',
-    paddingHorizontal: 12,
-  },
-  resetAllButtonText: {
-    color: accentColor,
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  resetAllSaveButton: {
-    minHeight: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 999,
-    backgroundColor: '#16A34A',
-    paddingHorizontal: 12,
-  },
-  statCard: {
-    width: 172,
-    minHeight: 116,
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: premiumColors.glassBorder,
-    borderRadius: 22,
-    backgroundColor: surfaceColor,
-    padding: 16,
-    ...premiumShadow,
-  },
-  statValue: {
-    color: textColor,
-    fontSize: 26,
-    fontWeight: '900',
-  },
-  statLabel: {
-    flex: 1,
-    color: mutedColor,
-    fontSize: 12,
-    fontWeight: '800',
-    lineHeight: 17,
-  },
-  statFooterRow: {
-    minHeight: 28,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  statActionStack: {
-    alignItems: 'stretch',
-    gap: 7,
-  },
-  statResetButton: {
+  metricResetButton: {
     minHeight: 26,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1436,78 +1176,400 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(177, 18, 38, 0.12)',
     paddingHorizontal: 9,
   },
-  statResetButtonUndo: {
+  metricUndoButton: {
     borderColor: 'rgba(245, 158, 11, 0.32)',
     backgroundColor: 'rgba(245, 158, 11, 0.1)',
   },
-  statResetButtonDisabled: {
-    borderColor: 'rgba(177, 18, 38, 0.14)',
-    backgroundColor: 'rgba(177, 18, 38, 0.05)',
-    opacity: 0.48,
-  },
-  statResetText: {
+  metricResetText: {
     color: accentColor,
     fontSize: 10,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
-  statResetTextUndo: {
+  metricUndoText: {
     color: '#F8C471',
   },
-  statResetTextDisabled: {
-    color: 'rgba(177, 18, 38, 0.72)',
-  },
-  statSaveButton: {
-    minHeight: 28,
+  metricSaveButton: {
+    minHeight: 26,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 999,
     backgroundColor: '#16A34A',
-    paddingHorizontal: 11,
+    paddingHorizontal: 9,
   },
-  statSaveText: {
+  metricSaveText: {
     color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
-  milestoneCard: {
+  card: {
     borderWidth: 1,
     borderColor: premiumColors.border,
-    borderRadius: 28,
-    backgroundColor: surfaceColor,
-    padding: 16,
+    borderRadius: 26,
+    backgroundColor: premiumColors.surface,
+    padding: 18,
     marginBottom: 16,
     ...premiumShadow,
   },
-  milestoneGrid: {
+  cardHeaderRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  milestoneTile: {
-    minHeight: 88,
-    flexBasis: '47%',
-    flexGrow: 1,
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.1)',
-    borderRadius: 20,
-    backgroundColor: premiumColors.surfaceSoft,
-    padding: 14,
+    gap: 12,
+    marginBottom: 14,
   },
-  milestoneValue: {
+  cardLabel: {
     color: accentColor,
-    fontSize: 22,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  cardTitle: {
+    color: textColor,
+    fontSize: 18,
     fontWeight: '900',
   },
-  milestoneLabel: {
+  cardSubtitle: {
+    color: mutedColor,
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  cardHint: {
     color: mutedColor,
     fontSize: 12,
     fontWeight: '800',
-    lineHeight: 17,
+    flexShrink: 1,
+    textAlign: 'right',
   },
-  smallButton: {
+  monthSwitcher: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginBottom: 12,
+    paddingHorizontal: 8,
+  },
+  monthArrowButton: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: premiumColors.glassBorder,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+  },
+  monthArrowButtonDisabled: {
+    opacity: 0.36,
+  },
+  monthArrowText: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  monthTitle: {
+    color: textColor,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  calendarLegendRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 10,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    color: mutedColor,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  calendarDay: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  calendarDayActive: {
+    borderColor: premiumColors.redBright,
+    backgroundColor: premiumColors.red,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  calendarDayText: {
+    color: 'rgba(255, 255, 255, 0.62)',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  calendarDayTextActive: {
+    color: '#FFFFFF',
+  },
+  calendarStatsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  calendarStatChip: {
+    flex: 1,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  calendarStatValue: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  calendarStatLabel: {
+    color: mutedColor,
+    fontSize: 10,
+    fontWeight: '900',
+    marginTop: 2,
+    textTransform: 'uppercase',
+  },
+  timerCard: {
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.18)',
+    borderRadius: 28,
+    backgroundColor: premiumColors.surface,
+    padding: 18,
+    marginBottom: 20,
+    overflow: 'hidden',
+    ...premiumShadow,
+  },
+  timerCardGlow: {
+    position: 'absolute',
+    top: -40,
+    right: -40,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(177, 18, 38, 0.08)',
+  },
+  timerDisplayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 16,
+  },
+  timerCircleWrap: {
+    width: 130,
+    height: 130,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timerCircleBackground: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 3,
+    borderColor: 'rgba(177, 18, 38, 0.18)',
+    borderRadius: 65,
+  },
+  timerCircleInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timerValue: {
+    color: textColor,
+    fontSize: 36,
+    fontWeight: '900',
+    letterSpacing: -1,
+  },
+  timerSubLabel: {
+    color: mutedColor,
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  timerStats: {
+    flex: 1,
+    gap: 10,
+  },
+  timerStatCard: {
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.12)',
+    borderRadius: 16,
+    backgroundColor: premiumColors.surfaceSoft,
+    padding: 12,
+  },
+  timerStatCardGreen: {
+    borderColor: 'rgba(34, 197, 94, 0.15)',
+    backgroundColor: 'rgba(34, 197, 94, 0.05)',
+  },
+  timerStatValue: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  timerStatLabel: {
+    color: mutedColor,
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  timerButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  timerPrimaryButton: {
+    flex: 1,
+    minHeight: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: accentColor,
+    ...premiumGlow,
+  },
+  timerPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  timerSecondaryButton: {
+    flex: 1,
+    minHeight: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(177, 18, 38, 0.18)',
+    borderRadius: 16,
+    backgroundColor: premiumColors.surfaceSoft,
+  },
+  timerSecondaryText: {
+    color: wineColor,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  timerButtonDimmed: {
+    opacity: 0.4,
+  },
+  achievementsRail: {
+    gap: 12,
+    paddingBottom: 20,
+    paddingRight: 4,
+  },
+  achievementCard: {
+    width: 160,
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 22,
+    backgroundColor: premiumColors.surface,
+    padding: 16,
+    opacity: 0.54,
+    ...premiumShadow,
+  },
+  achievementCardUnlocked: {
+    opacity: 1,
+    borderColor: 'rgba(177, 18, 38, 0.3)',
+    backgroundColor: 'rgba(177, 18, 38, 0.06)',
+  },
+  achievementIcon: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: premiumColors.surfaceSoft,
+    marginBottom: 12,
+  },
+  achievementIconUnlocked: {
+    backgroundColor: accentColor,
+  },
+  achievementIconText: {
+    color: textColor,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  achievementTitle: {
+    color: textColor,
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 18,
+  },
+  achievementTitleUnlocked: {
+    color: '#FFFFFF',
+  },
+  achievementDesc: {
+    color: mutedColor,
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 16,
+    marginTop: 5,
+  },
+  aiCard: {
+    position: 'relative',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.11)',
+    borderRadius: 26,
+    backgroundColor: 'rgba(18, 20, 28, 0.86)',
+    padding: 18,
+    marginBottom: 16,
+    ...premiumShadow,
+  },
+  aiCardGlow: {
+    position: 'absolute',
+    top: -30,
+    right: -30,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(177, 18, 38, 0.06)',
+  },
+  aiBody: {
+    color: mutedColor,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 20,
+    marginTop: 8,
+    marginBottom: 14,
+  },
+  aiButton: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: accentColor,
+    ...premiumGlow,
+  },
+  aiButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  editButton: {
     minHeight: 36,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1517,7 +1579,7 @@ const styles = StyleSheet.create({
     backgroundColor: premiumColors.surfaceSoft,
     paddingHorizontal: 16,
   },
-  smallButtonText: {
+  editButtonText: {
     color: wineColor,
     fontSize: 12,
     fontWeight: '900',
@@ -1529,7 +1591,7 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   planInput: {
-    minHeight: 136,
+    minHeight: 120,
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.18)',
     borderRadius: 18,
@@ -1540,133 +1602,6 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     padding: 14,
     textAlignVertical: 'top',
-  },
-  trainingNoteSubtitle: {
-    color: mutedColor,
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 16,
-    marginTop: 4,
-    maxWidth: 230,
-  },
-  monthBlock: {
-    marginBottom: 4,
-  },
-  monthSwitcher: {
-    minHeight: 42,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.1)',
-    borderRadius: 999,
-    backgroundColor: premiumColors.surfaceSoft,
-    marginBottom: 12,
-    paddingHorizontal: 8,
-  },
-  monthArrowButton: {
-    width: 34,
-    height: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 17,
-    backgroundColor: premiumColors.surfaceSoft,
-  },
-  monthArrowButtonDisabled: {
-    opacity: 0.36,
-  },
-  monthArrowText: {
-    color: wineColor,
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  monthTitle: {
-    color: textColor,
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  calendarDay: {
-    width: 35,
-    height: 35,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.1)',
-    borderRadius: 13,
-    backgroundColor: premiumColors.surfaceSoft,
-  },
-  calendarDayActive: {
-    borderColor: '#FF1744',
-    backgroundColor: '#FF1744',
-    shadowColor: '#FF1744',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.26,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  calendarDayText: {
-    color: mutedColor,
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  calendarDayTextActive: {
-    color: '#FFFFFF',
-  },
-  achievementList: {
-    gap: 10,
-  },
-  achievementCard: {
-    minHeight: 74,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
-    borderRadius: 18,
-    backgroundColor: premiumColors.surfaceSoft,
-    padding: 12,
-  },
-  achievementLocked: {
-    opacity: 0.58,
-  },
-  achievementIcon: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-    backgroundColor: premiumColors.surfaceSoft,
-  },
-  achievementIconUnlocked: {
-    backgroundColor: accentColor,
-  },
-  achievementIconText: {
-    color: premiumColors.textFaint,
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  achievementIconTextUnlocked: {
-    color: '#FFFFFF',
-  },
-  achievementCopy: {
-    flex: 1,
-  },
-  achievementTitle: {
-    color: textColor,
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  achievementBody: {
-    color: mutedColor,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 17,
-    marginTop: 3,
   },
   buttonPressed: {
     opacity: 0.76,
@@ -1767,6 +1702,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 12,
+    marginBottom: 12,
   },
   historyPanelTitle: {
     color: textColor,
@@ -1789,39 +1725,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
   },
-  historyTabs: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-    marginTop: 18,
-  },
-  historyTab: {
-    minHeight: 42,
-    justifyContent: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-    paddingHorizontal: 4,
-    marginRight: 22,
-  },
-  historyTabActive: {
-    borderBottomColor: accentColor,
-  },
-  historyTabTextActive: {
-    color: textColor,
-    fontSize: 13,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
   historyIntro: {
     color: mutedColor,
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 19,
-    marginTop: 14,
+    marginBottom: 14,
   },
   historyList: {
     flex: 1,
-    marginTop: 18,
   },
   historyListContent: {
     gap: 11,

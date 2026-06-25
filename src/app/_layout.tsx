@@ -75,6 +75,40 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="shop-orders"
+        options={{
+          headerShown: true,
+          headerBackButtonDisplayMode: 'minimal',
+          headerBackTitle: '',
+          headerBackVisible: false,
+          headerLeft: () => <BackHeaderButton />,
+          headerTitle: '',
+          headerBackground: () => null,
+          headerTransparent: true,
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: 'transparent' },
+          headerTintColor: accentColor,
+          title: '',
+        }}
+      />
+      <Stack.Screen
+        name="class-bookings"
+        options={{
+          headerShown: true,
+          headerBackButtonDisplayMode: 'minimal',
+          headerBackTitle: '',
+          headerBackVisible: false,
+          headerLeft: () => <BackHeaderButton />,
+          headerTitle: '',
+          headerBackground: () => null,
+          headerTransparent: true,
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: 'transparent' },
+          headerTintColor: accentColor,
+          title: '',
+        }}
+      />
+      <Stack.Screen
         name="profile"
         options={{
           headerShown: true,

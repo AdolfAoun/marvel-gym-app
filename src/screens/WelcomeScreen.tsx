@@ -51,6 +51,9 @@ export default function WelcomeScreen() {
     loadSlides();
   }, []);
 
+  const activeCaption = carouselSlides[activeSlide]?.caption;
+  const activeCaptionSub = carouselSlides[activeSlide]?.captionSub;
+
   return (
     <View style={styles.safeArea}>
       <StatusBar style="light" />
@@ -86,7 +89,7 @@ export default function WelcomeScreen() {
           style={styles.topVignette}
         />
 
-        {/* One smooth bottom fade: clear image up top, heavy dark red at the base. */}
+        {/* One smooth bottom fade */}
         <LinearGradient
           pointerEvents="none"
           colors={[
@@ -106,6 +109,17 @@ export default function WelcomeScreen() {
           edges={['bottom']}
           pointerEvents="box-none"
           style={styles.overlay}>
+
+          {/* Captions */}
+          {activeCaption ? (
+            <View pointerEvents="none" style={styles.captionBlock}>
+              <Text style={styles.captionTitle}>{activeCaption}</Text>
+              {activeCaptionSub ? (
+                <Text style={styles.captionSub}>{activeCaptionSub}</Text>
+              ) : null}
+            </View>
+          ) : null}
+
           <View pointerEvents="none" style={styles.carouselDots}>
             {carouselSlides.map((_, index) => (
               <View
@@ -118,10 +132,11 @@ export default function WelcomeScreen() {
             ))}
           </View>
 
+          {/* Sign In – now uses the filled red gradient style */}
           <Pressable
-            onPress={() => router.replace('/(tabs)')}
+            onPress={() => router.push('/login')}
             style={({ pressed }) => [
-              styles.guestButtonWrap,
+              styles.signInButtonWrap,
               pressed && styles.buttonPressed,
             ]}>
             <LinearGradient
@@ -129,20 +144,20 @@ export default function WelcomeScreen() {
               locations={[0, 0.58, 1]}
               start={{ x: 0.08, y: 0 }}
               end={{ x: 0.92, y: 1 }}
-              style={styles.guestButton}>
-              <View pointerEvents="none" style={styles.guestGloss} />
-              <View pointerEvents="none" style={styles.guestRedEdge} />
-              <Text style={styles.guestButtonText}>Continue as Guest</Text>
+              style={styles.signInGradientButton}>
+              <View pointerEvents="none" style={styles.signInGloss} />
+              <Text style={styles.signInGradientText}>Sign In</Text>
             </LinearGradient>
           </Pressable>
 
+          {/* Continue as Guest – now uses the outlined ghost style */}
           <Pressable
-            onPress={() => router.push('/login')}
+            onPress={() => router.replace('/(tabs)')}
             style={({ pressed }) => [
-              styles.signInButton,
+              styles.guestButton,
               pressed && styles.buttonPressed,
             ]}>
-            <Text style={styles.signInButtonText}>Sign In</Text>
+            <Text style={styles.guestButtonText}>Continue as Guest</Text>
           </Pressable>
         </SafeAreaView>
       </View>
@@ -201,11 +216,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     paddingBottom: Platform.OS === 'web' ? 24 : 18,
   },
+  captionBlock: {
+    marginBottom: 28,
+  },
+  captionTitle: {
+    color: '#FFFFFF',
+    fontSize: 32,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+    lineHeight: 38,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 12,
+  },
+  captionSub: {
+    color: 'rgba(255, 255, 255, 0.78)',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+    marginTop: 6,
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 8,
+  },
   carouselDots: {
     flexDirection: 'row',
     alignSelf: 'center',
     gap: 12,
-    marginBottom: 28,
+    marginBottom: 24,
   },
   carouselDot: {
     width: 10,
@@ -217,7 +255,7 @@ const styles = StyleSheet.create({
     width: 10,
     backgroundColor: '#FFFFFF',
   },
-  guestButtonWrap: {
+  signInButtonWrap: {
     borderRadius: 999,
     shadowColor: accentBright,
     shadowOffset: { width: 0, height: 16 },
@@ -225,7 +263,7 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 9,
   },
-  guestButton: {
+  signInGradientButton: {
     minHeight: 64,
     alignItems: 'center',
     justifyContent: 'center',
@@ -234,7 +272,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 91, 106, 0.72)',
     borderRadius: 999,
   },
-  guestGloss: {
+  signInGloss: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -242,22 +280,13 @@ const styles = StyleSheet.create({
     height: '42%',
     backgroundColor: 'rgba(255, 255, 255, 0.075)',
   },
-  guestRedEdge: {
-    position: 'absolute',
-    left: 1,
-    right: 1,
-    bottom: 1,
-    height: 1,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255, 94, 110, 0.5)',
-  },
-  guestButtonText: {
+  signInGradientText: {
     color: '#FFFFFF',
     fontSize: 17,
     fontWeight: '900',
     letterSpacing: 0,
   },
-  signInButton: {
+  guestButton: {
     minHeight: 58,
     alignItems: 'center',
     justifyContent: 'center',
@@ -271,7 +300,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 20,
   },
-  signInButtonText: {
+  guestButtonText: {
     color: '#FFFFFF',
     fontSize: 17,
     fontWeight: '900',
