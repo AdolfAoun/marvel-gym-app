@@ -1,0 +1,261 @@
+Starting project at C:\Users\Adolf Aoun\Desktop\marvel-gym-app
+Using src/app as the root directory for Expo Router.
+React Compiler enabled
+Starting Metro Bundler
+Waiting on http://localhost:8082
+Logs for your project will appear below.
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 48.5% (339/487)
+λ node_modules\expo-router\node\render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.5% (858/860)
+λ Bundled 2268ms node_modules\expo-router\node\render.js (860 modules)
+"shadow*" style props are deprecated. Use "boxShadow".
+"textShadow*" style props are deprecated. Use "textShadow".
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+Web Bundled 3806ms node_modules\expo-router\entry.js (834 modules)
+Web Bundled 314ms node_modules\expo-router\entry.js (701 modules)
+ LOG  [web] Logs will appear in the browser console
+ ERROR  SyntaxError: C:\Users\Adolf Aoun\Desktop\marvel-gym-app\src\screens\LoginScreen.tsx: Legacy octal literals are not allowed in strict mode. (566:16)
+
+  564 |   cardContent: {
+  565 |     paddingHorizontal: 26,
+> 566 |     paddingTop: 05,
+      |                 ^
+  567 |     paddingBottom: 26,
+  568 |   },
+  569 |   cardInnerHighlight: {
+    at constructor (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:365:19)
+    at TypeScriptParserMixin.raise (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:6616:19)
+    at TypeScriptParserMixin.recordStrictModeErrors (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:6553:12)
+    at TypeScriptParserMixin.readNumber (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:6443:12)
+    at TypeScriptParserMixin.getTokenFromCode (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:6271:14)
+    at TypeScriptParserMixin.getTokenFromCode (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:4809:11)
+    at TypeScriptParserMixin.getTokenFromCode (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10004:11)
+    at TypeScriptParserMixin.nextToken (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:5799:10)
+    at TypeScriptParserMixin.next (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:5709:10)
+    at TypeScriptParserMixin.eat (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:5713:12)
+    at TypeScriptParserMixin.parseObjectProperty (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11966:14)
+    at TypeScriptParserMixin.parseObjPropValue (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11995:100)
+    at TypeScriptParserMixin.parseObjPropValue (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9761:18)
+    at TypeScriptParserMixin.parsePropertyDefinition (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11932:17)
+    at TypeScriptParserMixin.parseObjectLike (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11849:21)
+    at TypeScriptParserMixin.parseExprAtom (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11356:23)
+    at TypeScriptParserMixin.parseExprAtom (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:4776:20)
+    at TypeScriptParserMixin.parseExprSubscripts (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11098:23)
+    at TypeScriptParserMixin.parseUpdate (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11083:21)
+    at TypeScriptParserMixin.parseMaybeUnary (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11063:23)
+    at TypeScriptParserMixin.parseMaybeUnary (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9854:18)
+    at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10916:61)
+    at TypeScriptParserMixin.parseExprOps (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10921:23)
+    at TypeScriptParserMixin.parseMaybeConditional (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10898:23)
+    at TypeScriptParserMixin.parseMaybeAssign (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10848:21)
+    at TypeScriptParserMixin.parseMaybeAssign (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9803:20)
+    at C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10817:39
+    at TypeScriptParserMixin.allowInAnd (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12443:12)
+    at TypeScriptParserMixin.parseMaybeAssignAllowIn (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10817:17)
+    at TypeScriptParserMixin.parseMaybeAssignAllowInOrVoidPattern (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12510:17)
+    at TypeScriptParserMixin.parseObjectProperty (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11967:83)
+    at TypeScriptParserMixin.parseObjPropValue (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11995:100)
+    at TypeScriptParserMixin.parseObjPropValue (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9761:18)
+    at TypeScriptParserMixin.parsePropertyDefinition (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11932:17)
+    at TypeScriptParserMixin.parseObjectLike (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11849:21)
+    at TypeScriptParserMixin.parseExprAtom (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11356:23)
+    at TypeScriptParserMixin.parseExprAtom (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:4776:20)
+    at TypeScriptParserMixin.parseExprSubscripts (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11098:23)
+    at TypeScriptParserMixin.parseUpdate (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11083:21)
+    at TypeScriptParserMixin.parseMaybeUnary (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11063:23)
+    at TypeScriptParserMixin.parseMaybeUnary (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9854:18)
+    at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10916:61)
+    at TypeScriptParserMixin.parseExprOps (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10921:23)
+    at TypeScriptParserMixin.parseMaybeConditional (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10898:23)
+    at TypeScriptParserMixin.parseMaybeAssign (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10848:21)
+    at TypeScriptParserMixin.parseMaybeAssign (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9803:20)
+    at C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10817:39
+    at TypeScriptParserMixin.allowInAnd (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12443:12)
+    at TypeScriptParserMixin.parseMaybeAssignAllowIn (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10817:17)
+    at TypeScriptParserMixin.parseMaybeAssignAllowInOrVoidPattern (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12510:17)
+ ERROR  SyntaxError: C:\Users\Adolf Aoun\Desktop\marvel-gym-app\src\screens\LoginScreen.tsx: Unexpected token (561:18)
+
+  559 |     borderWidth: 1,
+  560 |     borderColor: 'rgba(255, 255, 255, 0.16)',
+> 561 |     borderRadius: ,
+      |                   ^
+  562 |     backgroundColor: 'rgba(10,10,14,0.55)',
+  563 |   },
+  564 |   cardContent: {
+    at constructor (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:365:19)
+    at TypeScriptParserMixin.raise (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:6616:19)
+    at TypeScriptParserMixin.unexpected (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:6636:16)
+    at TypeScriptParserMixin.parseExprAtom (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11459:22)
+    at TypeScriptParserMixin.parseExprAtom (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:4776:20)
+    at TypeScriptParserMixin.parseExprSubscripts (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11098:23)
+    at TypeScriptParserMixin.parseUpdate (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11083:21)
+    at TypeScriptParserMixin.parseMaybeUnary (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11063:23)
+    at TypeScriptParserMixin.parseMaybeUnary (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9854:18)
+    at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10916:61)
+    at TypeScriptParserMixin.parseExprOps (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10921:23)
+    at TypeScriptParserMixin.parseMaybeConditional (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10898:23)
+    at TypeScriptParserMixin.parseMaybeAssign (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10848:21)
+    at TypeScriptParserMixin.parseMaybeAssign (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9803:20)
+    at C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10817:39
+    at TypeScriptParserMixin.allowInAnd (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12443:12)
+    at TypeScriptParserMixin.parseMaybeAssignAllowIn (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10817:17)
+    at TypeScriptParserMixin.parseMaybeAssignAllowInOrVoidPattern (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12510:17)
+    at TypeScriptParserMixin.parseObjectProperty (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11967:83)
+    at TypeScriptParserMixin.parseObjPropValue (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11995:100)
+    at TypeScriptParserMixin.parseObjPropValue (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9761:18)
+    at TypeScriptParserMixin.parsePropertyDefinition (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11932:17)
+    at TypeScriptParserMixin.parseObjectLike (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11849:21)
+    at TypeScriptParserMixin.parseExprAtom (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11356:23)
+    at TypeScriptParserMixin.parseExprAtom (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:4776:20)
+    at TypeScriptParserMixin.parseExprSubscripts (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11098:23)
+    at TypeScriptParserMixin.parseUpdate (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11083:21)
+    at TypeScriptParserMixin.parseMaybeUnary (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11063:23)
+    at TypeScriptParserMixin.parseMaybeUnary (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9854:18)
+    at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10916:61)
+    at TypeScriptParserMixin.parseExprOps (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10921:23)
+    at TypeScriptParserMixin.parseMaybeConditional (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10898:23)
+    at TypeScriptParserMixin.parseMaybeAssign (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10848:21)
+    at TypeScriptParserMixin.parseMaybeAssign (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9803:20)
+    at C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10817:39
+    at TypeScriptParserMixin.allowInAnd (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12443:12)
+    at TypeScriptParserMixin.parseMaybeAssignAllowIn (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10817:17)
+    at TypeScriptParserMixin.parseMaybeAssignAllowInOrVoidPattern (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12510:17)
+    at TypeScriptParserMixin.parseObjectProperty (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11967:83)
+    at TypeScriptParserMixin.parseObjPropValue (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11995:100)
+    at TypeScriptParserMixin.parseObjPropValue (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9761:18)
+    at TypeScriptParserMixin.parsePropertyDefinition (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11932:17)
+    at TypeScriptParserMixin.parseObjectLike (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11849:21)
+    at TypeScriptParserMixin.parseExprAtom (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11356:23)
+    at TypeScriptParserMixin.parseExprAtom (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:4776:20)
+    at TypeScriptParserMixin.parseExprSubscripts (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11098:23)
+    at TypeScriptParserMixin.parseUpdate (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11083:21)
+    at TypeScriptParserMixin.parseMaybeUnary (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11063:23)
+    at TypeScriptParserMixin.parseMaybeUnary (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9854:18)
+    at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10916:61)
+ ERROR  SyntaxError: C:\Users\Adolf Aoun\Desktop\marvel-gym-app\src\app\(tabs)\_layout.tsx: Unexpected token, expected "}" (435:8)
+
+  433 |
+  434 | const styles = StyleSheet.create({
+> 435 |   tabBar: {
+      |         ^
+  436 |     position: 'absolute',
+  437 |     borderTopWidth: 0,
+  438 |     backgroundColor: 'transparent',
+    at constructor (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:365:19)
+    at TypeScriptParserMixin.raise (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:6616:19)
+    at TypeScriptParserMixin.unexpected (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:6636:16)
+    at TypeScriptParserMixin.expect (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:6916:12)
+    at TypeScriptParserMixin.jsxParseExpressionContainer (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:4649:10)
+    at TypeScriptParserMixin.jsxParseElementAt (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:4723:36)
+    at TypeScriptParserMixin.jsxParseElement (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:4761:17)
+    at TypeScriptParserMixin.parseExprAtom (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:4771:19)
+    at TypeScriptParserMixin.parseExprSubscripts (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11098:23)
+    at TypeScriptParserMixin.parseUpdate (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11083:21)
+    at TypeScriptParserMixin.parseMaybeUnary (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11063:23)
+    at TypeScriptParserMixin.parseMaybeUnary (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9854:18)
+    at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10916:61)
+    at TypeScriptParserMixin.parseExprOps (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10921:23)
+    at TypeScriptParserMixin.parseMaybeConditional (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10898:23)
+    at TypeScriptParserMixin.parseMaybeAssign (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10848:21)
+    at C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9792:39
+    at TypeScriptParserMixin.tryParse (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:6924:20)
+    at TypeScriptParserMixin.parseMaybeAssign (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9792:18)
+    at C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10817:39
+    at TypeScriptParserMixin.allowInAnd (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12443:12)
+    at TypeScriptParserMixin.parseMaybeAssignAllowIn (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10817:17)
+    at TypeScriptParserMixin.parseMaybeAssignAllowInOrVoidPattern (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12510:17)
+    at TypeScriptParserMixin.parseParenAndDistinguishExpression (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11692:28)
+    at TypeScriptParserMixin.parseExprAtom (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11348:23)
+    at TypeScriptParserMixin.parseExprAtom (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:4776:20)
+    at TypeScriptParserMixin.parseExprSubscripts (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11098:23)
+    at TypeScriptParserMixin.parseUpdate (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11083:21)
+    at TypeScriptParserMixin.parseMaybeUnary (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11063:23)
+    at TypeScriptParserMixin.parseMaybeUnary (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9854:18)
+    at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10916:61)
+    at TypeScriptParserMixin.parseExprOps (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10921:23)
+    at TypeScriptParserMixin.parseMaybeConditional (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10898:23)
+    at TypeScriptParserMixin.parseMaybeAssign (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10848:21)
+    at TypeScriptParserMixin.parseMaybeAssign (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9803:20)
+    at TypeScriptParserMixin.parseExpressionBase (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10801:23)
+    at C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10797:39
+    at TypeScriptParserMixin.allowInAnd (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12438:16)
+    at TypeScriptParserMixin.parseExpression (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10797:17)
+    at TypeScriptParserMixin.parseReturnStatement (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:13159:28)
+    at TypeScriptParserMixin.parseStatementContent (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12815:21)
+    at TypeScriptParserMixin.parseStatementContent (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9525:18)
+    at TypeScriptParserMixin.parseStatementLike (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12784:17)
+    at TypeScriptParserMixin.parseStatementListItem (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12764:17)
+    at TypeScriptParserMixin.parseBlockOrModuleBlockBody (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:13333:61)
+    at TypeScriptParserMixin.parseBlockBody (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:13326:10)
+    at TypeScriptParserMixin.parseBlock (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:13314:10)
+    at TypeScriptParserMixin.parseFunctionBody (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12117:24)
+    at TypeScriptParserMixin.parseFunctionBodyAndFinish (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12103:10)
+    at TypeScriptParserMixin.parseFunctionBodyAndFinish (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9189:18)
+ ERROR  SyntaxError: C:\Users\Adolf Aoun\Desktop\marvel-gym-app\src\app\(tabs)\_layout.tsx: Unexpected token, expected "}" (435:8)
+
+  433 |
+  434 | const styles = StyleSheet.create({
+> 435 |   tabBar: {
+      |         ^
+  436 |     position: 'absolute',
+  437 |     borderTopWidth: 0,
+  438 |     backgroundColor: 'transparent',
+    at constructor (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:365:19)
+    at TypeScriptParserMixin.raise (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:6616:19)
+    at TypeScriptParserMixin.unexpected (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:6636:16)
+    at TypeScriptParserMixin.expect (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:6916:12)
+    at TypeScriptParserMixin.jsxParseExpressionContainer (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:4649:10)
+    at TypeScriptParserMixin.jsxParseElementAt (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:4723:36)
+    at TypeScriptParserMixin.jsxParseElement (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:4761:17)
+    at TypeScriptParserMixin.parseExprAtom (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:4771:19)
+    at TypeScriptParserMixin.parseExprSubscripts (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11098:23)
+    at TypeScriptParserMixin.parseUpdate (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11083:21)
+    at TypeScriptParserMixin.parseMaybeUnary (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11063:23)
+    at TypeScriptParserMixin.parseMaybeUnary (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9854:18)
+    at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10916:61)
+    at TypeScriptParserMixin.parseExprOps (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10921:23)
+    at TypeScriptParserMixin.parseMaybeConditional (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10898:23)
+    at TypeScriptParserMixin.parseMaybeAssign (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10848:21)
+    at C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9792:39
+    at TypeScriptParserMixin.tryParse (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:6924:20)
+    at TypeScriptParserMixin.parseMaybeAssign (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9792:18)
+    at C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10817:39
+    at TypeScriptParserMixin.allowInAnd (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12443:12)
+    at TypeScriptParserMixin.parseMaybeAssignAllowIn (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10817:17)
+    at TypeScriptParserMixin.parseMaybeAssignAllowInOrVoidPattern (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12510:17)
+    at TypeScriptParserMixin.parseParenAndDistinguishExpression (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11692:28)
+    at TypeScriptParserMixin.parseExprAtom (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11348:23)
+    at TypeScriptParserMixin.parseExprAtom (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:4776:20)
+    at TypeScriptParserMixin.parseExprSubscripts (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11098:23)
+    at TypeScriptParserMixin.parseUpdate (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11083:21)
+    at TypeScriptParserMixin.parseMaybeUnary (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:11063:23)
+    at TypeScriptParserMixin.parseMaybeUnary (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9854:18)
+    at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10916:61)
+    at TypeScriptParserMixin.parseExprOps (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10921:23)
+    at TypeScriptParserMixin.parseMaybeConditional (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10898:23)
+    at TypeScriptParserMixin.parseMaybeAssign (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10848:21)
+    at TypeScriptParserMixin.parseMaybeAssign (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9803:20)
+    at TypeScriptParserMixin.parseExpressionBase (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10801:23)
+    at C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10797:39
+    at TypeScriptParserMixin.allowInAnd (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12438:16)
+    at TypeScriptParserMixin.parseExpression (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:10797:17)
+    at TypeScriptParserMixin.parseReturnStatement (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:13159:28)
+    at TypeScriptParserMixin.parseStatementContent (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12815:21)
+    at TypeScriptParserMixin.parseStatementContent (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9525:18)
+    at TypeScriptParserMixin.parseStatementLike (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12784:17)
+    at TypeScriptParserMixin.parseStatementListItem (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12764:17)
+    at TypeScriptParserMixin.parseBlockOrModuleBlockBody (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:13333:61)
+    at TypeScriptParserMixin.parseBlockBody (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:13326:10)
+    at TypeScriptParserMixin.parseBlock (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:13314:10)
+    at TypeScriptParserMixin.parseFunctionBody (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12117:24)
+    at TypeScriptParserMixin.parseFunctionBodyAndFinish (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12103:10)
+    at TypeScriptParserMixin.parseFunctionBodyAndFinish (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9189:18)

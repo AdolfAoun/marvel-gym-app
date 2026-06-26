@@ -1,5 +1,6 @@
 import type { Member } from '../types';
 import {
+  getSignedInMember,
   loginLocalMember,
   logoutLocalMember,
   registerLocalMember,
@@ -36,7 +37,12 @@ export const logoutMember = async (): Promise<void> => {
   return logoutLocalMember();
 };
 
+export const getCurrentSessionMember = async (): Promise<Member | undefined> => {
+  return getSignedInMember();
+};
+
 export const authService = {
+  getCurrentSessionMember,
   registerMember,
   loginMember,
   logoutMember,

@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import type { Member } from '../types';
 
 export type LocalRegisterInput = {
@@ -18,6 +20,7 @@ type StoredAccount = {
 
 const now = () => new Date().toISOString();
 const seedTimestamp = now();
+const activeMemberStorageKey = 'marvel-gym.activeMemberId';
 
 let guestMember: Member = {
   id: 'guest-member',
@@ -66,6 +69,32 @@ let accounts: StoredAccount[] = [
   },
 ];
 let activeMemberId: string | undefined;
+let hasLoadedStoredSession = false;
+
+async function persistActiveMemberId(memberId: string | undefined) {
+  if (memberId) {
+    await AsyncStorage.setItem(activeMemberStorageKey, memberId);
+    return;
+  }
+
+  await AsyncStorage.removeItem(activeMemberStorageKey);
+}
+
+async function ensureStoredSessionLoaded() {
+  if (hasLoadedStoredSession) {
+    return;
+  }
+
+  const storedMemberId = await AsyncStorage.getItem(activeMemberStorageKey);
+  const accountExists = accounts.some((account) => account.member.id === storedMemberId);
+
+  activeMemberId = accountExists ? storedMemberId ?? undefined : undefined;
+  hasLoadedStoredSession = true;
+
+  if (storedMemberId && !accountExists) {
+    await persistActiveMemberId(undefined);
+  }
+}
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
@@ -120,6 +149,8 @@ export const loginLocalMember = async (
   identifier: string,
   password: string,
 ): Promise<Member> => {
+  await ensureStoredSessionLoaded();
+
   const account = findAccountByIdentifier(identifier);
 
   if (!account || account.password !== password) {
@@ -127,18 +158,29 @@ export const loginLocalMember = async (
   }
 
   activeMemberId = account.member.id;
+  await persistActiveMemberId(activeMemberId);
 
   return account.member;
 };
 
 export const logoutLocalMember = async (): Promise<void> => {
+  await ensureStoredSessionLoaded();
   activeMemberId = undefined;
+  await persistActiveMemberId(undefined);
 };
 
 export const getActiveMember = async (): Promise<Member> => {
+  await ensureStoredSessionLoaded();
+
   const account = accounts.find((item) => item.member.id === activeMemberId);
 
   return account?.member ?? guestMember;
+};
+
+export const getSignedInMember = async (): Promise<Member | undefined> => {
+  await ensureStoredSessionLoaded();
+
+  return accounts.find((item) => item.member.id === activeMemberId)?.member;
 };
 
 export const getLocalMemberById = async (
@@ -171,6 +213,8 @@ export const listLocalMembers = async (): Promise<Member[]> => {
 export const updateActiveMember = async (
   updates: Partial<Member>,
 ): Promise<Member> => {
+  await ensureStoredSessionLoaded();
+
   const timestamp = now();
   const account = accounts.find((item) => item.member.id === activeMemberId);
 

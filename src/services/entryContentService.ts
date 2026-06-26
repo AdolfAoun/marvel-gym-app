@@ -27,7 +27,7 @@ let entrySlides: EntrySlide[] = [
 
 let signInWallpaper: EntrySlide = {
   id: 'sign-in-wallpaper',
-  image: require('../../assets/images/prototype-back-pose-background.png'),
+  image: require('../../image.png'),
   label: 'Sign In Wallpaper',
 };
 

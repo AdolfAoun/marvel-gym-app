@@ -116,6 +116,7 @@ export default function ShopScreen() {
   const [customVoucherAmount, setCustomVoucherAmount] = useState('');
   const [isCreatingVoucher, setIsCreatingVoucher] = useState(false);
   const [toastText, setToastText] = useState('');
+  const [expandedBox, setExpandedBox] = useState<'vouchers' | 'orders' | null>(null);
 
   const loadData = useCallback(async () => {
     const [nextProducts, nextCategories, nextVouchers] = await Promise.all([
@@ -162,7 +163,8 @@ export default function ShopScreen() {
 
   const heroProduct = featuredProducts[0];
   const pendingVouchers = shopVouchers.filter((v) => v.status === 'Pending');
-  const orderedVouchers = shopVouchers.filter((v) => v.status === orderTab);
+  const historyVouchers = shopVouchers.filter((v) => v.status !== 'Pending');
+  const orderedVouchers = historyVouchers.filter((v) => v.status === orderTab);
 
   const showToast = (message: string) => {
     setToastText(message);
@@ -303,8 +305,10 @@ export default function ShopScreen() {
                 </Text>
                 <Pressable
                   onPress={() => {
-                    setSelectedCategory('Supplements');
-                    setSearch('');
+                    if (heroProduct) {
+                      setPendingVoucherProduct(heroProduct);
+                      setVoucherQuantity(1);
+                    }
                   }}
                   style={({ pressed }) => [
                     styles.heroButton,
@@ -556,121 +560,169 @@ export default function ShopScreen() {
           />
         </Pressable>
 
-        {/* My Vouchers (pending) */}
-        <View style={styles.sectionHeading}>
-          <View style={styles.accentBar} />
-          <View style={styles.sectionHeadingText}>
-            <Text style={styles.sectionEyebrow}>Awaiting counter</Text>
-            <Text style={styles.sectionHeadingTitle}>My Vouchers</Text>
-          </View>
-          <Text style={styles.sectionHint}>{pendingVouchers.length} pending</Text>
+        {/* ── VOUCHERS + ORDERS — two independent boxes ──────────── */}
+        <View style={styles.actBoxRow}>
+          {/* VOUCHERS: pending, awaiting counter — can be canceled */}
+          <Pressable
+            onPress={() =>
+              setExpandedBox(expandedBox === 'vouchers' ? null : 'vouchers')
+            }
+            style={[
+              styles.actBox,
+              expandedBox === 'vouchers' && styles.actBoxActive,
+            ]}>
+            <SymbolView
+              name="ticket.fill"
+              size={24}
+              tintColor={premiumColors.redBright}
+              fallback={<Text style={styles.actBoxGlyph}>▤</Text>}
+            />
+            <Text style={styles.actBoxCount}>{pendingVouchers.length}</Text>
+            <Text style={styles.actBoxLabel}>Vouchers</Text>
+            <Text style={styles.actBoxSub}>Pending</Text>
+          </Pressable>
+
+          {/* ORDERS: confirmed + canceled history log */}
+          <Pressable
+            onPress={() =>
+              setExpandedBox(expandedBox === 'orders' ? null : 'orders')
+            }
+            style={[
+              styles.actBox,
+              expandedBox === 'orders' && styles.actBoxActive,
+            ]}>
+            <SymbolView
+              name="list.bullet.clipboard"
+              size={24}
+              tintColor={premiumColors.redBright}
+              fallback={<Text style={styles.actBoxGlyph}>≡</Text>}
+            />
+            <Text style={styles.actBoxCount}>{historyVouchers.length}</Text>
+            <Text style={styles.actBoxLabel}>Orders</Text>
+            <Text style={styles.actBoxSub}>History</Text>
+          </Pressable>
         </View>
 
-        {pendingVouchers.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>No pending vouchers</Text>
-            <Text style={styles.emptyBody}>
-              Reserve a product to create a cash voucher.
+        {/* Vouchers expanded — pending, can cancel */}
+        {expandedBox === 'vouchers' ? (
+          <View style={styles.expandedPanel}>
+            <Text style={styles.expandedTitle}>My Vouchers</Text>
+            <Text style={styles.expandedSub}>
+              Awaiting counter confirmation. Cancel anytime before pickup.
             </Text>
-          </View>
-        ) : (
-          <View style={styles.voucherList}>
-            {pendingVouchers.map((voucher) => (
-              <View key={voucher.id} style={styles.voucherRow}>
-                <View
-                  style={[
-                    styles.voucherRail,
-                    { backgroundColor: getVoucherStatusColor(voucher.status) },
-                  ]}
-                />
-                <View style={styles.voucherRowBody}>
-                  <Text style={styles.voucherRowTitle} numberOfLines={2}>
-                    {voucher.description}
-                  </Text>
-                  <Text style={styles.voucherRowMeta}>
-                    {formatVoucherDate(voucher.date)} · {formatPrice(voucher.amount)}
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => handleCancelPendingVoucher(voucher.id)}
-                  style={({ pressed }) => [
-                    styles.voucherCancel,
-                    pressed && styles.buttonPressed,
-                  ]}>
-                  <Text style={styles.voucherCancelText}>Cancel</Text>
-                </Pressable>
+            {pendingVouchers.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>No pending vouchers</Text>
+                <Text style={styles.emptyBody}>
+                  Reserve a product to create a cash voucher.
+                </Text>
               </View>
-            ))}
+            ) : (
+              <View style={styles.voucherList}>
+                {pendingVouchers.map((voucher) => (
+                  <View key={voucher.id} style={styles.voucherRow}>
+                    <View
+                      style={[
+                        styles.voucherRail,
+                        { backgroundColor: getVoucherStatusColor(voucher.status) },
+                      ]}
+                    />
+                    <View style={styles.voucherRowBody}>
+                      <Text style={styles.voucherRowTitle} numberOfLines={2}>
+                        {voucher.description}
+                      </Text>
+                      <Text style={styles.voucherRowMeta}>
+                        {formatVoucherDate(voucher.date)} ·{' '}
+                        {formatPrice(voucher.amount)}
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={() => handleCancelPendingVoucher(voucher.id)}
+                      style={({ pressed }) => [
+                        styles.voucherCancel,
+                        pressed && styles.buttonPressed,
+                      ]}>
+                      <Text style={styles.voucherCancelText}>Cancel</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
-        )}
+        ) : null}
 
-        {/* My Orders */}
-        <View style={styles.sectionHeading}>
-          <View style={styles.accentBar} />
-          <View style={styles.sectionHeadingText}>
-            <Text style={styles.sectionEyebrow}>History</Text>
-            <Text style={styles.sectionHeadingTitle}>My Orders</Text>
-          </View>
-        </View>
-
-        <View style={styles.tabsRow}>
-          {(['Confirmed', 'Canceled'] as OrderTab[]).map((tab) => (
-            <Pressable
-              key={tab}
-              onPress={() => setOrderTab(tab)}
-              style={[styles.tab, orderTab === tab && styles.tabActive]}>
-              <Text
-                style={[styles.tabText, orderTab === tab && styles.tabTextActive]}>
-                {tab}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {orderedVouchers.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>No {orderTab.toLowerCase()} orders</Text>
-            <Text style={styles.emptyBody}>
-              {orderTab === 'Confirmed'
-                ? 'Orders confirmed at the counter will appear here.'
-                : 'Cancelled orders will appear here.'}
+        {/* Orders expanded — confirmed + canceled history */}
+        {expandedBox === 'orders' ? (
+          <View style={styles.expandedPanel}>
+            <Text style={styles.expandedTitle}>Order History</Text>
+            <Text style={styles.expandedSub}>
+              Confirmed and canceled shop orders.
             </Text>
-          </View>
-        ) : (
-          <View style={styles.voucherList}>
-            {orderedVouchers.map((voucher) => (
-              <View key={voucher.id} style={styles.voucherRow}>
-                <View
-                  style={[
-                    styles.voucherRail,
-                    { backgroundColor: getVoucherStatusColor(voucher.status) },
-                  ]}
-                />
-                <View style={styles.voucherRowBody}>
-                  <Text style={styles.voucherRowTitle} numberOfLines={2}>
-                    {voucher.description}
-                  </Text>
-                  <Text style={styles.voucherRowMeta}>
-                    {formatVoucherDate(voucher.date)} · {formatPrice(voucher.amount)}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.statusChip,
-                    { borderColor: getVoucherStatusColor(voucher.status) },
-                  ]}>
+            <View style={styles.tabsRow}>
+              {(['Confirmed', 'Canceled'] as OrderTab[]).map((tab) => (
+                <Pressable
+                  key={tab}
+                  onPress={() => setOrderTab(tab)}
+                  style={[styles.tab, orderTab === tab && styles.tabActive]}>
                   <Text
                     style={[
-                      styles.statusChipText,
-                      { color: getVoucherStatusColor(voucher.status) },
+                      styles.tabText,
+                      orderTab === tab && styles.tabTextActive,
                     ]}>
-                    {voucher.status}
+                    {tab}
                   </Text>
-                </View>
+                </Pressable>
+              ))}
+            </View>
+            {orderedVouchers.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>
+                  No {orderTab.toLowerCase()} orders
+                </Text>
+                <Text style={styles.emptyBody}>
+                  {orderTab === 'Confirmed'
+                    ? 'Orders confirmed at the counter will appear here.'
+                    : 'Cancelled orders will appear here.'}
+                </Text>
               </View>
-            ))}
+            ) : (
+              <View style={styles.voucherList}>
+                {orderedVouchers.map((voucher) => (
+                  <View key={voucher.id} style={styles.voucherRow}>
+                    <View
+                      style={[
+                        styles.voucherRail,
+                        { backgroundColor: getVoucherStatusColor(voucher.status) },
+                      ]}
+                    />
+                    <View style={styles.voucherRowBody}>
+                      <Text style={styles.voucherRowTitle} numberOfLines={2}>
+                        {voucher.description}
+                      </Text>
+                      <Text style={styles.voucherRowMeta}>
+                        {formatVoucherDate(voucher.date)} ·{' '}
+                        {formatPrice(voucher.amount)}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.statusChip,
+                        { borderColor: getVoucherStatusColor(voucher.status) },
+                      ]}>
+                      <Text
+                        style={[
+                          styles.statusChipText,
+                          { color: getVoucherStatusColor(voucher.status) },
+                        ]}>
+                        {voucher.status}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
-        )}
+        ) : null}
       </ScrollView>
 
       {/* Create Voucher modal */}
@@ -1553,5 +1605,47 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '900',
+  },
+
+  // Two-box row (Vouchers / Orders)
+  actBoxRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 20, marginBottom: 14 },
+  actBox: {
+    flex: 1,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: premiumColors.glassBorder,
+    borderRadius: 22,
+    backgroundColor: premiumColors.surface,
+    paddingVertical: 22,
+    paddingHorizontal: 10,
+    gap: 4,
+    ...premiumShadow,
+  },
+  actBoxActive: {
+    borderColor: 'rgba(225, 29, 46, 0.55)',
+    backgroundColor: 'rgba(177, 18, 38, 0.12)',
+  },
+  actBoxGlyph: { color: premiumColors.redBright, fontSize: 22 },
+  actBoxCount: { color: '#FFFFFF', fontSize: 30, fontWeight: '900', marginTop: 4 },
+  actBoxLabel: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  actBoxSub: { color: mutedColor, fontSize: 11, fontWeight: '700' },
+
+  // Expanded panel (vouchers / orders)
+  expandedPanel: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: premiumColors.glassBorder,
+    borderRadius: 22,
+    backgroundColor: premiumColors.surface,
+    padding: 16,
+  },
+  expandedTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '900', marginBottom: 4 },
+  expandedSub: {
+    color: mutedColor,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 14,
+    lineHeight: 17,
   },
 });

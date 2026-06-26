@@ -1,7 +1,8 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Image,
   NativeScrollEvent,
@@ -16,8 +17,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { entryContentService } from '@/services';
+import { authService, entryContentService } from '@/services';
 import type { EntrySlide } from '@/services/entryContentService';
+import type { Member } from '@/types';
 
 const accentBright = '#E11D2E';
 
@@ -25,6 +27,7 @@ export default function WelcomeScreen() {
   const router = useRouter();
   const { width: windowWidth } = useWindowDimensions();
   const [carouselSlides, setCarouselSlides] = useState<EntrySlide[]>([]);
+  const [signedInMember, setSignedInMember] = useState<Member>();
   const [activeSlide, setActiveSlide] = useState(0);
   const [frameWidth, setFrameWidth] = useState(0);
   const slideWidth =
@@ -50,6 +53,26 @@ export default function WelcomeScreen() {
 
     loadSlides();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const loadSession = async () => {
+        const member = await authService.getCurrentSessionMember();
+
+        if (isActive) {
+          setSignedInMember(member);
+        }
+      };
+
+      loadSession();
+
+      return () => {
+        isActive = false;
+      };
+    }, []),
+  );
 
   const activeCaption = carouselSlides[activeSlide]?.caption;
   const activeCaptionSub = carouselSlides[activeSlide]?.captionSub;
@@ -134,7 +157,14 @@ export default function WelcomeScreen() {
 
           {/* Sign In – now uses the filled red gradient style */}
           <Pressable
-            onPress={() => router.push('/login')}
+            onPress={() => {
+              if (!signedInMember) {
+                router.push('/login');
+                return;
+              }
+
+              router.replace(signedInMember.role === 'Admin' ? '/admin' : '/(tabs)');
+            }}
             style={({ pressed }) => [
               styles.signInButtonWrap,
               pressed && styles.buttonPressed,
@@ -146,7 +176,9 @@ export default function WelcomeScreen() {
               end={{ x: 0.92, y: 1 }}
               style={styles.signInGradientButton}>
               <View pointerEvents="none" style={styles.signInGloss} />
-              <Text style={styles.signInGradientText}>Sign In</Text>
+              <Text style={styles.signInGradientText}>
+                {signedInMember ? 'Continue' : 'Sign In'}
+              </Text>
             </LinearGradient>
           </Pressable>
 
@@ -155,6 +187,7 @@ export default function WelcomeScreen() {
             onPress={() => router.replace('/(tabs)')}
             style={({ pressed }) => [
               styles.guestButton,
+              signedInMember && styles.hiddenButton,
               pressed && styles.buttonPressed,
             ]}>
             <Text style={styles.guestButtonText}>Continue as Guest</Text>
@@ -305,6 +338,9 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '900',
     letterSpacing: 0,
+  },
+  hiddenButton: {
+    display: 'none',
   },
   buttonPressed: {
     opacity: 0.82,

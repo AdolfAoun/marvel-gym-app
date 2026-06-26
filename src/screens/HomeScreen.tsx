@@ -582,6 +582,17 @@ export default function HomeScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
+          <LinearGradient
+            pointerEvents="none"
+            colors={[
+              'rgba(255,255,255,0.10)',
+              'rgba(225,29,46,0.08)',
+              'rgba(255,255,255,0)',
+            ]}
+            start={{ x: 0.05, y: 0 }}
+            end={{ x: 0.95, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
           <View pointerEvents="none" style={styles.heroGloss} />
           <View style={styles.heroTopRow}>
             <View style={styles.heroTextBlock}>
@@ -970,6 +981,13 @@ export default function HomeScreen() {
           </View>
         </View>
         <View style={styles.infoCard}>
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(255,255,255,0.07)', 'rgba(225,29,46,0.05)', 'rgba(255,255,255,0)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
           <Text style={styles.cardLabel}>Latest update</Text>
             <Text style={styles.infoTitle}>
               {notification?.title ?? 'No notifications yet'}
@@ -1263,16 +1281,16 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 28,
-    backgroundColor: 'rgba(18, 20, 28, 0.66)',
+    backgroundColor: 'rgba(18, 20, 28, 0.72)',
     padding: 18,
     marginBottom: 22,
     shadowColor: premiumColors.red,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.3,
-    shadowRadius: 30,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.22,
+    shadowRadius: 26,
+    elevation: 8,
   },
   heroGloss: {
     position: 'absolute',
@@ -1281,14 +1299,6 @@ const styles = StyleSheet.create({
     right: 18,
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.22)',
-  },
-  heroBackgroundSign: {
-    position: 'absolute',
-    right: 8,
-    top: -10,
-    width: 78,
-    height: 78,
-    opacity: 0.12,
   },
   heroSheen: {
     position: 'absolute',
@@ -1326,21 +1336,21 @@ const styles = StyleSheet.create({
     textShadowRadius: 8,
   },
   subtitle: {
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: 'rgba(255, 255, 255, 0.74)',
     fontSize: 15,
     fontWeight: '800',
     lineHeight: 20,
     marginTop: 6,
   },
   avatarBadge: {
-    width: 50,
-    height: 50,
+    width: 54,
+    height: 54,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.45)',
-    borderRadius: 25,
-    backgroundColor: 'rgba(10, 8, 12, 0.35)',
+    borderRadius: 27,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
     overflow: 'hidden',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 6 },
@@ -1364,7 +1374,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 10,
     borderTopWidth: 0,
-    marginTop: 12,
+    marginTop: 14,
     paddingTop: 0,
   },
   statusBadgeOnRed: {
@@ -1375,7 +1385,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.075)',
     paddingHorizontal: 12,
   },
   statusDot: {
@@ -1427,9 +1437,9 @@ const styles = StyleSheet.create({
   expiryPill: {
     alignItems: 'flex-end',
     borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 18,
-    backgroundColor: premiumColors.surfaceSoft,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.055)',
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
@@ -1455,15 +1465,15 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    borderRadius: 26,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 28,
     width: '100%',
     padding: 20,
     shadowColor: '#E11D2E',
     shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.16,
     shadowRadius: 28,
-    elevation: 6,
+    elevation: 7,
   },
   daysGlassHighlight: {
     position: 'absolute',
@@ -1511,10 +1521,10 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   membershipTrack: {
-    height: 7,
+    height: 8,
     overflow: 'hidden',
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.11)',
+    backgroundColor: 'rgba(255, 255, 255, 0.095)',
     marginTop: 18,
   },
   membershipTrackFill: {
@@ -1570,8 +1580,12 @@ const styles = StyleSheet.create({
   accentBar: {
     width: 4,
     height: 36,
-    borderRadius: 3,
+    borderRadius: 999,
     backgroundColor: premiumColors.redBright,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.36,
+    shadowRadius: 8,
   },
   sectionHeadingText: {
     flex: 1,
@@ -1592,14 +1606,14 @@ const styles = StyleSheet.create({
   activityPanel: {
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 24,
-    backgroundColor: 'rgba(18, 20, 28, 0.6)',
-    padding: 14,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 26,
+    backgroundColor: 'rgba(18, 20, 28, 0.68)',
+    padding: 15,
     marginBottom: 22,
     shadowColor: premiumColors.red,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.18,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.16,
     shadowRadius: 22,
     elevation: 6,
   },
@@ -1621,8 +1635,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'flex-start',
     borderWidth: 1,
-    borderColor: premiumColors.glassBorder,
-    borderRadius: 20,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 22,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     paddingHorizontal: 14,
     paddingVertical: 15,
@@ -1662,11 +1676,11 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   actionIconWrap: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 13,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     marginBottom: 12,
   },
@@ -1725,12 +1739,12 @@ const styles = StyleSheet.create({
   },
   featureCard: {
     flex: 1,
-    minHeight: 178,
+    minHeight: 184,
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: premiumColors.glassBorder,
-    borderRadius: 24,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 28,
     padding: 16,
     shadowColor: premiumColors.red,
     shadowOffset: { width: 0, height: 14 },
@@ -1763,13 +1777,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   featureIconBadge: {
-    width: 46,
-    height: 46,
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.28)',
-    borderRadius: 15,
+    borderRadius: 17,
     backgroundColor: 'rgba(255, 255, 255, 0.16)',
   },
   featureIconBadgeAi: {
@@ -1885,9 +1899,9 @@ const styles = StyleSheet.create({
     gap: 16,
     minHeight: 186,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.13)',
-    borderRadius: 18,
-    backgroundColor: 'rgba(8, 10, 16, 0.64)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderRadius: 22,
+    backgroundColor: 'rgba(3, 5, 10, 0.72)',
     paddingHorizontal: 14,
     paddingTop: 16,
     paddingBottom: 14,
@@ -1905,14 +1919,14 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   activityTrack: {
-    width: 30,
+    width: 32,
     height: 120,
     justifyContent: 'flex-end',
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.14)',
-    borderRadius: 7,
-    backgroundColor: 'rgba(255, 255, 255, 0.095)',
+    borderRadius: 9,
+    backgroundColor: 'rgba(255, 255, 255, 0.075)',
   },
   activityFill: {
     width: '100%',
@@ -1990,17 +2004,17 @@ const styles = StyleSheet.create({
   },
   voucherCard: {
     width: 290,
-    minHeight: 120,
+    minHeight: 126,
     flexDirection: 'row',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: premiumColors.glassBorder,
-    borderRadius: 22,
-    backgroundColor: surfaceColor,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 24,
+    backgroundColor: 'rgba(18, 20, 28, 0.74)',
     ...premiumShadow,
   },
   voucherTear: {
-    width: 8,
+    width: 9,
     backgroundColor: accentColor,
   },
   voucherContent: {
@@ -2067,10 +2081,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   infoCard: {
+    position: 'relative',
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
-    borderRadius: 22,
-    backgroundColor: surfaceColor,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 24,
+    backgroundColor: 'rgba(18, 20, 28, 0.74)',
     padding: 18,
     ...premiumShadow,
   },

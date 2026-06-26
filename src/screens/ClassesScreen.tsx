@@ -1,223 +1,202 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   Image,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
+import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
-import {
-  premiumColors,
-  premiumGlow,
-  premiumShadow,
-} from '@/constants/premiumTheme';
+import { premiumColors, premiumGlow, premiumShadow } from '@/constants/premiumTheme';
 import { classService, voucherService } from '@/services';
 import type { ClassCategory, GymClass, Voucher } from '@/types';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const accentColor = premiumColors.red;
 const mutedColor = premiumColors.textMuted;
 
-const heroImage =
-  'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=900&q=80';
-
-const categories: ClassCategory[] = [
-  'Fitness Classes',
-  'Martial Arts',
-  'Gymnastics',
-  'Extra Classes',
-];
-
-const categorySymbols: Record<ClassCategory, { symbol: string; fallback: string }> = {
-  'Fitness Classes': { symbol: 'dumbbell.fill', fallback: 'Fit' },
-  'Martial Arts': { symbol: 'figure.boxing', fallback: 'MA' },
-  Gymnastics: { symbol: 'figure.gymnastics', fallback: 'Gym' },
-  'Extra Classes': { symbol: 'sparkles', fallback: 'Ex' },
+const CATEGORY_IMAGES: Record<ClassCategory, string> = {
+  'Fitness Classes':
+    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=900&q=80',
+  'Martial Arts':
+    'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=900&q=80',
+  Gymnastics:
+    'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=900&q=80',
+  'Extra Classes':
+    'https://images.unsplash.com/photo-1571731956672-f2b94d7dd0cb?w=900&q=80',
 };
 
-const weekdayOrder = [
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
+const CATEGORY_LOCATIONS: Record<ClassCategory, string> = {
+  'Fitness Classes': 'Main Gym',
+  'Martial Arts': 'Boxing Area',
+  Gymnastics: 'Studio 1',
+  'Extra Classes': 'Studio 2',
+};
+
+type ScheduleFilter = 'ALL' | ClassCategory;
+
+const SCHEDULE_FILTERS: { key: ScheduleFilter; label: string }[] = [
+  { key: 'ALL', label: 'ALL' },
+  { key: 'Fitness Classes', label: 'FITNESS' },
+  { key: 'Martial Arts', label: 'MARTIAL ARTS' },
+  { key: 'Gymnastics', label: 'GYMNASTICS' },
+  { key: 'Extra Classes', label: 'EXTRA' },
 ];
 
-type BookingsTab = 'Confirmed' | 'Canceled';
+const WEEKDAY_SHORTS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const WEEKDAY_FULLS = [
+  'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
+];
 
-function getWeekday(value: string) {
-  return new Intl.DateTimeFormat('en', { weekday: 'long' }).format(new Date(value));
+function getCurrentWeekDays() {
+  const today = new Date();
+  const start = new Date(today);
+  start.setDate(today.getDate() - today.getDay());
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    return {
+      short: WEEKDAY_SHORTS[i],
+      num: d.getDate(),
+      fullDay: WEEKDAY_FULLS[d.getDay()],
+      isToday: d.toDateString() === today.toDateString(),
+    };
+  });
 }
 
-function formatClassTime(value: string) {
+function fmt24(value: string) {
   return new Intl.DateTimeFormat('en', {
-    hour: 'numeric',
+    hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
   }).format(new Date(value));
 }
 
-function formatClassDayLabel(value: string) {
-  return new Intl.DateTimeFormat('en', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  }).format(new Date(value));
-}
-
-function formatDuration(startTime: string, endTime: string) {
-  const minutes = Math.max(
-    0,
-    Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000),
+function fmtDuration(start: string, end: string) {
+  const mins = Math.round(
+    (new Date(end).getTime() - new Date(start).getTime()) / 60000,
   );
-  return `${minutes} min`;
+  return `${mins} MIN`;
 }
 
-function formatVoucherDate(value: string) {
+function fmtVoucherDate(value: string) {
   return new Intl.DateTimeFormat('en', {
-    day: 'numeric',
     month: 'short',
+    day: 'numeric',
     year: 'numeric',
   }).format(new Date(value));
 }
 
-function getBookingStatusColor(status: string) {
+function fmtTodayLabel() {
+  return new Intl.DateTimeFormat('en', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date());
+}
+
+function getWeekdayName(iso: string) {
+  return new Intl.DateTimeFormat('en', { weekday: 'long' }).format(new Date(iso));
+}
+
+function statusColor(status: string) {
   if (status === 'Confirmed') return premiumColors.success;
   if (status === 'Canceled') return premiumColors.textMuted;
   return premiumColors.warning;
 }
 
-function getInitials(name: string) {
+function initial(name: string) {
   return name.slice(0, 1).toUpperCase();
 }
 
 export default function ClassesScreen() {
   const [classes, setClasses] = useState<GymClass[]>([]);
-  const [selectedCategory, setSelectedCategory] =
-    useState<ClassCategory>('Fitness Classes');
-  const [selectedDay, setSelectedDay] = useState('Monday');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [pendingClassAction, setPendingClassAction] = useState<{
+  const [classVouchers, setClassVouchers] = useState<Voucher[]>([]);
+  const [selectedDay, setSelectedDay] = useState(
+    () => WEEKDAY_FULLS[new Date().getDay()],
+  );
+  const [scheduleFilter, setScheduleFilter] = useState<ScheduleFilter>('ALL');
+  const [pendingAction, setPendingAction] = useState<{
     action: 'reserve' | 'cancel';
     gymClass: GymClass;
   }>();
   const [isLoading, setIsLoading] = useState(true);
-  const [classVouchers, setClassVouchers] = useState<Voucher[]>([]);
-  const [bookingsTab, setBookingsTab] = useState<BookingsTab>('Confirmed');
-  const [bookmarked, setBookmarked] = useState<Set<string>>(new Set());
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [expandedBox, setExpandedBox] = useState<'vouchers' | 'orders' | null>(null);
+  const [ordersTab, setOrdersTab] = useState<'Confirmed' | 'Canceled'>('Confirmed');
 
-  const loadClasses = useCallback(async () => {
+  const weekDays = useMemo(() => getCurrentWeekDays(), []);
+
+  const loadData = useCallback(async () => {
     const [scheduledClasses, vouchers] = await Promise.all([
       classService.getScheduledClasses(),
       voucherService.getVouchers(),
     ]);
-    setClasses(scheduledClasses.filter((gymClass) => gymClass.isActive));
+    setClasses(scheduledClasses.filter((c) => c.isActive));
     setClassVouchers(vouchers.filter((v) => v.type === 'Class Reservation'));
     setIsLoading(false);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadClasses();
-    }, [loadClasses]),
+      loadData();
+    }, [loadData]),
   );
 
-  const registeredClasses = useMemo(
-    () => classes.filter((gymClass) => gymClass.isRegistered),
+  const featuredClasses = useMemo(
+    () =>
+      [...classes]
+        .sort((a, b) => (b.isPopular ? 1 : 0) - (a.isPopular ? 1 : 0))
+        .slice(0, 5),
     [classes],
   );
 
-  const trimmedQuery = searchQuery.trim().toLowerCase();
-  const isSearching = trimmedQuery.length > 0;
-
-  const searchResults = useMemo(() => {
-    if (!isSearching) return [];
-    return classes.filter(
-      (gymClass) =>
-        gymClass.title.toLowerCase().includes(trimmedQuery) ||
-        gymClass.instructorName.toLowerCase().includes(trimmedQuery),
-    );
-  }, [classes, isSearching, trimmedQuery]);
-
-  const upcomingClasses = useMemo(
+  const todayClasses = useMemo(
     () =>
-      [...classes]
+      classes
+        .filter((c) => {
+          if (getWeekdayName(c.startTime) !== selectedDay) return false;
+          return scheduleFilter === 'ALL' || c.category === scheduleFilter;
+        })
         .sort(
           (a, b) =>
             new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
-        )
-        .slice(0, 6),
-    [classes],
+        ),
+    [classes, selectedDay, scheduleFilter],
   );
 
-  const categoryCounts = useMemo(() => {
-    const counts = new Map<ClassCategory, number>();
-    classes.forEach((gymClass) => {
-      counts.set(gymClass.category, (counts.get(gymClass.category) ?? 0) + 1);
-    });
-    return counts;
-  }, [classes]);
-
-  const dayMeta = useMemo(() => {
-    return weekdayOrder.map((weekday) => {
-      const sample = classes.find(
-        (gymClass) => getWeekday(gymClass.startTime) === weekday,
-      );
-      const dateNum = sample
-        ? new Intl.DateTimeFormat('en', { day: '2-digit' }).format(
-            new Date(sample.startTime),
-          )
-        : '--';
-      return { key: weekday, short: weekday.slice(0, 3), dateNum };
-    });
-  }, [classes]);
-
-  const scheduleClasses = useMemo(() => {
-    return classes
-      .filter(
-        (gymClass) =>
-          getWeekday(gymClass.startTime) === selectedDay &&
-          gymClass.category === selectedCategory,
-      )
-      .sort(
-        (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
-      );
-  }, [classes, selectedDay, selectedCategory]);
-
-  const pendingBookingVouchers = classVouchers.filter((v) => v.status === 'Pending');
-  const tabBookingVouchers = classVouchers.filter((v) => v.status === bookingsTab);
-
-  const toggleBookmark = (classId: string) => {
-    setBookmarked((current) => {
-      const next = new Set(current);
-      if (next.has(classId)) {
-        next.delete(classId);
-      } else {
-        next.add(classId);
-      }
-      return next;
-    });
-  };
+  const pendingVouchers = classVouchers.filter((v) => v.status === 'Pending');
+  const historyVouchers = classVouchers.filter((v) => v.status !== 'Pending');
+  const ordersFiltered = historyVouchers.filter((v) => v.status === ordersTab);
+  const nextBooking = classVouchers.find(
+    (v) => v.status === 'Confirmed' || v.status === 'Pending',
+  );
 
   const handleReserve = async (classId: string) => {
     await classService.registerForClass(classId);
-    await loadClasses();
-    setPendingClassAction(undefined);
+    await loadData();
+    setPendingAction(undefined);
   };
 
   const handleCancel = async (classId: string) => {
     await classService.cancelClassRegistration(classId);
-    await loadClasses();
-    setPendingClassAction(undefined);
+    await loadData();
+    setPendingAction(undefined);
+  };
+
+  const handleCancelVoucher = async (voucherId: string) => {
+    await voucherService.cancelVoucher(voucherId);
+    await loadData();
   };
 
   if (isLoading) {
@@ -232,548 +211,604 @@ export default function ClassesScreen() {
     );
   }
 
-  const renderClassRow = (gymClass: GymClass) => {
-    const isReserved = Boolean(gymClass.isRegistered);
-    const isFull = gymClass.status === 'Full' && !isReserved;
-    const spotsLeft = Math.max(0, gymClass.capacity - gymClass.enrolledCount);
-    return (
-      <View key={gymClass.id} style={styles.scheduleRow}>
-        <View style={styles.scheduleThumbWrap}>
-          {gymClass.coverImageUrl ? (
-            <Image
-              source={{ uri: gymClass.coverImageUrl }}
-              style={styles.scheduleThumb}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={[styles.scheduleThumb, styles.thumbFallback]}>
-              <Text style={styles.thumbFallbackText}>{getInitials(gymClass.title)}</Text>
-            </View>
-          )}
-          <View style={styles.scheduleTimePill}>
-            <Text style={styles.scheduleTimeText}>{formatClassTime(gymClass.startTime)}</Text>
-            <Text style={styles.scheduleDurationText}>
-              {formatDuration(gymClass.startTime, gymClass.endTime)}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.scheduleBody}>
-          <Text style={styles.scheduleTitle} numberOfLines={1}>
-            {gymClass.title}
-          </Text>
-          <Text style={styles.scheduleCoach}>Coach {gymClass.instructorName}</Text>
-          <View style={styles.tagRow}>
-            <View style={styles.tag}>
-              <Text style={styles.tagText}>{gymClass.category}</Text>
-            </View>
-            {gymClass.level ? (
-              <View style={styles.tagMuted}>
-                <Text style={styles.tagMutedText}>{gymClass.level}</Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
-
-        <View style={styles.scheduleActions}>
-          <Pressable
-            disabled={isFull}
-            onPress={() =>
-              setPendingClassAction({
-                action: isReserved ? 'cancel' : 'reserve',
-                gymClass,
-              })
-            }
-            style={({ pressed }) => [
-              styles.bookButton,
-              isReserved && styles.bookButtonReserved,
-              isFull && styles.bookButtonDisabled,
-              pressed && !isFull && styles.buttonPressed,
-            ]}>
-            <Text
-              style={[
-                styles.bookButtonText,
-                isReserved && styles.bookButtonTextReserved,
-              ]}>
-              {isReserved ? 'Cancel' : isFull ? 'Full' : 'Book'}
-            </Text>
-          </Pressable>
-          <Text style={styles.spotsText}>
-            {isFull ? 'No spots' : `${spotsLeft} left`}
-          </Text>
-        </View>
-      </View>
-    );
-  };
+  const carouselItems =
+    featuredClasses.length > 0 ? featuredClasses : classes.slice(0, 5);
 
   return (
     <PremiumScreenBackground>
       <StatusBar style="light" />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Top brand row */}
-        <View style={styles.topBar}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}>
+
+        {/* ── HEADER ───────────────────────────────────────────── */}
+        <View style={styles.header}>
           <View>
-            <Text style={styles.brandKicker}>Marvel</Text>
-            <Text style={styles.brandTitle}>Classes</Text>
+            <Text style={styles.headerTitle}>CLASSES</Text>
+            <Text style={styles.headerTagline}>
+              Challenge yourself. Become{' '}
+              <Text style={styles.headerAccent}>legendary.</Text>
+            </Text>
           </View>
-          {pendingBookingVouchers.length > 0 ? (
-            <View style={styles.calendarBadge}>
+          <View style={styles.headerIcons}>
+            <View style={styles.iconBtn}>
+              <SymbolView
+                name="magnifyingglass"
+                size={18}
+                tintColor="#FFFFFF"
+                fallback={<Text style={styles.iconGlyph}>⌕</Text>}
+              />
+            </View>
+            <View style={styles.iconBtn}>
               <SymbolView
                 name="calendar"
                 size={18}
                 tintColor="#FFFFFF"
-                fallback={<Text style={styles.calendarGlyph}>{'▦'}</Text>}
+                fallback={<Text style={styles.iconGlyph}>▦</Text>}
               />
-              <View style={styles.calendarCount}>
-                <Text style={styles.calendarCountText}>
-                  {pendingBookingVouchers.length}
-                </Text>
-              </View>
-            </View>
-          ) : null}
-        </View>
-
-        {/* Hero */}
-        <View style={styles.heroCard}>
-          <Image source={{ uri: heroImage }} style={styles.heroImage} resizeMode="cover" />
-          <LinearGradient
-            pointerEvents="none"
-            colors={['rgba(10, 11, 15, 0.35)', 'rgba(10, 11, 15, 0.92)']}
-            start={{ x: 1, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={styles.heroContent}>
-            <Text style={styles.heroTitle}>CLASSES</Text>
-            <Text style={styles.heroSubtitle}>
-              Join our expert-led classes and achieve your goals.
-            </Text>
-            <View style={styles.heroStatsRow}>
-              <View style={styles.heroStatPill}>
-                <Text style={styles.heroStatValue}>{classes.length}</Text>
-                <Text style={styles.heroStatLabel}>weekly</Text>
-              </View>
-              <View style={styles.heroStatPill}>
-                <Text style={styles.heroStatValue}>{registeredClasses.length}</Text>
-                <Text style={styles.heroStatLabel}>reserved</Text>
-              </View>
-              <View style={styles.heroStatPill}>
-                <Text style={styles.heroStatValue}>{pendingBookingVouchers.length}</Text>
-                <Text style={styles.heroStatLabel}>pending</Text>
-              </View>
+              {pendingVouchers.length > 0 ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{pendingVouchers.length}</Text>
+                </View>
+              ) : null}
             </View>
           </View>
         </View>
 
-        {/* Search */}
-        <View style={styles.searchBar}>
-          <SymbolView
-            name="magnifyingglass"
-            size={18}
-            tintColor={premiumColors.textFaint}
-            fallback={<Text style={styles.searchGlyph}>{'⌕'}</Text>}
-          />
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search classes by name or coach"
-            placeholderTextColor={premiumColors.textFaint}
-            style={styles.searchInput}
-            returnKeyType="search"
-            autoCorrect={false}
-          />
+        {/* ── FEATURED CAROUSEL ─────────────────────────────────── */}
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          decelerationRate="fast"
+          onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+            setCarouselIndex(
+              Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH),
+            );
+          }}
+          style={styles.carouselScroll}>
+          {carouselItems.map((gymClass) => {
+            const isReserved = Boolean(gymClass.isRegistered);
+            const isFull = gymClass.status === 'Full' && !isReserved;
+            const spotsLeft = Math.max(
+              0,
+              gymClass.capacity - gymClass.enrolledCount,
+            );
+            const imgUri =
+              gymClass.coverImageUrl || CATEGORY_IMAGES[gymClass.category];
+            return (
+              <View key={gymClass.id} style={styles.carouselSlide}>
+                <View style={styles.featuredCard}>
+                  <Image
+                    source={{ uri: imgUri }}
+                    style={StyleSheet.absoluteFillObject}
+                    resizeMode="cover"
+                  />
+                  <LinearGradient
+                    pointerEvents="none"
+                    colors={[
+                      'rgba(0,0,0,0.08)',
+                      'rgba(0,0,0,0.0)',
+                      'rgba(0,0,0,0.84)',
+                    ]}
+                    locations={[0, 0.28, 1]}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  <View style={styles.featuredTopRow}>
+                    <View style={styles.featuredBadge}>
+                      <Text style={styles.featuredBadgeText}>FEATURED CLASS</Text>
+                    </View>
+                    <Pressable style={styles.heartBtn}>
+                      <SymbolView
+                        name="heart"
+                        size={16}
+                        tintColor="#FFFFFF"
+                        fallback={<Text style={styles.heartGlyph}>♡</Text>}
+                      />
+                    </Pressable>
+                  </View>
+                  <View style={styles.featuredBottom}>
+                    <Text style={styles.featuredTitle}>
+                      {gymClass.title.toUpperCase()}
+                    </Text>
+                    <Text style={styles.featuredDesc} numberOfLines={2}>
+                      {gymClass.level} level · Coach {gymClass.instructorName}
+                    </Text>
+                    <View style={styles.statsRow}>
+                      <View style={styles.stat}>
+                        <SymbolView
+                          name="clock"
+                          size={12}
+                          tintColor="rgba(255,255,255,0.72)"
+                          fallback={<Text style={styles.statGlyph}>○</Text>}
+                        />
+                        <Text style={styles.statText}>
+                          {fmtDuration(gymClass.startTime, gymClass.endTime)}
+                        </Text>
+                      </View>
+                      <View style={styles.statDivider} />
+                      <View style={styles.stat}>
+                        <SymbolView
+                          name="chart.bar.fill"
+                          size={12}
+                          tintColor="rgba(255,255,255,0.72)"
+                          fallback={<Text style={styles.statGlyph}>▪</Text>}
+                        />
+                        <Text style={styles.statText}>
+                          {gymClass.level?.toUpperCase() ?? 'ALL LEVELS'}
+                        </Text>
+                      </View>
+                      <View style={styles.statDivider} />
+                      <View style={styles.stat}>
+                        <SymbolView
+                          name="person.2.fill"
+                          size={12}
+                          tintColor="rgba(255,255,255,0.72)"
+                          fallback={<Text style={styles.statGlyph}>◎</Text>}
+                        />
+                        <Text style={styles.statText}>{spotsLeft} SPOTS LEFT</Text>
+                      </View>
+                    </View>
+                    <Pressable
+                      disabled={isFull}
+                      onPress={() =>
+                        setPendingAction({
+                          action: isReserved ? 'cancel' : 'reserve',
+                          gymClass,
+                        })
+                      }
+                      style={({ pressed }) => [
+                        styles.featuredBookBtn,
+                        isFull && styles.featuredBookBtnDisabled,
+                        pressed && !isFull && styles.btnPressed,
+                      ]}>
+                      <Text style={styles.featuredBookBtnText}>
+                        {isReserved
+                          ? 'CANCEL BOOKING'
+                          : isFull
+                            ? 'CLASS FULL'
+                            : 'BOOK NOW'}
+                      </Text>
+                      {!isFull ? (
+                        <Text style={styles.featuredBookBtnArrow}> ›</Text>
+                      ) : null}
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+
+        {/* Pagination dots */}
+        {carouselItems.length > 1 ? (
+          <View style={styles.pagination}>
+            {carouselItems.map((_, i) => (
+              <View
+                key={i}
+                style={[styles.dot, i === carouselIndex && styles.dotActive]}
+              />
+            ))}
+          </View>
+        ) : null}
+
+        {/* ── TODAY SCHEDULE ──────────────────────────────────── */}
+        <View style={styles.todayRow}>
+          <View>
+            <Text style={styles.todayLabel}>TODAY</Text>
+            <Text style={styles.todayDate}>{fmtTodayLabel()}</Text>
+          </View>
+          <View style={styles.filterChip}>
+            <Text style={styles.filterChipText}>FILTER</Text>
+            <SymbolView
+              name="slider.horizontal.3"
+              size={13}
+              tintColor="#FFFFFF"
+              fallback={<Text style={styles.filterGlyph}>≡</Text>}
+            />
+          </View>
         </View>
 
-        {isSearching ? (
-          <>
-            <View style={styles.sectionHeading}>
-              <View style={styles.accentBar} />
-              <View style={styles.sectionHeadingText}>
-                <Text style={styles.sectionEyebrow}>Search</Text>
-                <Text style={styles.sectionHeadingTitle}>Matching classes</Text>
-              </View>
-              <Text style={styles.sectionHint}>{searchResults.length} found</Text>
-            </View>
-            {searchResults.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>No matching classes</Text>
-                <Text style={styles.emptyBody}>Try a different class name or coach.</Text>
-              </View>
-            ) : (
-              <View style={styles.scheduleList}>{searchResults.map(renderClassRow)}</View>
-            )}
-          </>
+        {todayClasses.length === 0 ? (
+          <View style={[styles.emptyCard, { marginHorizontal: 20 }]}>
+            <Text style={styles.emptyTitle}>No classes today</Text>
+            <Text style={styles.emptyBody}>
+              Try a different day or remove the category filter.
+            </Text>
+          </View>
         ) : (
-          <>
-            {/* Upcoming Classes */}
-            <View style={styles.sectionHeading}>
-              <View style={styles.accentBar} />
-              <View style={styles.sectionHeadingText}>
-                <Text style={styles.sectionEyebrow}>Next up</Text>
-                <Text style={styles.sectionHeadingTitle}>Upcoming Classes</Text>
-              </View>
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.upcomingRail}>
-              {upcomingClasses.map((gymClass) => {
-                const isReserved = Boolean(gymClass.isRegistered);
-                const isFull = gymClass.status === 'Full' && !isReserved;
-                const isBookmarked = bookmarked.has(gymClass.id);
-                return (
-                  <View key={gymClass.id} style={styles.upcomingCard}>
-                    <View style={styles.upcomingImageWrap}>
-                      {gymClass.coverImageUrl ? (
+          <View style={styles.timeline}>
+            <View style={styles.timelineBar} />
+            {todayClasses.map((gymClass) => {
+              const isReserved = Boolean(gymClass.isRegistered);
+              const isFull = gymClass.status === 'Full' && !isReserved;
+              const spotsLeft = Math.max(
+                0,
+                gymClass.capacity - gymClass.enrolledCount,
+              );
+              const imgUri =
+                gymClass.coverImageUrl || CATEGORY_IMAGES[gymClass.category];
+              const location = CATEGORY_LOCATIONS[gymClass.category];
+              const nameParts = gymClass.instructorName.split(' ');
+              const shortName =
+                nameParts[0] +
+                (nameParts[1] ? ` ${nameParts[1].slice(0, 1)}.` : '');
+              return (
+                <View key={gymClass.id} style={styles.timelineRow}>
+                  <View style={styles.timelineTimCol}>
+                    <View style={styles.timelineDot} />
+                    <Text style={styles.timelineStartTime}>
+                      {fmt24(gymClass.startTime)}
+                    </Text>
+                    <Text style={styles.timelineEndTime}>
+                      {fmt24(gymClass.endTime)}
+                    </Text>
+                  </View>
+                  <View style={styles.timelineCard}>
+                    <Image
+                      source={{ uri: imgUri }}
+                      style={styles.timelineThumb}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.timelineBody}>
+                      <Text style={styles.timelineTitle} numberOfLines={1}>
+                        {gymClass.title.toUpperCase()}
+                      </Text>
+                      <Text style={styles.timelineCat}>{gymClass.category}</Text>
+                      <View style={styles.timelineMeta}>
+                        <SymbolView
+                          name="mappin.circle.fill"
+                          size={11}
+                          tintColor={mutedColor}
+                          fallback={<Text style={styles.metaGlyph}>⊕</Text>}
+                        />
+                        <Text style={styles.timelineMetaText}>{location}</Text>
+                      </View>
+                      <View style={styles.timelineMeta}>
+                        <SymbolView
+                          name="person.2.fill"
+                          size={11}
+                          tintColor={mutedColor}
+                          fallback={<Text style={styles.metaGlyph}>◎</Text>}
+                        />
+                        <Text style={styles.timelineMetaText}>
+                          {spotsLeft} spots left
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.timelineRight}>
+                      {gymClass.instructorImageUrl ? (
                         <Image
-                          source={{ uri: gymClass.coverImageUrl }}
-                          style={styles.upcomingImage}
-                          resizeMode="cover"
+                          source={{ uri: gymClass.instructorImageUrl }}
+                          style={styles.instructorAvatar}
                         />
                       ) : (
-                        <View style={[styles.upcomingImage, styles.thumbFallback]}>
-                          <Text style={styles.thumbFallbackText}>
-                            {getInitials(gymClass.title)}
+                        <View style={styles.instructorAvatarFallback}>
+                          <Text style={styles.instructorAvatarText}>
+                            {initial(gymClass.instructorName)}
                           </Text>
                         </View>
                       )}
-                      <LinearGradient
-                        pointerEvents="none"
-                        colors={['transparent', 'rgba(10, 11, 15, 0.85)']}
-                        style={styles.upcomingImageScrim}
-                      />
-                      {gymClass.isPopular ? (
-                        <View style={styles.popularBadge}>
-                          <Text style={styles.popularBadgeText}>Popular</Text>
-                        </View>
-                      ) : null}
-                      {gymClass.caloriesBurned ? (
-                        <View style={styles.kcalBadge}>
-                          <SymbolView
-                            name="flame.fill"
-                            size={12}
-                            tintColor={premiumColors.redBright}
-                            fallback={<Text style={styles.kcalGlyph}>{'▴'}</Text>}
-                          />
-                          <Text style={styles.kcalText}>{gymClass.caloriesBurned} kcal</Text>
-                        </View>
-                      ) : null}
-                    </View>
-
-                    <View style={styles.upcomingBody}>
-                      <Text style={styles.upcomingTitle} numberOfLines={1}>
-                        {gymClass.title}
+                      <Text style={styles.instructorName} numberOfLines={1}>
+                        {shortName}
                       </Text>
-                      <View style={styles.coachRow}>
-                        {gymClass.instructorImageUrl ? (
-                          <Image
-                            source={{ uri: gymClass.instructorImageUrl }}
-                            style={styles.coachAvatar}
-                          />
-                        ) : (
-                          <View style={[styles.coachAvatar, styles.thumbFallback]}>
-                            <Text style={styles.coachAvatarText}>
-                              {getInitials(gymClass.instructorName)}
-                            </Text>
-                          </View>
-                        )}
-                        <Text style={styles.coachName}>{gymClass.instructorName}</Text>
-                      </View>
-                      <View style={styles.tagRow}>
-                        <View style={styles.tag}>
-                          <Text style={styles.tagText}>{gymClass.category}</Text>
-                        </View>
-                        {gymClass.level ? (
-                          <View style={styles.tagMuted}>
-                            <Text style={styles.tagMutedText}>{gymClass.level}</Text>
-                          </View>
-                        ) : null}
-                      </View>
-                      <View style={styles.upcomingMetaRow}>
-                        <SymbolView
-                          name="calendar"
-                          size={13}
-                          tintColor={premiumColors.textMuted}
-                          fallback={<Text style={styles.metaGlyph}>{'▦'}</Text>}
-                        />
-                        <Text style={styles.upcomingMetaText}>
-                          {formatClassDayLabel(gymClass.startTime)} ·{' '}
-                          {formatClassTime(gymClass.startTime)}
-                        </Text>
-                      </View>
-                      <View style={styles.upcomingActionRow}>
-                        <Pressable
-                          disabled={isFull}
-                          onPress={() =>
-                            setPendingClassAction({
-                              action: isReserved ? 'cancel' : 'reserve',
-                              gymClass,
-                            })
-                          }
-                          style={({ pressed }) => [
-                            styles.upcomingBookButton,
-                            isReserved && styles.bookButtonReserved,
-                            isFull && styles.bookButtonDisabled,
-                            pressed && !isFull && styles.buttonPressed,
+                      <Text style={styles.instructorLevel}>{gymClass.level}</Text>
+                      <Pressable
+                        disabled={isFull}
+                        onPress={() =>
+                          setPendingAction({
+                            action: isReserved ? 'cancel' : 'reserve',
+                            gymClass,
+                          })
+                        }
+                        style={({ pressed }) => [
+                          styles.timelineBtn,
+                          isReserved && styles.timelineBtnReserved,
+                          isFull && styles.timelineBtnDisabled,
+                          pressed && !isFull && styles.btnPressed,
+                        ]}>
+                        <Text
+                          style={[
+                            styles.timelineBtnText,
+                            isReserved && styles.timelineBtnTextMuted,
                           ]}>
-                          <Text
-                            style={[
-                              styles.bookButtonText,
-                              isReserved && styles.bookButtonTextReserved,
-                            ]}>
-                            {isReserved ? 'Cancel Reservation' : isFull ? 'Full' : 'Book Class'}
-                          </Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => toggleBookmark(gymClass.id)}
-                          style={styles.bookmarkButton}>
-                          <SymbolView
-                            name={isBookmarked ? 'bookmark.fill' : 'bookmark'}
-                            size={16}
-                            tintColor={
-                              isBookmarked ? premiumColors.redBright : premiumColors.textMuted
-                            }
-                            fallback={
-                              <Text
-                                style={[
-                                  styles.bookmarkGlyph,
-                                  isBookmarked && styles.bookmarkGlyphActive,
-                                ]}>
-                                {isBookmarked ? '❘' : '❙'}
-                              </Text>
-                            }
-                          />
-                        </Pressable>
-                      </View>
+                          {isReserved
+                            ? 'VIEW CLASS ›'
+                            : isFull
+                              ? 'FULL'
+                              : 'BOOK NOW ›'}
+                        </Text>
+                      </Pressable>
                     </View>
                   </View>
-                );
-              })}
-            </ScrollView>
-
-            {/* Browse by Category */}
-            <View style={styles.sectionHeading}>
-              <View style={styles.accentBar} />
-              <View style={styles.sectionHeadingText}>
-                <Text style={styles.sectionEyebrow}>Disciplines</Text>
-                <Text style={styles.sectionHeadingTitle}>Browse by Category</Text>
-              </View>
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoryRail}>
-              {categories.map((category) => {
-                const isSelected = selectedCategory === category;
-                const meta = categorySymbols[category];
-                return (
-                  <Pressable
-                    key={category}
-                    onPress={() => setSelectedCategory(category)}
-                    style={({ pressed }) => [
-                      styles.categoryTile,
-                      isSelected && styles.categoryTileSelected,
-                      pressed && styles.buttonPressed,
-                    ]}>
-                    <View
-                      style={[
-                        styles.categoryIconWrap,
-                        isSelected && styles.categoryIconWrapSelected,
-                      ]}>
-                      <SymbolView
-                        name={meta.symbol as never}
-                        size={24}
-                        tintColor={isSelected ? '#FFFFFF' : premiumColors.textMuted}
-                        fallback={
-                          <Text
-                            style={[
-                              styles.categoryFallback,
-                              isSelected && styles.categoryFallbackSelected,
-                            ]}>
-                            {meta.fallback}
-                          </Text>
-                        }
-                      />
-                    </View>
-                    <Text
-                      style={[
-                        styles.categoryLabel,
-                        isSelected && styles.categoryLabelSelected,
-                      ]}>
-                      {category}
-                    </Text>
-                    <Text style={styles.categoryCount}>
-                      {categoryCounts.get(category) ?? 0} classes
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            {/* This Week's Schedule */}
-            <View style={styles.sectionHeading}>
-              <View style={styles.accentBar} />
-              <View style={styles.sectionHeadingText}>
-                <Text style={styles.sectionEyebrow}>{selectedCategory}</Text>
-                <Text style={styles.sectionHeadingTitle}>This Week&apos;s Schedule</Text>
-              </View>
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.dayRail}>
-              {dayMeta.map((day) => {
-                const isSelected = selectedDay === day.key;
-                return (
-                  <Pressable
-                    key={day.key}
-                    onPress={() => setSelectedDay(day.key)}
-                    style={[styles.dayPill, isSelected && styles.dayPillSelected]}>
-                    <Text style={[styles.dayShort, isSelected && styles.daySelectedText]}>
-                      {day.short}
-                    </Text>
-                    <Text style={[styles.dayNum, isSelected && styles.daySelectedText]}>
-                      {day.dateNum}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            {scheduleClasses.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>No classes scheduled</Text>
-                <Text style={styles.emptyBody}>
-                  No {selectedCategory.toLowerCase()} on {selectedDay}. Try another day or
-                  category.
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.scheduleList}>{scheduleClasses.map(renderClassRow)}</View>
-            )}
-          </>
+                </View>
+              );
+            })}
+          </View>
         )}
 
-        {/* My Bookings */}
-        <View style={styles.sectionHeading}>
-          <View style={styles.accentBar} />
-          <View style={styles.sectionHeadingText}>
-            <Text style={styles.sectionEyebrow}>Approved &amp; history</Text>
-            <Text style={styles.sectionHeadingTitle}>My Bookings</Text>
-          </View>
-        </View>
-
-        <View style={styles.tabsRow}>
-          {(['Confirmed', 'Canceled'] as BookingsTab[]).map((tab) => (
+        {/* ── CATEGORY FILTER CHIPS ──────────────────────────── */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRail}>
+          {SCHEDULE_FILTERS.map((f) => (
             <Pressable
-              key={tab}
-              onPress={() => setBookingsTab(tab)}
-              style={[styles.tab, bookingsTab === tab && styles.tabActive]}>
-              <Text style={[styles.tabText, bookingsTab === tab && styles.tabTextActive]}>
-                {tab}
+              key={f.key}
+              onPress={() => setScheduleFilter(f.key)}
+              style={[styles.chip, scheduleFilter === f.key && styles.chipActive]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  scheduleFilter === f.key && styles.chipTextActive,
+                ]}>
+                {f.label}
               </Text>
             </Pressable>
           ))}
+        </ScrollView>
+
+        {/* ── MY BOOKINGS CARD ──────────────────────────────────── */}
+        <View style={styles.bookingsCard}>
+          <View style={styles.bookingsLeft}>
+            <Text style={styles.bookingsTitle}>MY BOOKINGS</Text>
+            {nextBooking ? (
+              <>
+                <Text style={styles.bookingsNextDate}>
+                  {fmtVoucherDate(nextBooking.date)}
+                </Text>
+                <Text style={styles.bookingsNextDesc} numberOfLines={2}>
+                  {nextBooking.description}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.bookingsEmpty}>No upcoming bookings yet.</Text>
+            )}
+          </View>
+          <Text style={styles.bookingsEmoji}>📅</Text>
         </View>
 
-        {tabBookingVouchers.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>No {bookingsTab.toLowerCase()} bookings</Text>
-            <Text style={styles.emptyBody}>
-              {bookingsTab === 'Confirmed'
-                ? 'Bookings approved by staff will appear here.'
-                : 'Cancelled bookings will appear here.'}
+        {/* ── VOUCHERS + ORDERS — two independent boxes ─────────── */}
+        <View style={styles.boxesRow}>
+          {/* VOUCHERS: pending class reservations awaiting admin approval */}
+          <Pressable
+            onPress={() =>
+              setExpandedBox(expandedBox === 'vouchers' ? null : 'vouchers')
+            }
+            style={[
+              styles.actBox,
+              expandedBox === 'vouchers' && styles.actBoxActive,
+            ]}>
+            <SymbolView
+              name="ticket.fill"
+              size={24}
+              tintColor={premiumColors.redBright}
+              fallback={<Text style={styles.boxGlyph}>▤</Text>}
+            />
+            <Text style={styles.actBoxCount}>{pendingVouchers.length}</Text>
+            <Text style={styles.actBoxLabel}>Vouchers</Text>
+            <Text style={styles.actBoxSub}>Pending approval</Text>
+          </Pressable>
+
+          {/* ORDERS: confirmed + canceled history */}
+          <Pressable
+            onPress={() =>
+              setExpandedBox(expandedBox === 'orders' ? null : 'orders')
+            }
+            style={[
+              styles.actBox,
+              expandedBox === 'orders' && styles.actBoxActive,
+            ]}>
+            <SymbolView
+              name="list.bullet.clipboard"
+              size={24}
+              tintColor={premiumColors.redBright}
+              fallback={<Text style={styles.boxGlyph}>≡</Text>}
+            />
+            <Text style={styles.actBoxCount}>{historyVouchers.length}</Text>
+            <Text style={styles.actBoxLabel}>Orders</Text>
+            <Text style={styles.actBoxSub}>History</Text>
+          </Pressable>
+        </View>
+
+        {/* Vouchers expanded — pending, can cancel */}
+        {expandedBox === 'vouchers' ? (
+          <View style={styles.expandedPanel}>
+            <Text style={styles.expandedTitle}>Pending Vouchers</Text>
+            <Text style={styles.expandedSub}>
+              Awaiting admin approval. You can cancel before confirmation.
             </Text>
-          </View>
-        ) : (
-          <View style={styles.bookingsList}>
-            {tabBookingVouchers.map((voucher) => (
-              <View key={voucher.id} style={styles.bookingCard}>
-                <View
-                  style={[
-                    styles.bookingRail,
-                    { backgroundColor: getBookingStatusColor(voucher.status) },
-                  ]}
-                />
-                <View style={styles.bookingContent}>
-                  <View style={styles.bookingTopRow}>
-                    <View style={styles.bookingStatusPill}>
-                      <View
-                        style={[
-                          styles.bookingStatusDot,
-                          { backgroundColor: getBookingStatusColor(voucher.status) },
-                        ]}
-                      />
-                      <Text
-                        style={[
-                          styles.bookingStatusText,
-                          { color: getBookingStatusColor(voucher.status) },
-                        ]}>
-                        {voucher.status}
+            {pendingVouchers.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>No pending vouchers</Text>
+                <Text style={styles.emptyBody}>
+                  Book a class to generate a pending voucher.
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.voucherList}>
+                {pendingVouchers.map((v) => (
+                  <View key={v.id} style={styles.voucherRow}>
+                    <View
+                      style={[
+                        styles.voucherRail,
+                        { backgroundColor: premiumColors.warning },
+                      ]}
+                    />
+                    <View style={styles.voucherBody}>
+                      <Text style={styles.voucherTitle}>{v.description}</Text>
+                      <Text style={styles.voucherMeta}>
+                        {fmtVoucherDate(v.date)} · Pending
                       </Text>
                     </View>
-                    <Text style={styles.bookingDate}>{formatVoucherDate(voucher.date)}</Text>
+                    <Pressable
+                      onPress={() => handleCancelVoucher(v.id)}
+                      style={({ pressed }) => [
+                        styles.voucherCancelBtn,
+                        pressed && styles.btnPressed,
+                      ]}>
+                      <Text style={styles.voucherCancelText}>Cancel</Text>
+                    </Pressable>
                   </View>
-                  <Text style={styles.bookingDescription}>{voucher.description}</Text>
-                </View>
+                ))}
               </View>
-            ))}
+            )}
           </View>
-        )}
+        ) : null}
+
+        {/* Orders expanded — confirmed + canceled history */}
+        {expandedBox === 'orders' ? (
+          <View style={styles.expandedPanel}>
+            <Text style={styles.expandedTitle}>Order History</Text>
+            <Text style={styles.expandedSub}>
+              Confirmed and canceled class reservations.
+            </Text>
+            <View style={styles.tabsRow}>
+              {(['Confirmed', 'Canceled'] as const).map((tab) => (
+                <Pressable
+                  key={tab}
+                  onPress={() => setOrdersTab(tab)}
+                  style={[styles.tab, ordersTab === tab && styles.tabActive]}>
+                  <Text
+                    style={[
+                      styles.tabText,
+                      ordersTab === tab && styles.tabTextActive,
+                    ]}>
+                    {tab}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            {ordersFiltered.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>
+                  No {ordersTab.toLowerCase()} orders
+                </Text>
+                <Text style={styles.emptyBody}>
+                  {ordersTab === 'Confirmed'
+                    ? 'Approved bookings will appear here.'
+                    : 'Canceled bookings will appear here.'}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.voucherList}>
+                {ordersFiltered.map((v) => (
+                  <View key={v.id} style={styles.voucherRow}>
+                    <View
+                      style={[
+                        styles.voucherRail,
+                        { backgroundColor: statusColor(v.status) },
+                      ]}
+                    />
+                    <View style={styles.voucherBody}>
+                      <Text style={styles.voucherTitle}>{v.description}</Text>
+                      <Text style={styles.voucherMeta}>
+                        {fmtVoucherDate(v.date)}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.statusChip,
+                        { borderColor: statusColor(v.status) },
+                      ]}>
+                      <Text
+                        style={[
+                          styles.statusChipText,
+                          { color: statusColor(v.status) },
+                        ]}>
+                        {v.status}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        ) : null}
+
+        {/* ── WEEKLY DAY PICKER ───────────────────────────────── */}
+        <View style={styles.dayRow}>
+          {weekDays.map((day) => (
+            <Pressable
+              key={day.short}
+              onPress={() => setSelectedDay(day.fullDay)}
+              style={[
+                styles.dayCell,
+                selectedDay === day.fullDay && styles.dayCellActive,
+              ]}>
+              <Text
+                style={[
+                  styles.dayCellShort,
+                  selectedDay === day.fullDay && styles.dayCellTextActive,
+                ]}>
+                {day.short}
+              </Text>
+              <Text
+                style={[
+                  styles.dayCellNum,
+                  selectedDay === day.fullDay && styles.dayCellTextActive,
+                ]}>
+                {day.num}
+              </Text>
+              {day.isToday ? <View style={styles.todayDot} /> : null}
+            </Pressable>
+          ))}
+        </View>
       </ScrollView>
 
-      {/* Reserve / Cancel modal */}
-      <Modal transparent visible={Boolean(pendingClassAction)} animationType="fade">
+      {/* ── BOOKING MODAL ─────────────────────────────────────────── */}
+      <Modal transparent visible={Boolean(pendingAction)} animationType="fade">
         <View style={styles.modalOverlay}>
           <Pressable
             style={styles.modalBackdrop}
-            onPress={() => setPendingClassAction(undefined)}
+            onPress={() => setPendingAction(undefined)}
           />
           <View style={styles.modalCard}>
-            {pendingClassAction ? (
+            {pendingAction ? (
               <>
                 <Text style={styles.modalKicker}>
-                  {pendingClassAction.action === 'reserve'
+                  {pendingAction.action === 'reserve'
                     ? 'Reserve class'
                     : 'Cancel reservation'}
                 </Text>
-                <Text style={styles.modalTitle}>{pendingClassAction.gymClass.title}</Text>
-                <Text style={styles.modalMeta}>
-                  Coach {pendingClassAction.gymClass.instructorName} ·{' '}
-                  {formatClassDayLabel(pendingClassAction.gymClass.startTime)}
+                <Text style={styles.modalTitle}>
+                  {pendingAction.gymClass.title}
                 </Text>
-                {pendingClassAction.action === 'reserve' ? (
+                <Text style={styles.modalMeta}>
+                  Coach {pendingAction.gymClass.instructorName} ·{' '}
+                  {fmt24(pendingAction.gymClass.startTime)}
+                </Text>
+                {pendingAction.action === 'reserve' ? (
                   <Text style={styles.modalNote}>
                     A pending booking is created and must be confirmed by staff.
                   </Text>
                 ) : null}
-                <View style={styles.modalActionRow}>
+                <View style={styles.modalActions}>
                   <Pressable
-                    onPress={() => setPendingClassAction(undefined)}
+                    onPress={() => setPendingAction(undefined)}
                     style={({ pressed }) => [
-                      styles.modalSecondaryButton,
-                      pressed && styles.buttonPressed,
+                      styles.modalSecBtn,
+                      pressed && styles.btnPressed,
                     ]}>
-                    <Text style={styles.modalSecondaryText}>Back</Text>
+                    <Text style={styles.modalSecText}>Back</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => {
-                      if (!pendingClassAction) return;
-                      if (pendingClassAction.action === 'cancel') {
-                        handleCancel(pendingClassAction.gymClass.id);
-                        return;
+                      if (!pendingAction) return;
+                      if (pendingAction.action === 'cancel') {
+                        handleCancel(pendingAction.gymClass.id);
+                      } else {
+                        handleReserve(pendingAction.gymClass.id);
                       }
-                      handleReserve(pendingClassAction.gymClass.id);
                     }}
                     style={({ pressed }) => [
-                      styles.modalPrimaryButton,
-                      pressed && styles.buttonPressed,
+                      styles.modalPrimBtn,
+                      pressed && styles.btnPressed,
                     ]}>
-                    <Text style={styles.modalPrimaryText}>
-                      {pendingClassAction.action === 'reserve' ? 'Confirm' : 'Cancel booking'}
+                    <Text style={styles.modalPrimText}>
+                      {pendingAction.action === 'reserve'
+                        ? 'Confirm'
+                        : 'Cancel booking'}
                     </Text>
                   </Pressable>
                 </View>
@@ -787,477 +822,235 @@ export default function ClassesScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: {
+  content: { paddingTop: 60, paddingBottom: 130 },
+  loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  loadingText: { color: mutedColor, fontSize: 14, fontWeight: '700' },
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 64,
-    paddingBottom: 132,
+    marginBottom: 22,
   },
-  loadingState: {
-    flex: 1,
+  headerTitle: {
+    color: '#FFFFFF',
+    fontSize: 52,
+    fontWeight: '900',
+    fontStyle: 'italic',
+    letterSpacing: -1,
+    lineHeight: 56,
+  },
+  headerTagline: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 4,
+    lineHeight: 20,
+  },
+  headerAccent: { color: premiumColors.redBright, fontWeight: '800' },
+  headerIcons: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  iconBtn: {
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.07)',
   },
-  loadingText: {
-    color: mutedColor,
-    fontSize: 14,
-    fontWeight: '700',
+  iconGlyph: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: premiumColors.redBright,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
   },
-  topBar: {
+  badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
+
+  // Carousel
+  carouselScroll: { marginBottom: 14 },
+  carouselSlide: { width: SCREEN_WIDTH, paddingHorizontal: 20 },
+  featuredCard: {
+    height: 310,
+    borderRadius: 26,
+    overflow: 'hidden',
+    justifyContent: 'space-between',
+    ...premiumShadow,
+  },
+  featuredTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    padding: 16,
   },
-  brandKicker: {
-    color: premiumColors.redBright,
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-  },
-  brandTitle: {
-    color: '#FFFFFF',
-    fontSize: 30,
-    fontWeight: '900',
-    marginTop: 2,
-  },
-  calendarBadge: {
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: premiumColors.glassBorder,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  calendarGlyph: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  calendarCount: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    minWidth: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-    backgroundColor: premiumColors.redBright,
-    paddingHorizontal: 5,
-  },
-  calendarCountText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  heroCard: {
-    position: 'relative',
-    overflow: 'hidden',
-    height: 196,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    borderRadius: 28,
-    marginBottom: 20,
-    shadowColor: premiumColors.red,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.3,
-    shadowRadius: 30,
-    elevation: 10,
-  },
-  heroImage: {
-    ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
-  },
-  heroContent: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    padding: 18,
-  },
-  heroTitle: {
-    color: '#FFFFFF',
-    fontSize: 34,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  heroSubtitle: {
-    color: 'rgba(255, 255, 255, 0.82)',
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 18,
-    marginTop: 4,
-    maxWidth: '74%',
-  },
-  heroStatsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 14,
-  },
-  heroStatPill: {
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-  },
-  heroStatValue: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  heroStatLabel: {
-    color: 'rgba(255, 255, 255, 0.82)',
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    minHeight: 50,
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingHorizontal: 16,
-    marginBottom: 20,
-  },
-  searchGlyph: {
-    color: premiumColors.textFaint,
-    fontSize: 18,
-  },
-  searchInput: {
-    flex: 1,
-    color: premiumColors.text,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  sectionHeading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 14,
-  },
-  accentBar: {
-    width: 4,
-    height: 36,
-    borderRadius: 3,
-    backgroundColor: premiumColors.redBright,
-  },
-  sectionHeadingText: {
-    flex: 1,
-  },
-  sectionEyebrow: {
-    color: premiumColors.redBright,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    marginBottom: 2,
-    textTransform: 'uppercase',
-  },
-  sectionHeadingTitle: {
-    color: premiumColors.text,
-    fontSize: 21,
-    fontWeight: '900',
-  },
-  sectionHint: {
-    color: mutedColor,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  upcomingRail: {
-    gap: 14,
-    paddingRight: 4,
-    paddingBottom: 4,
-    marginBottom: 22,
-  },
-  upcomingCard: {
-    width: 250,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: premiumColors.glassBorder,
-    borderRadius: 22,
-    backgroundColor: premiumColors.surface,
-    ...premiumShadow,
-  },
-  upcomingImageWrap: {
-    position: 'relative',
-    height: 132,
-  },
-  upcomingImage: {
-    width: '100%',
-    height: '100%',
-  },
-  upcomingImageScrim: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: '60%',
-  },
-  popularBadge: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
+  featuredBadge: {
     borderRadius: 999,
     backgroundColor: premiumColors.red,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
   },
-  popularBadgeText: {
+  featuredBadgeText: {
     color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
-  kcalBadge: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    flexDirection: 'row',
+  heartBtn: {
+    width: 36,
+    height: 36,
     alignItems: 'center',
-    gap: 4,
-    borderRadius: 999,
-    backgroundColor: 'rgba(10, 11, 15, 0.66)',
+    justifyContent: 'center',
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.16)',
     borderWidth: 1,
-    borderColor: premiumColors.glassBorder,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    borderColor: 'rgba(255,255,255,0.22)',
   },
-  kcalGlyph: {
-    color: premiumColors.redBright,
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  kcalText: {
+  heartGlyph: { color: '#FFFFFF', fontSize: 16 },
+  featuredBottom: { padding: 18 },
+  featuredTitle: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 38,
     fontWeight: '900',
+    fontStyle: 'italic',
+    letterSpacing: -0.5,
+    lineHeight: 40,
   },
-  upcomingBody: {
-    padding: 14,
-  },
-  upcomingTitle: {
-    color: premiumColors.text,
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  coachRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
-  },
-  coachAvatar: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  coachAvatarText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  coachName: {
-    color: premiumColors.textMuted,
+  featuredDesc: {
+    color: 'rgba(255,255,255,0.72)',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
+    marginTop: 6,
+    lineHeight: 18,
   },
-  tagRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 10,
-  },
-  tag: {
-    borderRadius: 8,
-    backgroundColor: 'rgba(177, 18, 38, 0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.3)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  tagText: {
-    color: premiumColors.redBright,
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  tagMuted: {
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  tagMutedText: {
-    color: premiumColors.textMuted,
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  upcomingMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 10,
-  },
-  metaGlyph: {
-    color: premiumColors.textMuted,
-    fontSize: 12,
-  },
-  upcomingMetaText: {
-    color: premiumColors.textMuted,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  upcomingActionRow: {
+  statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     marginTop: 14,
+    flexWrap: 'wrap',
   },
-  upcomingBookButton: {
-    flex: 1,
-    minHeight: 42,
+  stat: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  statText: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '800' },
+  statDivider: {
+    width: 1,
+    height: 14,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  statGlyph: { color: 'rgba(255,255,255,0.7)', fontSize: 10 },
+  featuredBookBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 14,
+    marginTop: 16,
+    borderRadius: 18,
     backgroundColor: premiumColors.red,
+    paddingVertical: 15,
     ...premiumGlow,
   },
-  bookmarkButton: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: premiumColors.glassBorder,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  featuredBookBtnDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    shadowOpacity: 0,
+    elevation: 0,
   },
-  bookmarkGlyph: {
-    color: premiumColors.textMuted,
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  bookmarkGlyphActive: {
-    color: premiumColors.redBright,
-  },
-  categoryRail: {
-    gap: 12,
-    paddingRight: 4,
-    paddingBottom: 4,
-    marginBottom: 22,
-  },
-  categoryTile: {
-    width: 116,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: premiumColors.glassBorder,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingVertical: 16,
-    paddingHorizontal: 10,
-  },
-  categoryTileSelected: {
-    borderColor: 'rgba(225, 29, 46, 0.5)',
-    backgroundColor: 'rgba(177, 18, 38, 0.16)',
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  categoryIconWrap: {
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    marginBottom: 10,
-  },
-  categoryIconWrapSelected: {
-    backgroundColor: premiumColors.red,
-  },
-  categoryFallback: {
-    color: premiumColors.textMuted,
+  featuredBookBtnText: {
+    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '900',
+    letterSpacing: 0.6,
   },
-  categoryFallbackSelected: {
+  featuredBookBtnArrow: { color: '#FFFFFF', fontSize: 20, fontWeight: '900' },
+  btnPressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
+
+  // Pagination
+  pagination: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    marginBottom: 26,
+  },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.22)' },
+  dotActive: { width: 22, backgroundColor: premiumColors.redBright },
+
+  // Today header
+  todayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 18,
+  },
+  todayLabel: { color: '#FFFFFF', fontSize: 20, fontWeight: '900', fontStyle: 'italic' },
+  todayDate: { color: mutedColor, fontSize: 12, fontWeight: '700', marginTop: 2 },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  filterChipText: {
     color: '#FFFFFF',
-  },
-  categoryLabel: {
-    color: premiumColors.text,
     fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+  },
+  filterGlyph: { color: '#FFFFFF', fontSize: 14 },
+
+  // Timeline
+  timeline: { paddingHorizontal: 20, marginBottom: 20, position: 'relative' },
+  timelineBar: {
+    position: 'absolute',
+    left: 56,
+    top: 10,
+    bottom: 10,
+    width: 2,
+    borderRadius: 1,
+    backgroundColor: premiumColors.red,
+    opacity: 0.35,
+  },
+  timelineRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 },
+  timelineTimCol: { width: 60, alignItems: 'center', paddingTop: 14 },
+  timelineDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: premiumColors.red,
+    borderWidth: 2.5,
+    borderColor: '#FFFFFF',
+    marginBottom: 6,
+    zIndex: 1,
+  },
+  timelineStartTime: {
+    color: premiumColors.red,
+    fontSize: 15,
     fontWeight: '900',
     textAlign: 'center',
   },
-  categoryLabelSelected: {
-    color: '#FFFFFF',
-  },
-  categoryCount: {
-    color: premiumColors.textFaint,
-    fontSize: 10,
-    fontWeight: '800',
+  timelineEndTime: {
+    color: mutedColor,
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
     marginTop: 2,
   },
-  dayRail: {
-    gap: 10,
-    paddingRight: 4,
-    marginBottom: 16,
-  },
-  dayPill: {
-    width: 62,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingVertical: 10,
-  },
-  dayPillSelected: {
-    borderColor: premiumColors.redBright,
-    backgroundColor: premiumColors.red,
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  dayShort: {
-    color: premiumColors.textMuted,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  dayNum: {
-    color: premiumColors.text,
-    fontSize: 18,
-    fontWeight: '900',
-    marginTop: 2,
-  },
-  daySelectedText: {
-    color: '#FFFFFF',
-  },
-  scheduleList: {
-    gap: 12,
-    marginBottom: 24,
-  },
-  scheduleRow: {
+  timelineCard: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     borderWidth: 1,
     borderColor: premiumColors.glassBorder,
     borderRadius: 20,
@@ -1265,210 +1058,257 @@ const styles = StyleSheet.create({
     padding: 10,
     ...premiumShadow,
   },
-  scheduleThumbWrap: {
-    position: 'relative',
-    width: 64,
-    height: 64,
-  },
-  scheduleThumb: {
-    width: 64,
-    height: 64,
-    borderRadius: 14,
-  },
-  thumbFallback: {
+  timelineThumb: { width: 64, height: 64, borderRadius: 32 },
+  timelineBody: { flex: 1 },
+  timelineTitle: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
+  timelineCat: { color: premiumColors.redBright, fontSize: 11, fontWeight: '800', marginTop: 3 },
+  timelineMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 },
+  timelineMetaText: { color: mutedColor, fontSize: 11, fontWeight: '700' },
+  metaGlyph: { color: mutedColor, fontSize: 10 },
+  timelineRight: { alignItems: 'center', width: 86 },
+  instructorAvatar: { width: 38, height: 38, borderRadius: 19 },
+  instructorAvatarFallback: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
-  thumbFallbackText: {
+  instructorAvatarText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  instructorName: {
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '900',
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 5,
+    textAlign: 'center',
   },
-  scheduleTimePill: {
-    position: 'absolute',
-    bottom: -6,
-    left: -2,
-    right: -2,
-    alignItems: 'center',
-    borderRadius: 8,
-    backgroundColor: 'rgba(10, 11, 15, 0.9)',
-    borderWidth: 1,
-    borderColor: premiumColors.glassBorder,
-    paddingVertical: 1,
-  },
-  scheduleTimeText: {
-    color: '#FFFFFF',
+  instructorLevel: {
+    color: mutedColor,
     fontSize: 10,
-    fontWeight: '900',
-  },
-  scheduleDurationText: {
-    color: premiumColors.textFaint,
-    fontSize: 8,
-    fontWeight: '800',
-  },
-  scheduleBody: {
-    flex: 1,
-  },
-  scheduleTitle: {
-    color: premiumColors.text,
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  scheduleCoach: {
-    color: premiumColors.textMuted,
-    fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
     marginTop: 2,
+    textAlign: 'center',
   },
-  scheduleActions: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  bookButton: {
-    minWidth: 64,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
+  timelineBtn: {
+    marginTop: 8,
+    borderRadius: 10,
     backgroundColor: premiumColors.red,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
     ...premiumGlow,
   },
-  bookButtonReserved: {
+  timelineBtnReserved: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  timelineBtnDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  timelineBtnText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900', letterSpacing: 0.3 },
+  timelineBtnTextMuted: { color: mutedColor },
+
+  // Category chips
+  chipRail: { paddingHorizontal: 20, gap: 8, paddingBottom: 4, marginBottom: 22 },
+  chip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  chipActive: { backgroundColor: 'rgba(255,255,255,0.9)', borderColor: '#FFFFFF' },
+  chipText: { color: mutedColor, fontSize: 12, fontWeight: '900', letterSpacing: 0.5 },
+  chipTextActive: { color: '#0A0B0F' },
+
+  // My Bookings
+  bookingsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: premiumColors.glassBorder,
+    borderRadius: 24,
+    backgroundColor: premiumColors.surface,
+    padding: 18,
+    ...premiumShadow,
+  },
+  bookingsLeft: { flex: 1 },
+  bookingsTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '900', letterSpacing: 0.6 },
+  bookingsNextDate: {
+    color: premiumColors.redBright,
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 9,
+  },
+  bookingsNextDesc: { color: mutedColor, fontSize: 13, fontWeight: '700', marginTop: 4 },
+  bookingsEmpty: { color: mutedColor, fontSize: 13, fontWeight: '700', marginTop: 9 },
+  bookingsEmoji: { fontSize: 50 },
+
+  // Two boxes
+  boxesRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 20, marginBottom: 14 },
+  actBox: {
+    flex: 1,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: premiumColors.glassBorder,
+    borderRadius: 22,
+    backgroundColor: premiumColors.surface,
+    paddingVertical: 22,
+    paddingHorizontal: 10,
+    gap: 4,
+    ...premiumShadow,
+  },
+  actBoxActive: {
+    borderColor: 'rgba(225, 29, 46, 0.55)',
+    backgroundColor: 'rgba(177, 18, 38, 0.12)',
+  },
+  boxGlyph: { color: premiumColors.redBright, fontSize: 22 },
+  actBoxCount: { color: '#FFFFFF', fontSize: 30, fontWeight: '900', marginTop: 4 },
+  actBoxLabel: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  actBoxSub: { color: mutedColor, fontSize: 11, fontWeight: '700' },
+
+  // Expanded panel
+  expandedPanel: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: premiumColors.glassBorder,
+    borderRadius: 22,
+    backgroundColor: premiumColors.surface,
+    padding: 16,
+  },
+  expandedTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '900', marginBottom: 4 },
+  expandedSub: {
+    color: mutedColor,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 14,
+    lineHeight: 17,
+  },
+  voucherList: { gap: 10 },
+  voucherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: premiumColors.glassBorder,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  voucherRail: { width: 4, alignSelf: 'stretch' },
+  voucherBody: { flex: 1, paddingVertical: 12, paddingHorizontal: 12 },
+  voucherTitle: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', lineHeight: 18 },
+  voucherMeta: { color: mutedColor, fontSize: 11, fontWeight: '700', marginTop: 3 },
+  voucherCancelBtn: {
     borderWidth: 1,
     borderColor: 'rgba(225, 29, 46, 0.3)',
+    borderRadius: 10,
     backgroundColor: 'rgba(177, 18, 38, 0.1)',
-    shadowOpacity: 0,
-    elevation: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 12,
   },
-  bookButtonDisabled: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    shadowOpacity: 0,
-    elevation: 0,
+  voucherCancelText: { color: premiumColors.redBright, fontSize: 12, fontWeight: '900' },
+  statusChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginRight: 12,
   },
-  bookButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
+  statusChipText: { fontSize: 10, fontWeight: '900', textTransform: 'uppercase' },
+
+  // Tabs
+  tabsRow: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    marginBottom: 14,
+    padding: 3,
+    gap: 3,
+  },
+  tab: {
+    flex: 1,
+    minHeight: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 11,
+  },
+  tabActive: {
+    backgroundColor: premiumColors.red,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  tabText: { color: mutedColor, fontSize: 13, fontWeight: '900' },
+  tabTextActive: { color: '#FFFFFF' },
+
+  // Day picker
+  dayRow: { flexDirection: 'row', paddingHorizontal: 12, marginTop: 10, gap: 3 },
+  dayCell: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  dayCellActive: {
+    backgroundColor: premiumColors.red,
+    borderColor: premiumColors.redBright,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  dayCellShort: {
+    color: mutedColor,
+    fontSize: 9,
     fontWeight: '900',
+    textTransform: 'uppercase',
   },
-  bookButtonTextReserved: {
-    color: premiumColors.redBright,
+  dayCellNum: { color: '#FFFFFF', fontSize: 17, fontWeight: '900', marginTop: 2 },
+  dayCellTextActive: { color: '#FFFFFF' },
+  todayDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: premiumColors.redBright,
+    marginTop: 3,
   },
-  spotsText: {
-    color: premiumColors.textFaint,
-    fontSize: 10,
-    fontWeight: '800',
-  },
+
+  // Empty
   emptyCard: {
     borderWidth: 1,
     borderColor: premiumColors.border,
-    borderRadius: 22,
-    backgroundColor: premiumColors.surfaceSoft,
-    padding: 20,
-    marginBottom: 24,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    padding: 18,
+    marginBottom: 8,
   },
-  emptyTitle: {
-    color: premiumColors.text,
-    fontSize: 16,
-    fontWeight: '900',
-  },
+  emptyTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
   emptyBody: {
     color: mutedColor,
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 18,
-    marginTop: 6,
+    marginTop: 5,
   },
-  tabsRow: {
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 16,
-    backgroundColor: premiumColors.surfaceSoft,
-    marginBottom: 14,
-    padding: 4,
-    gap: 4,
-  },
-  tab: {
-    flex: 1,
-    minHeight: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-  },
-  tabActive: {
-    backgroundColor: premiumColors.red,
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  tabText: {
-    color: premiumColors.textMuted,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  tabTextActive: {
-    color: '#FFFFFF',
-  },
-  bookingsList: {
-    gap: 10,
-    marginBottom: 16,
-  },
-  bookingCard: {
-    flexDirection: 'row',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: premiumColors.glassBorder,
-    borderRadius: 20,
-    backgroundColor: premiumColors.surface,
-    ...premiumShadow,
-  },
-  bookingRail: {
-    width: 4,
-  },
-  bookingContent: {
-    flex: 1,
-    padding: 14,
-    gap: 6,
-  },
-  bookingTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  bookingStatusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  bookingStatusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  bookingStatusText: {
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  bookingDate: {
-    color: premiumColors.textMuted,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  bookingDescription: {
-    color: premiumColors.text,
-    fontSize: 14,
-    fontWeight: '900',
-    lineHeight: 19,
-  },
-  buttonPressed: {
-    opacity: 0.82,
-    transform: [{ scale: 0.99 }],
-  },
+
+  // Modal
   modalOverlay: {
     flex: 1,
     alignItems: 'center',
@@ -1477,7 +1317,7 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(4, 5, 8, 0.72)',
+    backgroundColor: 'rgba(4,5,8,0.72)',
   },
   modalCard: {
     width: '100%',
@@ -1495,18 +1335,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
-  modalTitle: {
-    color: premiumColors.text,
-    fontSize: 23,
-    fontWeight: '900',
-    marginTop: 6,
-  },
-  modalMeta: {
-    color: mutedColor,
-    fontSize: 13,
-    fontWeight: '800',
-    marginTop: 6,
-  },
+  modalTitle: { color: '#FFFFFF', fontSize: 23, fontWeight: '900', marginTop: 6 },
+  modalMeta: { color: mutedColor, fontSize: 13, fontWeight: '800', marginTop: 6 },
   modalNote: {
     color: premiumColors.warning,
     fontSize: 12,
@@ -1517,12 +1347,8 @@ const styles = StyleSheet.create({
     borderLeftColor: premiumColors.warning,
     paddingLeft: 10,
   },
-  modalActionRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 20,
-  },
-  modalSecondaryButton: {
+  modalActions: { flexDirection: 'row', gap: 10, marginTop: 20 },
+  modalSecBtn: {
     flex: 1,
     minHeight: 50,
     alignItems: 'center',
@@ -1532,12 +1358,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: premiumColors.surfaceSoft,
   },
-  modalSecondaryText: {
-    color: premiumColors.textMuted,
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  modalPrimaryButton: {
+  modalSecText: { color: mutedColor, fontSize: 14, fontWeight: '900' },
+  modalPrimBtn: {
     flex: 1.4,
     minHeight: 50,
     alignItems: 'center',
@@ -1546,9 +1368,5 @@ const styles = StyleSheet.create({
     backgroundColor: premiumColors.red,
     ...premiumGlow,
   },
-  modalPrimaryText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '900',
-  },
+  modalPrimText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
 });

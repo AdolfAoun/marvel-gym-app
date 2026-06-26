@@ -108,25 +108,51 @@ function formatDateInput(value: string) {
 }
 
 function getPasswordErrors(value: string) {
-  const missing: string[] = [];
-
-  if (value.length < 5) {
-    missing.push('Too short');
+  if (!value) {
+    return ['Enter a password.'];
   }
 
-  if (!/[A-Za-z]/.test(value)) {
-    missing.push('Missing letter');
+  return getPasswordStrength(value).score < 3 ? ['Password too weak.'] : [];
+}
+
+function getPasswordStrength(value: string) {
+  const checks = [
+    value.length >= 5,
+    /[A-Za-z]/.test(value),
+    /\d/.test(value),
+    /[^A-Za-z0-9]/.test(value),
+  ];
+  const score = checks.filter(Boolean).length;
+
+  if (!value) {
+    return {
+      color: 'rgba(255, 255, 255, 0.16)',
+      label: '',
+      score: 0,
+    };
   }
 
-  if (!/\d/.test(value)) {
-    missing.push('Missing number');
+  if (score < 3) {
+    return {
+      color: '#F05D6D',
+      label: 'Weak',
+      score,
+    };
   }
 
-  if (!/[^A-Za-z0-9]/.test(value)) {
-    missing.push('Missing special character');
+  if (score === 3) {
+    return {
+      color: '#F2B94B',
+      label: 'Medium',
+      score,
+    };
   }
 
-  return missing;
+  return {
+    color: '#45D483',
+    label: 'Strong',
+    score,
+  };
 }
 
 export default function CreateAccountScreen() {
@@ -141,6 +167,7 @@ export default function CreateAccountScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitError, setSubmitError] = useState('');
+  const passwordStrength = getPasswordStrength(password.trim());
 
   const validate = () => {
     const nextErrors: FormErrors = {};
@@ -398,10 +425,33 @@ export default function CreateAccountScreen() {
               {errors.password ? (
                 <Text style={styles.errorText}>{errors.password}</Text>
               ) : null}
-              <Text style={styles.passwordGuidance}>
-                Use at least 5 characters with one letter, one number, and one
-                special sign.
-              </Text>
+              <View style={styles.passwordStrengthHeader}>
+                <Text style={styles.passwordStrengthLabel}>
+                  Password strength
+                </Text>
+                {passwordStrength.label ? (
+                  <Text
+                    style={[
+                      styles.passwordStrengthValue,
+                      { color: passwordStrength.color },
+                    ]}>
+                    {passwordStrength.label}
+                  </Text>
+                ) : null}
+              </View>
+              <View style={styles.passwordStrengthTrack}>
+                {[1, 2, 3, 4].map((level) => (
+                  <View
+                    key={level}
+                    style={[
+                      styles.passwordStrengthSegment,
+                      level <= passwordStrength.score && {
+                        backgroundColor: passwordStrength.color,
+                      },
+                    ]}
+                  />
+                ))}
+              </View>
             </View>
 
             <Pressable
@@ -621,12 +671,35 @@ const styles = StyleSheet.create({
     lineHeight: 15,
     marginTop: 6,
   },
-  passwordGuidance: {
+  passwordStrengthHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 9,
+  },
+  passwordStrengthLabel: {
     color: premiumColors.textMuted,
     fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 15,
+    fontWeight: '800',
+    lineHeight: 14,
+  },
+  passwordStrengthValue: {
+    fontSize: 10,
+    fontWeight: '900',
+    lineHeight: 14,
+    textTransform: 'uppercase',
+  },
+  passwordStrengthTrack: {
+    flexDirection: 'row',
+    gap: 6,
     marginTop: 7,
+  },
+  passwordStrengthSegment: {
+    height: 6,
+    flex: 1,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
   },
   submitErrorText: {
     color: '#F2B8BF',
