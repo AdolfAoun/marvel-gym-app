@@ -2,9 +2,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Dimensions,
   Image,
   Modal,
   Pressable,
@@ -14,11 +16,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import type { NativeScrollEvent, NativeSyntheticEvent, ViewStyle } from 'react-native';
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import {
   premiumColors,
-  premiumGradients,
   premiumGlow,
   premiumShadow,
 } from '@/constants/premiumTheme';
@@ -30,25 +32,48 @@ import type {
   VoucherStatus,
 } from '@/types';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// ShopScreen content has 20px horizontal padding, so the carousel pages by the
+// inner content width rather than the full screen width.
+const CAROUSEL_WIDTH = SCREEN_WIDTH - 40;
 const accentColor = premiumColors.red;
 const mutedColor = premiumColors.textMuted;
 
+// Faint Marvel logo signs used as glow-box watermarks.
+const ORDERS_SIGN = require('@/assets/images/marvel-logo-startup-sign-dot.png');
+const VOUCHERS_SIGN = require('@/assets/images/marvel-logo-startup-sign-x.png');
+
 type OrderTab = 'Confirmed' | 'Canceled';
 
+// Member-facing shop categories. Each groups one or more underlying
+// ProductCategory values so the storefront stays clean (no Apparel section,
+// Equipment + Accessories merged into "Gym Equipment").
+type ShopCategory = 'Supplements' | 'Snacks' | 'Drinks' | 'Gym Equipment';
+
 type CategoryMeta = {
-  key: ProductCategory;
+  key: ShopCategory;
   symbol: string;
   fallback: string;
+  sources: ProductCategory[];
 };
 
 const categoryMeta: CategoryMeta[] = [
-  { key: 'Supplements', symbol: 'pills.fill', fallback: 'Su' },
-  { key: 'Apparel', symbol: 'tshirt.fill', fallback: 'Ap' },
-  { key: 'Equipment', symbol: 'dumbbell.fill', fallback: 'Eq' },
-  { key: 'Accessories', symbol: 'bag.fill', fallback: 'Ac' },
-  { key: 'Nutrition', symbol: 'fork.knife', fallback: 'Nu' },
-  { key: 'Beverages', symbol: 'cup.and.saucer.fill', fallback: 'Be' },
+  { key: 'Supplements', symbol: 'pills.fill', fallback: 'Su', sources: ['Supplements'] },
+  { key: 'Snacks', symbol: 'popcorn.fill', fallback: 'Sn', sources: ['Nutrition'] },
+  { key: 'Drinks', symbol: 'waterbottle.fill', fallback: 'Dr', sources: ['Beverages'] },
+  {
+    key: 'Gym Equipment',
+    symbol: 'dumbbell.fill',
+    fallback: 'Gym',
+    sources: ['Equipment', 'Accessories', 'Apparel'],
+  },
 ];
+
+// Reverse lookup: underlying ProductCategory -> shop category.
+const PRODUCT_TO_SHOP_CATEGORY = new Map<ProductCategory, ShopCategory>();
+categoryMeta.forEach((meta) => {
+  meta.sources.forEach((source) => PRODUCT_TO_SHOP_CATEGORY.set(source, meta.key));
+});
 
 function formatPrice(price: number) {
   return `$${price.toFixed(2)}`;
@@ -99,33 +124,142 @@ function RatingStars({ rating }: { rating: number }) {
   );
 }
 
+// ── Animated heart button ─────────────────────────────────────────────────────
+function HeartButton({
+  isFav,
+  onToggle,
+  btnSize = 36,
+  iconSize = 16,
+  style,
+}: {
+  isFav: boolean;
+  onToggle: () => void;
+  btnSize?: number;
+  iconSize?: number;
+  style?: ViewStyle;
+}) {
+  const pressScale = useRef(new Animated.Value(1)).current;
+  const breatheScale = useRef(new Animated.Value(1)).current;
+  const combined = useRef(Animated.multiply(pressScale, breatheScale)).current;
+
+  useEffect(() => {
+    if (isFav) {
+      const anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(breatheScale, {
+            toValue: 1.20,
+            duration: 850,
+            useNativeDriver: true,
+          }),
+          Animated.timing(breatheScale, {
+            toValue: 0.88,
+            duration: 850,
+            useNativeDriver: true,
+          }),
+        ]),
+      );
+      anim.start();
+      return () => anim.stop();
+    }
+    Animated.timing(breatheScale, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [isFav, breatheScale]);
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(pressScale, {
+        toValue: 1.45,
+        duration: 90,
+        useNativeDriver: true,
+      }),
+      Animated.spring(pressScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        bounciness: 18,
+        speed: 12,
+      }),
+    ]).start();
+    onToggle();
+  };
+
+  return (
+    <Pressable
+      hitSlop={8}
+      onPress={handlePress}
+      style={[
+        hStyles.btn,
+        {
+          width: btnSize,
+          height: btnSize,
+          borderRadius: btnSize / 2,
+        },
+        isFav && hStyles.btnLiked,
+        style,
+      ]}>
+      <Animated.View style={{ transform: [{ scale: combined }] }}>
+        <SymbolView
+          name={isFav ? 'heart.fill' : 'heart'}
+          size={iconSize}
+          tintColor={premiumColors.redBright}
+          fallback={
+            <Text style={[hStyles.glyph, { fontSize: iconSize }]}>
+              {isFav ? '♥' : '♡'}
+            </Text>
+          }
+        />
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+const hStyles = StyleSheet.create({
+  btn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.13)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.20)',
+  },
+  btnLiked: {
+    backgroundColor: 'rgba(177,18,38,0.28)',
+    borderColor: 'rgba(225,29,46,0.60)',
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.65,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  glyph: { color: premiumColors.redBright, fontWeight: '900' },
+});
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function ShopScreen() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [selectedCategory, setSelectedCategory] =
-    useState<ProductCategory>('Supplements');
+    useState<ShopCategory>('Supplements');
   const [search, setSearch] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [shopVouchers, setShopVouchers] = useState<Voucher[]>([]);
   const [orderTab, setOrderTab] = useState<OrderTab>('Confirmed');
   const [pendingVoucherProduct, setPendingVoucherProduct] = useState<Product>();
   const [voucherQuantity, setVoucherQuantity] = useState(1);
-  const [isCustomVoucherOpen, setIsCustomVoucherOpen] = useState(false);
-  const [customVoucherName, setCustomVoucherName] = useState('');
-  const [customVoucherAmount, setCustomVoucherAmount] = useState('');
   const [isCreatingVoucher, setIsCreatingVoucher] = useState(false);
   const [toastText, setToastText] = useState('');
+  const [carouselIndex, setCarouselIndex] = useState(0);
   const [expandedBox, setExpandedBox] = useState<'vouchers' | 'orders' | null>(null);
 
   const loadData = useCallback(async () => {
-    const [nextProducts, nextCategories, nextVouchers] = await Promise.all([
+    const [nextProducts, nextVouchers] = await Promise.all([
       productService.getProducts(),
-      productService.getProductCategories(),
       voucherService.getVouchers(),
     ]);
     setProducts(nextProducts.filter((item) => item.isActive));
-    setCategories(nextCategories);
     setShopVouchers(nextVouchers.filter((v) => v.type === 'Shop Reservation'));
     setIsLoading(false);
   }, []);
@@ -138,13 +272,22 @@ export default function ShopScreen() {
 
   const normalizedSearch = search.trim().toLowerCase();
 
+  const shopCategoryOf = (product: Product): ShopCategory | undefined =>
+    product.category ? PRODUCT_TO_SHOP_CATEGORY.get(product.category) : undefined;
+
   const visibleProducts = useMemo(() => {
     return products.filter((product) => {
-      if (product.category !== selectedCategory) return false;
+      // Favorites view shows favorited products across every category;
+      // otherwise stay within the selected category.
+      if (showFavoritesOnly) {
+        if (!favorites.has(product.id)) return false;
+      } else if (shopCategoryOf(product) !== selectedCategory) {
+        return false;
+      }
       if (!normalizedSearch) return true;
       return product.name.toLowerCase().includes(normalizedSearch);
     });
-  }, [products, selectedCategory, normalizedSearch]);
+  }, [products, selectedCategory, normalizedSearch, showFavoritesOnly, favorites]);
 
   const featuredProducts = useMemo(() => {
     return [...products]
@@ -153,15 +296,15 @@ export default function ShopScreen() {
   }, [products]);
 
   const categoryCounts = useMemo(() => {
-    const counts = new Map<ProductCategory, number>();
+    const counts = new Map<ShopCategory, number>();
     products.forEach((product) => {
-      if (!product.category) return;
-      counts.set(product.category, (counts.get(product.category) ?? 0) + 1);
+      const shopCategory = shopCategoryOf(product);
+      if (!shopCategory) return;
+      counts.set(shopCategory, (counts.get(shopCategory) ?? 0) + 1);
     });
     return counts;
   }, [products]);
 
-  const heroProduct = featuredProducts[0];
   const pendingVouchers = shopVouchers.filter((v) => v.status === 'Pending');
   const historyVouchers = shopVouchers.filter((v) => v.status !== 'Pending');
   const orderedVouchers = historyVouchers.filter((v) => v.status === orderTab);
@@ -202,23 +345,6 @@ export default function ShopScreen() {
     }
   };
 
-  const handleCreateCustomVoucher = async () => {
-    const amount = Number.parseFloat(customVoucherAmount);
-    const name = customVoucherName.trim();
-    if (!name || Number.isNaN(amount) || amount <= 0) return;
-    setIsCreatingVoucher(true);
-    try {
-      await voucherService.createShopVoucher(name, amount);
-      await loadData();
-      setIsCustomVoucherOpen(false);
-      setCustomVoucherName('');
-      setCustomVoucherAmount('');
-      showToast('Custom voucher created');
-    } finally {
-      setIsCreatingVoucher(false);
-    }
-  };
-
   const handleCancelPendingVoucher = async (voucherId: string) => {
     await voucherService.cancelVoucher(voucherId);
     await loadData();
@@ -242,108 +368,144 @@ export default function ShopScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        {/* Top brand row */}
-        <View style={styles.topBar}>
+        {/* Header — matches Classes (big italic title + tagline) */}
+        <View style={styles.header}>
           <View>
-            <Text style={styles.brandKicker}>Marvel</Text>
-            <Text style={styles.brandTitle}>Shop</Text>
+            <Text style={styles.headerTitle}>SHOP</Text>
+            <Text style={styles.headerTagline}>
+              Fuel your grind. Stay{' '}
+              <Text style={styles.headerAccent}>unstoppable.</Text>
+            </Text>
           </View>
-          {pendingVouchers.length > 0 ? (
-            <View style={styles.cartBadge}>
-              <SymbolView
-                name="bag.fill"
-                size={18}
-                tintColor="#FFFFFF"
-                fallback={<Text style={styles.cartBadgeGlyph}>{pendingVouchers.length}</Text>}
-              />
-              <View style={styles.cartCount}>
-                <Text style={styles.cartCountText}>{pendingVouchers.length}</Text>
-              </View>
-            </View>
-          ) : null}
         </View>
 
-        {/* Search */}
-        <View style={styles.searchBar}>
-          <SymbolView
-            name="magnifyingglass"
-            size={18}
-            tintColor={premiumColors.textFaint}
-            fallback={<Text style={styles.searchGlyph}>{'⌕'}</Text>}
-          />
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search products"
-            placeholderTextColor={premiumColors.textFaint}
-            style={styles.searchInput}
-            returnKeyType="search"
-            autoCorrect={false}
-          />
-        </View>
+        {/* Featured items carousel */}
+        {featuredProducts.length > 0 ? (
+          <>
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              decelerationRate="fast"
+              onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+                setCarouselIndex(
+                  Math.round(e.nativeEvent.contentOffset.x / CAROUSEL_WIDTH),
+                );
+              }}
+              style={styles.carouselScroll}>
+              {featuredProducts.map((product) => {
+                const imageUri = getDisplayProductImageUri(product);
+                const isFavorite = favorites.has(product.id);
+                const discount =
+                  product.compareAtPrice && product.compareAtPrice > product.price
+                    ? Math.round(
+                        ((product.compareAtPrice - product.price) /
+                          product.compareAtPrice) *
+                          100,
+                      )
+                    : undefined;
+                return (
+                  <View key={product.id} style={styles.carouselSlide}>
+                    {/* Outer glow ring separated from overflow:hidden card */}
+                    <View style={styles.featuredGlowRing}>
+                    <View style={styles.featuredCard}>
+                      {imageUri ? (
+                        <Image
+                          source={{ uri: imageUri }}
+                          style={StyleSheet.absoluteFillObject}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            StyleSheet.absoluteFillObject,
+                            styles.featuredFallback,
+                          ]}>
+                          <Text style={styles.featuredFallbackText}>
+                            {getInitials(product.name)}
+                          </Text>
+                        </View>
+                      )}
+                      <LinearGradient
+                        pointerEvents="none"
+                        colors={[
+                          'rgba(0,0,0,0.05)',
+                          'rgba(0,0,0,0.0)',
+                          'rgba(40,4,8,0.90)',
+                        ]}
+                        locations={[0, 0.25, 1]}
+                        style={StyleSheet.absoluteFillObject}
+                      />
+                      <View style={styles.featuredTopRow}>
+                        <View style={styles.featuredBadge}>
+                          <Text style={styles.featuredBadgeText}>FEATURED ITEM</Text>
+                        </View>
+                        <HeartButton
+                          isFav={isFavorite}
+                          onToggle={() => toggleFavorite(product.id)}
+                        />
+                      </View>
+                      <View style={styles.featuredBottom}>
+                        <Text style={styles.featuredTitle} numberOfLines={1}>
+                          {product.name}
+                        </Text>
+                        <Text style={styles.featuredDesc} numberOfLines={2}>
+                          {product.description}
+                        </Text>
+                        <View style={styles.statsRow}>
+                          <Text style={styles.featuredPrice}>
+                            {formatPrice(product.price)}
+                          </Text>
+                          {product.compareAtPrice ? (
+                            <Text style={styles.featuredCompare}>
+                              {formatPrice(product.compareAtPrice)}
+                            </Text>
+                          ) : null}
+                          {discount ? (
+                            <View style={styles.featuredDiscount}>
+                              <Text style={styles.featuredDiscountText}>
+                                -{discount}%
+                              </Text>
+                            </View>
+                          ) : product.rating ? (
+                            <View style={styles.featuredRatingChip}>
+                              <Text style={styles.featuredRatingText}>
+                                ★ {product.rating.toFixed(1)}
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+                        <Pressable
+                          onPress={() => {
+                            setPendingVoucherProduct(product);
+                            setVoucherQuantity(1);
+                          }}
+                          style={({ pressed }) => [
+                            styles.featuredBookBtn,
+                            pressed && styles.buttonPressed,
+                          ]}>
+                          <Text style={styles.featuredBookBtnText}>SHOP NOW</Text>
+                          <Text style={styles.featuredBookBtnArrow}> ›</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
 
-        {/* Hero banner */}
-        {heroProduct ? (
-          <View style={styles.heroCard}>
-            <View pointerEvents="none" style={styles.heroGloss} />
-            <LinearGradient
-              pointerEvents="none"
-              colors={['rgba(177, 18, 38, 0.32)', 'rgba(10, 11, 15, 0.1)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={styles.heroBody}>
-              <View style={styles.heroLeft}>
-                <View style={styles.heroTag}>
-                  <Text style={styles.heroTagText}>Limited Time</Text>
-                </View>
-                <Text style={styles.heroTitle}>Maximum</Text>
-                <Text style={styles.heroTitleAccent}>Performance</Text>
-                <Text style={styles.heroSubtitle}>
-                  Premium supplements for serious results.
-                </Text>
-                <Pressable
-                  onPress={() => {
-                    if (heroProduct) {
-                      setPendingVoucherProduct(heroProduct);
-                      setVoucherQuantity(1);
-                    }
-                  }}
-                  style={({ pressed }) => [
-                    styles.heroButton,
-                    pressed && styles.buttonPressed,
-                  ]}>
-                  <LinearGradient
-                    colors={premiumGradients.redButton}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.heroButtonGradient}>
-                    <Text style={styles.heroButtonText}>Shop Now</Text>
-                    <SymbolView
-                      name="arrow.right"
-                      size={16}
-                      tintColor="#FFFFFF"
-                      fallback={<Text style={styles.heroButtonArrow}>{'→'}</Text>}
-                    />
-                  </LinearGradient>
-                </Pressable>
+            {featuredProducts.length > 1 ? (
+              <View style={styles.pagination}>
+                {featuredProducts.map((_, i) => (
+                  <View
+                    key={i}
+                    style={[styles.dot, i === carouselIndex && styles.dotActive]}
+                  />
+                ))}
               </View>
-              {getDisplayProductImageUri(heroProduct) ? (
-                <Image
-                  source={{ uri: getDisplayProductImageUri(heroProduct) }}
-                  style={styles.heroImage}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={[styles.heroImage, styles.heroImageFallback]}>
-                  <Text style={styles.heroImageFallbackText}>
-                    {getInitials(heroProduct.name)}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
+            ) : null}
+          </>
         ) : null}
 
         {/* Shop by Category */}
@@ -361,7 +523,8 @@ export default function ShopScreen() {
           contentContainerStyle={styles.categoryRail}>
           {categoryMeta.map((meta) => {
             const isSelected = selectedCategory === meta.key;
-            const available = categories.includes(meta.key);
+            const count = categoryCounts.get(meta.key) ?? 0;
+            const available = count > 0;
             return (
               <Pressable
                 key={meta.key}
@@ -394,15 +557,16 @@ export default function ShopScreen() {
                   />
                 </View>
                 <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
                   style={[
                     styles.categoryLabel,
                     isSelected && styles.categoryLabelSelected,
                   ]}>
                   {meta.key}
                 </Text>
-                <Text style={styles.categoryCount}>
-                  {categoryCounts.get(meta.key) ?? 0} items
-                </Text>
+                <Text style={styles.categoryCount}>{count} items</Text>
               </Pressable>
             );
           })}
@@ -412,19 +576,85 @@ export default function ShopScreen() {
         <View style={styles.sectionHeading}>
           <View style={styles.accentBar} />
           <View style={styles.sectionHeadingText}>
-            <Text style={styles.sectionEyebrow}>{selectedCategory}</Text>
-            <Text style={styles.sectionHeadingTitle}>Featured Products</Text>
+            <Text style={styles.sectionEyebrow}>
+              {showFavoritesOnly ? 'Favorites' : selectedCategory}
+            </Text>
+            <Text style={styles.sectionHeadingTitle}>Available Products</Text>
           </View>
-          <Text style={styles.sectionHint}>{visibleProducts.length} items</Text>
+          <View style={styles.sectionIcons}>
+            <Pressable
+              onPress={() => setShowFavoritesOnly((v) => !v)}
+              style={[styles.iconBtnSmall, showFavoritesOnly && styles.iconBtnActive]}>
+              <SymbolView
+                name={showFavoritesOnly ? 'heart.fill' : 'heart'}
+                size={17}
+                tintColor={showFavoritesOnly ? '#FFFFFF' : 'rgba(255,255,255,0.85)'}
+                fallback={
+                  <Text style={styles.iconGlyph}>{showFavoritesOnly ? '♥' : '♡'}</Text>
+                }
+              />
+            </Pressable>
+            {searchOpen ? (
+              <View style={styles.searchExpanded}>
+                <SymbolView
+                  name="magnifyingglass"
+                  size={14}
+                  tintColor={premiumColors.textFaint}
+                  fallback={<Text style={styles.searchGlyphSmall}>⌕</Text>}
+                />
+                <TextInput
+                  autoFocus
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder="Search"
+                  placeholderTextColor={premiumColors.textFaint}
+                  style={styles.searchExpandedInput}
+                  returnKeyType="search"
+                  autoCorrect={false}
+                  onBlur={() => {
+                    if (!search) setSearchOpen(false);
+                  }}
+                />
+                <Pressable
+                  hitSlop={8}
+                  onPress={() => {
+                    setSearch('');
+                    setSearchOpen(false);
+                  }}>
+                  <SymbolView
+                    name="xmark"
+                    size={12}
+                    tintColor={premiumColors.textMuted}
+                    fallback={<Text style={styles.searchGlyphSmall}>×</Text>}
+                  />
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                onPress={() => setSearchOpen(true)}
+                style={styles.iconBtnSmall}>
+                <SymbolView
+                  name="magnifyingglass"
+                  size={17}
+                  tintColor="#FFFFFF"
+                  fallback={<Text style={styles.iconGlyph}>⌕</Text>}
+                />
+              </Pressable>
+            )}
+          </View>
         </View>
 
         {visibleProducts.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>No products found</Text>
+            <Text style={styles.emptyTitle}>
+              {showFavoritesOnly ? 'No favorite products' : 'No products found'}
+            </Text>
             <Text style={styles.emptyBody}>
-              {normalizedSearch
-                ? 'Try a different search term.'
-                : 'No products in this category yet.'}
+              {showFavoritesOnly
+                ? 'Tap the heart on a product to add it here.'
+                : normalizedSearch
+                  ? 'Try a different search term.'
+                  : 'No products in this category yet.'}
             </Text>
           </View>
         ) : (
@@ -465,25 +695,13 @@ export default function ShopScreen() {
                         <Text style={styles.tagBadgeText}>{product.badge}</Text>
                       </View>
                     ) : null}
-                    <Pressable
-                      hitSlop={8}
-                      onPress={() => toggleFavorite(product.id)}
-                      style={styles.favoriteButton}>
-                      <SymbolView
-                        name={isFavorite ? 'heart.fill' : 'heart'}
-                        size={16}
-                        tintColor={isFavorite ? premiumColors.redBright : '#FFFFFF'}
-                        fallback={
-                          <Text
-                            style={[
-                              styles.favoriteGlyph,
-                              isFavorite && styles.favoriteGlyphActive,
-                            ]}>
-                            {isFavorite ? '♥' : '♡'}
-                          </Text>
-                        }
-                      />
-                    </Pressable>
+                    <HeartButton
+                      isFav={isFavorite}
+                      onToggle={() => toggleFavorite(product.id)}
+                      btnSize={32}
+                      iconSize={15}
+                      style={styles.favoriteButton}
+                    />
                   </View>
 
                   <View style={styles.productInfo}>
@@ -519,12 +737,12 @@ export default function ShopScreen() {
                         pressed && styles.buttonPressed,
                       ]}>
                       <SymbolView
-                        name="ticket.fill"
+                        name="bag.fill"
                         size={15}
                         tintColor={premiumColors.redBright}
                         fallback={<Text style={styles.voucherButtonGlyph}>{'▤'}</Text>}
                       />
-                      <Text style={styles.voucherButtonText}>Create Voucher</Text>
+                      <Text style={styles.voucherButtonText}>Order</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -533,36 +751,41 @@ export default function ShopScreen() {
           </View>
         )}
 
-        {/* Create your own voucher CTA */}
-        <Pressable
-          onPress={() => setIsCustomVoucherOpen(true)}
-          style={({ pressed }) => [
-            styles.customVoucherCard,
-            pressed && styles.buttonPressed,
-          ]}>
-          <View style={styles.customVoucherIcon}>
-            <SymbolView
-              name="percent"
-              size={22}
-              tintColor={premiumColors.redBright}
-              fallback={<Text style={styles.customVoucherGlyph}>%</Text>}
-            />
+        {/* ── ORDERS + VOUCHERS — two independent glow boxes ─────── */}
+        <View style={styles.sectionHeading}>
+          <View style={styles.accentBar} />
+          <View style={styles.sectionHeadingText}>
+            <Text style={styles.sectionEyebrow}>My activity</Text>
+            <Text style={styles.sectionHeadingTitle}>Orders &amp; Vouchers</Text>
           </View>
-          <View style={styles.customVoucherText}>
-            <Text style={styles.customVoucherTitle}>Create your own voucher</Text>
-            <Text style={styles.customVoucherSub}>Gift or save with custom vouchers.</Text>
-          </View>
-          <SymbolView
-            name="chevron.right"
-            size={18}
-            tintColor={premiumColors.textMuted}
-            fallback={<Text style={styles.customVoucherChevron}>{'›'}</Text>}
-          />
-        </Pressable>
-
-        {/* ── VOUCHERS + ORDERS — two independent boxes ──────────── */}
+        </View>
         <View style={styles.actBoxRow}>
-          {/* VOUCHERS: pending, awaiting counter — can be canceled */}
+          {/* ORDERS (left): confirmed + canceled history log */}
+          <Pressable
+            onPress={() =>
+              setExpandedBox(expandedBox === 'orders' ? null : 'orders')
+            }
+            style={[
+              styles.actBox,
+              expandedBox === 'orders' && styles.actBoxActive,
+            ]}>
+            <Image
+              source={ORDERS_SIGN}
+              style={styles.actBoxWatermark}
+              resizeMode="contain"
+            />
+            <SymbolView
+              name="bag.fill"
+              size={24}
+              tintColor={premiumColors.redBright}
+              fallback={<Text style={styles.actBoxGlyph}>≡</Text>}
+            />
+            <Text style={styles.actBoxCount}>{historyVouchers.length}</Text>
+            <Text style={styles.actBoxLabel}>Orders</Text>
+            <Text style={styles.actBoxSub}>History</Text>
+          </Pressable>
+
+          {/* VOUCHERS (right): pending, awaiting counter — can be canceled */}
           <Pressable
             onPress={() =>
               setExpandedBox(expandedBox === 'vouchers' ? null : 'vouchers')
@@ -571,6 +794,11 @@ export default function ShopScreen() {
               styles.actBox,
               expandedBox === 'vouchers' && styles.actBoxActive,
             ]}>
+            <Image
+              source={VOUCHERS_SIGN}
+              style={styles.actBoxWatermark}
+              resizeMode="contain"
+            />
             <SymbolView
               name="ticket.fill"
               size={24}
@@ -580,26 +808,6 @@ export default function ShopScreen() {
             <Text style={styles.actBoxCount}>{pendingVouchers.length}</Text>
             <Text style={styles.actBoxLabel}>Vouchers</Text>
             <Text style={styles.actBoxSub}>Pending</Text>
-          </Pressable>
-
-          {/* ORDERS: confirmed + canceled history log */}
-          <Pressable
-            onPress={() =>
-              setExpandedBox(expandedBox === 'orders' ? null : 'orders')
-            }
-            style={[
-              styles.actBox,
-              expandedBox === 'orders' && styles.actBoxActive,
-            ]}>
-            <SymbolView
-              name="list.bullet.clipboard"
-              size={24}
-              tintColor={premiumColors.redBright}
-              fallback={<Text style={styles.actBoxGlyph}>≡</Text>}
-            />
-            <Text style={styles.actBoxCount}>{historyVouchers.length}</Text>
-            <Text style={styles.actBoxLabel}>Orders</Text>
-            <Text style={styles.actBoxSub}>History</Text>
           </Pressable>
         </View>
 
@@ -735,10 +943,10 @@ export default function ShopScreen() {
           <View style={styles.modalCard}>
             {pendingVoucherProduct ? (
               <>
-                <Text style={styles.modalKicker}>Create Voucher</Text>
+                <Text style={styles.modalKicker}>Place Order</Text>
                 <Text style={styles.modalTitle}>{pendingVoucherProduct.name}</Text>
                 <Text style={styles.modalBody}>
-                  A pending reservation is created and paid in cash at the counter.
+                  A pending order is created and paid in cash at the counter.
                 </Text>
 
                 <View style={styles.stepperRow}>
@@ -777,63 +985,11 @@ export default function ShopScreen() {
                       styles.modalPrimaryButton,
                       pressed && styles.buttonPressed,
                     ]}>
-                    <Text style={styles.modalPrimaryText}>Create voucher</Text>
+                    <Text style={styles.modalPrimaryText}>Place order</Text>
                   </Pressable>
                 </View>
               </>
             ) : null}
-          </View>
-        </View>
-      </Modal>
-
-      {/* Custom Voucher modal */}
-      <Modal transparent visible={isCustomVoucherOpen} animationType="fade">
-        <View style={styles.modalOverlay}>
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setIsCustomVoucherOpen(false)}
-          />
-          <View style={styles.modalCard}>
-            <Text style={styles.modalKicker}>Custom Voucher</Text>
-            <Text style={styles.modalTitle}>Create your own</Text>
-            <Text style={styles.modalBody}>
-              Name the voucher and set an amount to pay in cash at the counter.
-            </Text>
-            <TextInput
-              value={customVoucherName}
-              onChangeText={setCustomVoucherName}
-              placeholder="Voucher name"
-              placeholderTextColor={premiumColors.textFaint}
-              style={styles.modalInput}
-            />
-            <TextInput
-              value={customVoucherAmount}
-              onChangeText={setCustomVoucherAmount}
-              placeholder="Amount (USD)"
-              placeholderTextColor={premiumColors.textFaint}
-              keyboardType="decimal-pad"
-              style={styles.modalInput}
-            />
-            <View style={styles.modalActionRow}>
-              <Pressable
-                disabled={isCreatingVoucher}
-                onPress={() => setIsCustomVoucherOpen(false)}
-                style={({ pressed }) => [
-                  styles.modalSecondaryButton,
-                  pressed && styles.buttonPressed,
-                ]}>
-                <Text style={styles.modalSecondaryText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                disabled={isCreatingVoucher}
-                onPress={handleCreateCustomVoucher}
-                style={({ pressed }) => [
-                  styles.modalPrimaryButton,
-                  pressed && styles.buttonPressed,
-                ]}>
-                <Text style={styles.modalPrimaryText}>Create voucher</Text>
-              </Pressable>
-            </View>
           </View>
         </View>
       </Modal>
@@ -864,185 +1020,192 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  topBar: {
+  // Header (matches ClassesScreen)
+  header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 22,
   },
-  brandKicker: {
-    color: premiumColors.redBright,
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-  },
-  brandTitle: {
+  headerTitle: {
     color: '#FFFFFF',
-    fontSize: 30,
+    fontSize: 52,
     fontWeight: '900',
-    marginTop: 2,
+    fontStyle: 'italic',
+    letterSpacing: -1,
+    lineHeight: 56,
   },
-  cartBadge: {
-    width: 48,
-    height: 48,
+  headerTagline: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 4,
+    lineHeight: 20,
+  },
+  headerAccent: { color: premiumColors.redBright, fontWeight: '800' },
+  iconGlyph: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
+
+  // Section icon controls (favorites + expanding search)
+  sectionIcons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconBtnSmall: {
+    width: 38,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: premiumColors.glassBorder,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.07)',
   },
-  cartBadgeGlyph: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
+  iconBtnActive: {
+    borderColor: 'rgba(225,29,46,0.55)',
+    backgroundColor: 'rgba(177,18,38,0.2)',
   },
-  cartCount: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    minWidth: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-    backgroundColor: premiumColors.redBright,
-    paddingHorizontal: 5,
-  },
-  cartCountText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    minHeight: 50,
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingHorizontal: 16,
-    marginBottom: 20,
-  },
-  searchGlyph: {
-    color: premiumColors.textFaint,
-    fontSize: 18,
-  },
-  searchInput: {
-    flex: 1,
-    color: premiumColors.text,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  heroCard: {
-    position: 'relative',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    borderRadius: 28,
-    backgroundColor: 'rgba(18, 20, 28, 0.72)',
-    padding: 18,
-    marginBottom: 24,
-    shadowColor: premiumColors.red,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.3,
-    shadowRadius: 30,
-    elevation: 10,
-  },
-  heroGloss: {
-    position: 'absolute',
-    top: 0,
-    left: 18,
-    right: 18,
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-  },
-  heroBody: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  heroLeft: {
-    flex: 1,
-  },
-  heroTag: {
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.4)',
-    borderRadius: 999,
-    backgroundColor: 'rgba(177, 18, 38, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginBottom: 10,
-  },
-  heroTagText: {
-    color: premiumColors.redBright,
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  heroTitle: {
-    color: '#FFFFFF',
-    fontSize: 26,
-    fontWeight: '900',
-    lineHeight: 28,
-  },
-  heroTitleAccent: {
-    color: premiumColors.redBright,
-    fontSize: 26,
-    fontWeight: '900',
-    lineHeight: 28,
-  },
-  heroSubtitle: {
-    color: 'rgba(255, 255, 255, 0.78)',
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 18,
-    marginTop: 10,
-  },
-  heroButton: {
-    alignSelf: 'flex-start',
-    marginTop: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-    ...premiumGlow,
-  },
-  heroButtonGradient: {
+  searchExpanded: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    width: 168,
+    height: 38,
+    borderWidth: 1.5,
+    borderColor: 'rgba(225,29,46,0.60)',
+    borderRadius: 19,
+    backgroundColor: 'rgba(177,18,38,0.10)',
+    paddingHorizontal: 12,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.65,
+    shadowRadius: 14,
+    elevation: 6,
   },
-  heroButtonText: {
-    color: '#FFFFFF',
+  searchExpandedInput: {
+    flex: 1,
+    color: premiumColors.text,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '700',
+    padding: 0,
   },
-  heroButtonArrow: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
+  searchGlyphSmall: { color: premiumColors.textMuted, fontSize: 12, fontWeight: '800' },
+
+  // Featured carousel
+  carouselScroll: { marginBottom: 8 },
+  carouselSlide: { width: CAROUSEL_WIDTH, paddingVertical: 6 },
+  // Outer glow ring (separate from overflow:hidden so red glow shows)
+  featuredGlowRing: {
+    borderRadius: 32,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.45,
+    shadowRadius: 24,
+    elevation: 14,
   },
-  heroImage: {
-    width: 116,
-    height: 152,
-    borderRadius: 18,
+  featuredCard: {
+    width: '100%',
+    height: 300,
+    borderRadius: 32,
+    overflow: 'hidden',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: 'rgba(225, 29, 46, 0.30)',
   },
-  heroImageFallback: {
+  featuredFallback: {
+    backgroundColor: premiumColors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
-  heroImageFallbackText: {
+  featuredFallbackText: { color: '#FFFFFF', fontSize: 48, fontWeight: '900' },
+  featuredTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  featuredBadge: {
+    borderRadius: 999,
+    backgroundColor: premiumColors.red,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  featuredBadgeText: {
     color: '#FFFFFF',
-    fontSize: 28,
+    fontSize: 10,
     fontWeight: '900',
+    letterSpacing: 0.8,
   },
+  featuredBottom: { padding: 18 },
+  featuredTitle: {
+    color: '#FFFFFF',
+    fontSize: 34,
+    fontWeight: '900',
+    fontStyle: 'italic',
+    letterSpacing: -0.5,
+  },
+  featuredDesc: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 14,
+    flexWrap: 'wrap',
+  },
+  featuredPrice: { color: '#FFFFFF', fontSize: 22, fontWeight: '900' },
+  featuredCompare: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 14,
+    fontWeight: '700',
+    textDecorationLine: 'line-through',
+  },
+  featuredDiscount: {
+    borderRadius: 8,
+    backgroundColor: premiumColors.redBright,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  featuredDiscountText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
+  featuredRatingChip: {
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  featuredRatingText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
+  featuredBookBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    borderRadius: 18,
+    backgroundColor: premiumColors.red,
+    paddingVertical: 15,
+    ...premiumGlow,
+  },
+  featuredBookBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+  },
+  featuredBookBtnArrow: { color: '#FFFFFF', fontSize: 20, fontWeight: '900' },
+  pagination: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    marginBottom: 22,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+  },
+  dotActive: { width: 22, backgroundColor: premiumColors.redBright },
+
   sectionHeading: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1083,7 +1246,7 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
   categoryTile: {
-    width: 104,
+    width: 116,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: premiumColors.glassBorder,
@@ -1129,6 +1292,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
     textAlign: 'center',
+    alignSelf: 'stretch',
   },
   categoryLabelSelected: {
     color: '#FFFFFF',
@@ -1228,20 +1392,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-    backgroundColor: 'rgba(10, 11, 15, 0.55)',
-  },
-  favoriteGlyph: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  favoriteGlyphActive: {
-    color: premiumColors.redBright,
   },
   productInfo: {
     padding: 12,
@@ -1316,52 +1466,6 @@ const styles = StyleSheet.create({
   voucherButtonText: {
     color: premiumColors.redBright,
     fontSize: 13,
-    fontWeight: '900',
-  },
-  customVoucherCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.36)',
-    borderRadius: 22,
-    backgroundColor: 'rgba(177, 18, 38, 0.08)',
-    padding: 16,
-    marginTop: 6,
-    marginBottom: 24,
-  },
-  customVoucherIcon: {
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.4)',
-    borderRadius: 16,
-    backgroundColor: 'rgba(177, 18, 38, 0.16)',
-  },
-  customVoucherGlyph: {
-    color: premiumColors.redBright,
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  customVoucherText: {
-    flex: 1,
-  },
-  customVoucherTitle: {
-    color: premiumColors.text,
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  customVoucherSub: {
-    color: mutedColor,
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  customVoucherChevron: {
-    color: premiumColors.textMuted,
-    fontSize: 20,
     fontWeight: '900',
   },
   tabsRow: {
@@ -1501,18 +1605,6 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginTop: 8,
   },
-  modalInput: {
-    minHeight: 50,
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingHorizontal: 14,
-    marginTop: 12,
-    color: premiumColors.text,
-    fontSize: 15,
-    fontWeight: '700',
-  },
   stepperRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1607,10 +1699,12 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 
-  // Two-box row (Vouchers / Orders)
-  actBoxRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 20, marginBottom: 14 },
+  // Two-box row (Orders / Vouchers)
+  actBoxRow: { flexDirection: 'row', gap: 12, marginBottom: 14 },
   actBox: {
     flex: 1,
+    position: 'relative',
+    overflow: 'hidden',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: premiumColors.glassBorder,
@@ -1619,7 +1713,21 @@ const styles = StyleSheet.create({
     paddingVertical: 22,
     paddingHorizontal: 10,
     gap: 4,
-    ...premiumShadow,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    elevation: 6,
+  },
+  actBoxWatermark: {
+    position: 'absolute',
+    right: -12,
+    top: -10,
+    width: 80,
+    height: 80,
+    opacity: 0.12,
+    tintColor: '#FFFFFF',
+    transform: [{ rotate: '14deg' }],
   },
   actBoxActive: {
     borderColor: 'rgba(225, 29, 46, 0.55)',
@@ -1632,7 +1740,6 @@ const styles = StyleSheet.create({
 
   // Expanded panel (vouchers / orders)
   expandedPanel: {
-    marginHorizontal: 20,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: premiumColors.glassBorder,

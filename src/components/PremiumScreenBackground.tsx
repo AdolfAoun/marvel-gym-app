@@ -85,10 +85,10 @@ export function PremiumScreenBackground({
           ))}
         </View>
       ) : null}
-      {/* Quiet red horizon glow rising from the bottom — accent, not a spotlight */}
+      {/* Subtle red horizon glow rising from the bottom — accent only */}
       <LinearGradient
         pointerEvents="none"
-        colors={['transparent', 'rgba(177, 18, 38, 0.14)']}
+        colors={['transparent', 'rgba(177, 18, 38, 0.16)']}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={styles.redHorizon}

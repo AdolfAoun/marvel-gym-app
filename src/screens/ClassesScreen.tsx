@@ -2,9 +2,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SymbolView } from 'expo-symbols';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Dimensions,
   Image,
   Modal,
@@ -12,9 +13,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
-import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
+import type { NativeScrollEvent, NativeSyntheticEvent, ViewStyle } from 'react-native';
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import { premiumColors, premiumGlow, premiumShadow } from '@/constants/premiumTheme';
@@ -22,8 +24,14 @@ import { classService, voucherService } from '@/services';
 import type { ClassCategory, GymClass, Voucher } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const DATE_PAGE_W = SCREEN_WIDTH - 40;
+const DATE_CELL_GAP = 4;
+const DATE_CELL_W = Math.floor((DATE_PAGE_W - DATE_CELL_GAP * 6) / 7);
 const accentColor = premiumColors.red;
 const mutedColor = premiumColors.textMuted;
+
+const BOOKINGS_SIGN = require('@/assets/images/marvel-logo-startup-sign-dot.png');
+const VOUCHERS_SIGN = require('@/assets/images/marvel-logo-startup-sign-x.png');
 
 const CATEGORY_IMAGES: Record<ClassCategory, string> = {
   'Fitness Classes':
@@ -34,13 +42,6 @@ const CATEGORY_IMAGES: Record<ClassCategory, string> = {
     'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=900&q=80',
   'Extra Classes':
     'https://images.unsplash.com/photo-1571731956672-f2b94d7dd0cb?w=900&q=80',
-};
-
-const CATEGORY_LOCATIONS: Record<ClassCategory, string> = {
-  'Fitness Classes': 'Main Gym',
-  'Martial Arts': 'Boxing Area',
-  Gymnastics: 'Studio 1',
-  'Extra Classes': 'Studio 2',
 };
 
 type ScheduleFilter = 'ALL' | ClassCategory;
@@ -58,20 +59,50 @@ const WEEKDAY_FULLS = [
   'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
 ];
 
-function getCurrentWeekDays() {
+// Generate 7 days for a given week offset (0 = current week, -1 = last week, 1 = next week)
+function getWeekDays(weekOffset: number) {
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const start = new Date(today);
-  start.setDate(today.getDate() - today.getDay());
+  start.setDate(today.getDate() + weekOffset * 7);
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
+    const offset = Math.round((d.getTime() - today.getTime()) / 86400000);
     return {
-      short: WEEKDAY_SHORTS[i],
+      short: WEEKDAY_SHORTS[d.getDay()],
       num: d.getDate(),
       fullDay: WEEKDAY_FULLS[d.getDay()],
-      isToday: d.toDateString() === today.toDateString(),
+      iso: d.toISOString(),
+      offset,
+      isToday: offset === 0,
     };
   });
+}
+
+function offsetFromToday(iso: string) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(iso);
+  d.setHours(0, 0, 0, 0);
+  return Math.round((d.getTime() - today.getTime()) / 86400000);
+}
+
+function relativeDayLabel(offset: number) {
+  if (offset === 0) return 'Today';
+  if (offset === 1) return 'Tomorrow';
+  if (offset === -1) return 'Yesterday';
+  if (offset > 1) return `In ${offset} days`;
+  return `${Math.abs(offset)} days ago`;
+}
+
+function fmtFullDate(iso: string) {
+  return new Intl.DateTimeFormat('en', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(iso));
 }
 
 function fmt24(value: string) {
@@ -97,14 +128,6 @@ function fmtVoucherDate(value: string) {
   }).format(new Date(value));
 }
 
-function fmtTodayLabel() {
-  return new Intl.DateTimeFormat('en', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date());
-}
-
 function getWeekdayName(iso: string) {
   return new Intl.DateTimeFormat('en', { weekday: 'long' }).format(new Date(iso));
 }
@@ -119,12 +142,131 @@ function initial(name: string) {
   return name.slice(0, 1).toUpperCase();
 }
 
+// ── Animated heart button ─────────────────────────────────────────────────────
+function HeartButton({
+  isFav,
+  onToggle,
+  btnSize = 36,
+  iconSize = 16,
+  style,
+}: {
+  isFav: boolean;
+  onToggle: () => void;
+  btnSize?: number;
+  iconSize?: number;
+  style?: ViewStyle;
+}) {
+  const pressScale = useRef(new Animated.Value(1)).current;
+  const breatheScale = useRef(new Animated.Value(1)).current;
+  const combined = useRef(Animated.multiply(pressScale, breatheScale)).current;
+
+  useEffect(() => {
+    if (isFav) {
+      const anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(breatheScale, {
+            toValue: 1.20,
+            duration: 850,
+            useNativeDriver: true,
+          }),
+          Animated.timing(breatheScale, {
+            toValue: 0.88,
+            duration: 850,
+            useNativeDriver: true,
+          }),
+        ]),
+      );
+      anim.start();
+      return () => anim.stop();
+    }
+    Animated.timing(breatheScale, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [isFav, breatheScale]);
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(pressScale, {
+        toValue: 1.45,
+        duration: 90,
+        useNativeDriver: true,
+      }),
+      Animated.spring(pressScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        bounciness: 18,
+        speed: 12,
+      }),
+    ]).start();
+    onToggle();
+  };
+
+  return (
+    <Pressable
+      hitSlop={8}
+      onPress={handlePress}
+      style={[
+        hStyles.btn,
+        {
+          width: btnSize,
+          height: btnSize,
+          borderRadius: btnSize / 2,
+        },
+        isFav && hStyles.btnLiked,
+        style,
+      ]}>
+      <Animated.View style={{ transform: [{ scale: combined }] }}>
+        <SymbolView
+          name={isFav ? 'heart.fill' : 'heart'}
+          size={iconSize}
+          tintColor={premiumColors.redBright}
+          fallback={
+            <Text style={[hStyles.glyph, { fontSize: iconSize }]}>
+              {isFav ? '♥' : '♡'}
+            </Text>
+          }
+        />
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+const hStyles = StyleSheet.create({
+  btn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.13)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.20)',
+  },
+  btnLiked: {
+    backgroundColor: 'rgba(177,18,38,0.28)',
+    borderColor: 'rgba(225,29,46,0.60)',
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.65,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  glyph: { color: premiumColors.redBright, fontWeight: '900' },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function ClassesScreen() {
   const [classes, setClasses] = useState<GymClass[]>([]);
   const [classVouchers, setClassVouchers] = useState<Voucher[]>([]);
-  const [selectedDay, setSelectedDay] = useState(
-    () => WEEKDAY_FULLS[new Date().getDay()],
-  );
+  const [selectedIso, setSelectedIso] = useState(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString();
+  });
+  // weekOffset: -1 = last week, 0 = this week, 1 = next week
+  const [weekOffset, setWeekOffset] = useState(0);
+  const weekScrollRef = useRef<ScrollView>(null);
+
   const [scheduleFilter, setScheduleFilter] = useState<ScheduleFilter>('ALL');
   const [pendingAction, setPendingAction] = useState<{
     action: 'reserve' | 'cancel';
@@ -132,10 +274,33 @@ export default function ClassesScreen() {
   }>();
   const [isLoading, setIsLoading] = useState(true);
   const [carouselIndex, setCarouselIndex] = useState(0);
-  const [expandedBox, setExpandedBox] = useState<'vouchers' | 'orders' | null>(null);
+  const [expandedBox, setExpandedBox] = useState<'vouchers' | 'bookings' | null>(null);
   const [ordersTab, setOrdersTab] = useState<'Confirmed' | 'Canceled'>('Confirmed');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
-  const weekDays = useMemo(() => getCurrentWeekDays(), []);
+  // Pre-compute all 3 weeks (prev / current / next) — static for session
+  const allWeeksData = useMemo(() => [-1, 0, 1].map(getWeekDays), []);
+
+  const selectedOffset = offsetFromToday(selectedIso);
+  const selectedDay = getWeekdayName(selectedIso);
+  const normalizedSearch = search.trim().toLowerCase();
+
+  // Sync arrow-triggered week change → animated scroll
+  useEffect(() => {
+    const pageIdx = weekOffset + 1; // -1→0, 0→1, 1→2
+    weekScrollRef.current?.scrollTo({ x: pageIdx * DATE_PAGE_W, animated: true });
+  }, [weekOffset]);
+
+  const toggleFavorite = (id: string) =>
+    setFavorites((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const loadData = useCallback(async () => {
     const [scheduledClasses, vouchers] = await Promise.all([
@@ -166,21 +331,25 @@ export default function ClassesScreen() {
       classes
         .filter((c) => {
           if (getWeekdayName(c.startTime) !== selectedDay) return false;
-          return scheduleFilter === 'ALL' || c.category === scheduleFilter;
+          if (scheduleFilter !== 'ALL' && c.category !== scheduleFilter) return false;
+          if (showFavoritesOnly && !favorites.has(c.id)) return false;
+          if (normalizedSearch) {
+            const haystack =
+              `${c.title} ${c.instructorName} ${c.category}`.toLowerCase();
+            if (!haystack.includes(normalizedSearch)) return false;
+          }
+          return true;
         })
         .sort(
           (a, b) =>
             new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
         ),
-    [classes, selectedDay, scheduleFilter],
+    [classes, selectedDay, scheduleFilter, showFavoritesOnly, favorites, normalizedSearch],
   );
 
   const pendingVouchers = classVouchers.filter((v) => v.status === 'Pending');
   const historyVouchers = classVouchers.filter((v) => v.status !== 'Pending');
   const ordersFiltered = historyVouchers.filter((v) => v.status === ordersTab);
-  const nextBooking = classVouchers.find(
-    (v) => v.status === 'Confirmed' || v.status === 'Pending',
-  );
 
   const handleReserve = async (classId: string) => {
     await classService.registerForClass(classId);
@@ -230,29 +399,6 @@ export default function ClassesScreen() {
               <Text style={styles.headerAccent}>legendary.</Text>
             </Text>
           </View>
-          <View style={styles.headerIcons}>
-            <View style={styles.iconBtn}>
-              <SymbolView
-                name="magnifyingglass"
-                size={18}
-                tintColor="#FFFFFF"
-                fallback={<Text style={styles.iconGlyph}>⌕</Text>}
-              />
-            </View>
-            <View style={styles.iconBtn}>
-              <SymbolView
-                name="calendar"
-                size={18}
-                tintColor="#FFFFFF"
-                fallback={<Text style={styles.iconGlyph}>▦</Text>}
-              />
-              {pendingVouchers.length > 0 ? (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{pendingVouchers.length}</Text>
-                </View>
-              ) : null}
-            </View>
-          </View>
         </View>
 
         {/* ── FEATURED CAROUSEL ─────────────────────────────────── */}
@@ -270,109 +416,96 @@ export default function ClassesScreen() {
           {carouselItems.map((gymClass) => {
             const isReserved = Boolean(gymClass.isRegistered);
             const isFull = gymClass.status === 'Full' && !isReserved;
-            const spotsLeft = Math.max(
-              0,
-              gymClass.capacity - gymClass.enrolledCount,
-            );
+            const isFav = favorites.has(gymClass.id);
             const imgUri =
               gymClass.coverImageUrl || CATEGORY_IMAGES[gymClass.category];
             return (
               <View key={gymClass.id} style={styles.carouselSlide}>
-                <View style={styles.featuredCard}>
-                  <Image
-                    source={{ uri: imgUri }}
-                    style={StyleSheet.absoluteFillObject}
-                    resizeMode="cover"
-                  />
-                  <LinearGradient
-                    pointerEvents="none"
-                    colors={[
-                      'rgba(0,0,0,0.08)',
-                      'rgba(0,0,0,0.0)',
-                      'rgba(0,0,0,0.84)',
-                    ]}
-                    locations={[0, 0.28, 1]}
-                    style={StyleSheet.absoluteFillObject}
-                  />
-                  <View style={styles.featuredTopRow}>
-                    <View style={styles.featuredBadge}>
-                      <Text style={styles.featuredBadgeText}>FEATURED CLASS</Text>
-                    </View>
-                    <Pressable style={styles.heartBtn}>
-                      <SymbolView
-                        name="heart"
-                        size={16}
-                        tintColor="#FFFFFF"
-                        fallback={<Text style={styles.heartGlyph}>♡</Text>}
+                {/* Outer glow ring (separate from overflow:hidden card) */}
+                <View style={styles.featuredGlowRing}>
+                  <View style={styles.featuredCard}>
+                    <Image
+                      source={{ uri: imgUri }}
+                      style={StyleSheet.absoluteFillObject}
+                      resizeMode="cover"
+                    />
+                    {/* Edge vignette — warm red tint at bottom */}
+                    <LinearGradient
+                      pointerEvents="none"
+                      colors={[
+                        'rgba(0,0,0,0.05)',
+                        'rgba(0,0,0,0.0)',
+                        'rgba(40,4,8,0.90)',
+                      ]}
+                      locations={[0, 0.25, 1]}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                    <View style={styles.featuredTopRow}>
+                      <View style={styles.featuredBadge}>
+                        <Text style={styles.featuredBadgeText}>FEATURED CLASS</Text>
+                      </View>
+                      <HeartButton
+                        isFav={isFav}
+                        onToggle={() => toggleFavorite(gymClass.id)}
                       />
-                    </Pressable>
-                  </View>
-                  <View style={styles.featuredBottom}>
-                    <Text style={styles.featuredTitle}>
-                      {gymClass.title.toUpperCase()}
-                    </Text>
-                    <Text style={styles.featuredDesc} numberOfLines={2}>
-                      {gymClass.level} level · Coach {gymClass.instructorName}
-                    </Text>
-                    <View style={styles.statsRow}>
-                      <View style={styles.stat}>
-                        <SymbolView
-                          name="clock"
-                          size={12}
-                          tintColor="rgba(255,255,255,0.72)"
-                          fallback={<Text style={styles.statGlyph}>○</Text>}
-                        />
-                        <Text style={styles.statText}>
-                          {fmtDuration(gymClass.startTime, gymClass.endTime)}
-                        </Text>
-                      </View>
-                      <View style={styles.statDivider} />
-                      <View style={styles.stat}>
-                        <SymbolView
-                          name="chart.bar.fill"
-                          size={12}
-                          tintColor="rgba(255,255,255,0.72)"
-                          fallback={<Text style={styles.statGlyph}>▪</Text>}
-                        />
-                        <Text style={styles.statText}>
-                          {gymClass.level?.toUpperCase() ?? 'ALL LEVELS'}
-                        </Text>
-                      </View>
-                      <View style={styles.statDivider} />
-                      <View style={styles.stat}>
-                        <SymbolView
-                          name="person.2.fill"
-                          size={12}
-                          tintColor="rgba(255,255,255,0.72)"
-                          fallback={<Text style={styles.statGlyph}>◎</Text>}
-                        />
-                        <Text style={styles.statText}>{spotsLeft} SPOTS LEFT</Text>
-                      </View>
                     </View>
-                    <Pressable
-                      disabled={isFull}
-                      onPress={() =>
-                        setPendingAction({
-                          action: isReserved ? 'cancel' : 'reserve',
-                          gymClass,
-                        })
-                      }
-                      style={({ pressed }) => [
-                        styles.featuredBookBtn,
-                        isFull && styles.featuredBookBtnDisabled,
-                        pressed && !isFull && styles.btnPressed,
-                      ]}>
-                      <Text style={styles.featuredBookBtnText}>
-                        {isReserved
-                          ? 'CANCEL BOOKING'
-                          : isFull
-                            ? 'CLASS FULL'
-                            : 'BOOK NOW'}
+                    <View style={styles.featuredBottom}>
+                      <Text style={styles.featuredTitle}>
+                        {gymClass.title.toUpperCase()}
                       </Text>
-                      {!isFull ? (
-                        <Text style={styles.featuredBookBtnArrow}> ›</Text>
-                      ) : null}
-                    </Pressable>
+                      <Text style={styles.featuredDesc} numberOfLines={1}>
+                        Coach {gymClass.instructorName}
+                      </Text>
+                      <View style={styles.statsRow}>
+                        <View style={styles.stat}>
+                          <SymbolView
+                            name="clock"
+                            size={12}
+                            tintColor="rgba(255,255,255,0.72)"
+                            fallback={<Text style={styles.statGlyph}>○</Text>}
+                          />
+                          <Text style={styles.statText}>
+                            {fmtDuration(gymClass.startTime, gymClass.endTime)}
+                          </Text>
+                        </View>
+                        <View style={styles.statDivider} />
+                        <View style={styles.stat}>
+                          <SymbolView
+                            name="person.2.fill"
+                            size={12}
+                            tintColor="rgba(255,255,255,0.72)"
+                            fallback={<Text style={styles.statGlyph}>◎</Text>}
+                          />
+                          <Text style={styles.statText}>
+                            {isFull ? 'FULL' : 'SPOTS AVAILABLE'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Pressable
+                        disabled={isFull}
+                        onPress={() =>
+                          setPendingAction({
+                            action: isReserved ? 'cancel' : 'reserve',
+                            gymClass,
+                          })
+                        }
+                        style={({ pressed }) => [
+                          styles.featuredBookBtn,
+                          isFull && styles.featuredBookBtnDisabled,
+                          pressed && !isFull && styles.btnPressed,
+                        ]}>
+                        <Text style={styles.featuredBookBtnText}>
+                          {isReserved
+                            ? 'CANCEL BOOKING'
+                            : isFull
+                              ? 'CLASS FULL'
+                              : 'BOOK NOW'}
+                        </Text>
+                        {!isFull ? (
+                          <Text style={styles.featuredBookBtnArrow}> ›</Text>
+                        ) : null}
+                      </Pressable>
+                    </View>
                   </View>
                 </View>
               </View>
@@ -392,28 +525,206 @@ export default function ClassesScreen() {
           </View>
         ) : null}
 
-        {/* ── TODAY SCHEDULE ──────────────────────────────────── */}
-        <View style={styles.todayRow}>
+        {/* ── DATES (paging week strip — ±1 week only) ─────────── */}
+        <View style={styles.datesHeader}>
           <View>
-            <Text style={styles.todayLabel}>TODAY</Text>
-            <Text style={styles.todayDate}>{fmtTodayLabel()}</Text>
+            <Text style={styles.datesTitle}>Dates</Text>
           </View>
-          <View style={styles.filterChip}>
-            <Text style={styles.filterChipText}>FILTER</Text>
-            <SymbolView
-              name="slider.horizontal.3"
-              size={13}
-              tintColor="#FFFFFF"
-              fallback={<Text style={styles.filterGlyph}>≡</Text>}
-            />
+          <View style={styles.datesControls}>
+            {weekOffset !== 0 ? (
+              <Pressable onPress={() => setWeekOffset(0)} hitSlop={8}>
+                <Text style={styles.datesReset}>This week</Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              onPress={() => setWeekOffset((w) => Math.max(-1, w - 1))}
+              disabled={weekOffset === -1}
+              style={[
+                styles.weekNavBtn,
+                weekOffset === -1 && styles.weekNavBtnDisabled,
+              ]}>
+              <SymbolView
+                name="chevron.left"
+                size={14}
+                tintColor={weekOffset === -1 ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.9)'}
+                fallback={
+                  <Text style={[styles.weekNavGlyph, weekOffset === -1 && styles.weekNavGlyphDisabled]}>
+                    ‹
+                  </Text>
+                }
+              />
+            </Pressable>
+            <Pressable
+              onPress={() => setWeekOffset((w) => Math.min(1, w + 1))}
+              disabled={weekOffset === 1}
+              style={[
+                styles.weekNavBtn,
+                weekOffset === 1 && styles.weekNavBtnDisabled,
+              ]}>
+              <SymbolView
+                name="chevron.right"
+                size={14}
+                tintColor={weekOffset === 1 ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.9)'}
+                fallback={
+                  <Text style={[styles.weekNavGlyph, weekOffset === 1 && styles.weekNavGlyphDisabled]}>
+                    ›
+                  </Text>
+                }
+              />
+            </Pressable>
           </View>
         </View>
 
+        {/* Paging horizontal strip — 3 week pages side by side */}
+        <ScrollView
+          ref={weekScrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+          decelerationRate="fast"
+          contentOffset={{ x: DATE_PAGE_W, y: 0 }}
+          onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+            const page = Math.round(e.nativeEvent.contentOffset.x / DATE_PAGE_W);
+            const newOffset = (page - 1) as -1 | 0 | 1;
+            if (newOffset !== weekOffset) setWeekOffset(newOffset);
+          }}
+          style={styles.weekStripScroll}
+          contentContainerStyle={styles.weekStripContainer}>
+          {allWeeksData.map((week, wIdx) => (
+            <View key={wIdx} style={styles.weekPage}>
+              {week.map((day) => {
+                const selected = day.offset === selectedOffset;
+                return (
+                  <Pressable
+                    key={day.iso}
+                    onPress={() => setSelectedIso(day.iso)}
+                    style={[styles.dayCell, selected && styles.dayCellActive]}>
+                    <Text
+                      style={[
+                        styles.dayCellShort,
+                        selected && styles.dayCellTextActive,
+                      ]}>
+                      {day.short}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.dayCellNum,
+                        selected && styles.dayCellTextActive,
+                      ]}>
+                      {day.num}
+                    </Text>
+                    {day.isToday ? <View style={styles.todayDot} /> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ))}
+        </ScrollView>
+
+        {/* ── SELECTED-DAY HEADER + SEARCH / FAVORITES ────────── */}
+        <View style={styles.todayRow}>
+          <View style={styles.todayLabelBlock}>
+            <Text style={styles.todayLabel} numberOfLines={1}>
+              {relativeDayLabel(selectedOffset).toUpperCase()}
+            </Text>
+            <Text style={styles.todayDate} numberOfLines={1}>
+              {fmtFullDate(selectedIso)}
+            </Text>
+          </View>
+          <View style={styles.sectionIcons}>
+            <Pressable
+              onPress={() => setShowFavoritesOnly((v) => !v)}
+              style={[styles.iconBtnSmall, showFavoritesOnly && styles.iconBtnActive]}>
+              <SymbolView
+                name={showFavoritesOnly ? 'heart.fill' : 'heart'}
+                size={18}
+                tintColor={showFavoritesOnly ? premiumColors.redBright : 'rgba(255,255,255,0.85)'}
+                fallback={
+                  <Text style={styles.iconGlyph}>{showFavoritesOnly ? '♥' : '♡'}</Text>
+                }
+              />
+            </Pressable>
+            {searchOpen ? (
+              <View style={styles.searchExpanded}>
+                <SymbolView
+                  name="magnifyingglass"
+                  size={15}
+                  tintColor={premiumColors.textFaint}
+                  fallback={<Text style={styles.searchGlyphSmall}>⌕</Text>}
+                />
+                <TextInput
+                  autoFocus
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder="Search"
+                  placeholderTextColor={premiumColors.textFaint}
+                  style={styles.searchExpandedInput}
+                  returnKeyType="search"
+                  autoCorrect={false}
+                  onBlur={() => {
+                    if (!search) setSearchOpen(false);
+                  }}
+                />
+                <Pressable
+                  hitSlop={8}
+                  onPress={() => {
+                    setSearch('');
+                    setSearchOpen(false);
+                  }}>
+                  <SymbolView
+                    name="xmark"
+                    size={13}
+                    tintColor={premiumColors.textMuted}
+                    fallback={<Text style={styles.searchGlyphSmall}>×</Text>}
+                  />
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                onPress={() => setSearchOpen(true)}
+                style={styles.iconBtnSmall}>
+                <SymbolView
+                  name="magnifyingglass"
+                  size={18}
+                  tintColor="#FFFFFF"
+                  fallback={<Text style={styles.iconGlyph}>⌕</Text>}
+                />
+              </Pressable>
+            )}
+          </View>
+        </View>
+
+        {/* ── CATEGORY CHIPS ── */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRail}>
+          {SCHEDULE_FILTERS.map((f) => (
+            <Pressable
+              key={f.key}
+              onPress={() => setScheduleFilter(f.key)}
+              style={[styles.chip, scheduleFilter === f.key && styles.chipActive]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  scheduleFilter === f.key && styles.chipTextActive,
+                ]}>
+                {f.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
         {todayClasses.length === 0 ? (
           <View style={[styles.emptyCard, { marginHorizontal: 20 }]}>
-            <Text style={styles.emptyTitle}>No classes today</Text>
+            <Text style={styles.emptyTitle}>
+              {showFavoritesOnly ? 'No favorite classes' : 'No classes'}
+            </Text>
             <Text style={styles.emptyBody}>
-              Try a different day or remove the category filter.
+              {showFavoritesOnly
+                ? 'Tap the heart on a class to add it here.'
+                : 'Try another day, category, or search term.'}
             </Text>
           </View>
         ) : (
@@ -422,13 +733,8 @@ export default function ClassesScreen() {
             {todayClasses.map((gymClass) => {
               const isReserved = Boolean(gymClass.isRegistered);
               const isFull = gymClass.status === 'Full' && !isReserved;
-              const spotsLeft = Math.max(
-                0,
-                gymClass.capacity - gymClass.enrolledCount,
-              );
               const imgUri =
                 gymClass.coverImageUrl || CATEGORY_IMAGES[gymClass.category];
-              const location = CATEGORY_LOCATIONS[gymClass.category];
               const nameParts = gymClass.instructorName.split(' ');
               const shortName =
                 nameParts[0] +
@@ -436,10 +742,12 @@ export default function ClassesScreen() {
               return (
                 <View key={gymClass.id} style={styles.timelineRow}>
                   <View style={styles.timelineTimCol}>
-                    <View style={styles.timelineDot} />
-                    <Text style={styles.timelineStartTime}>
-                      {fmt24(gymClass.startTime)}
-                    </Text>
+                    <View style={styles.timelineTimTop}>
+                      <View style={styles.timelineDot} />
+                      <Text style={styles.timelineStartTime}>
+                        {fmt24(gymClass.startTime)}
+                      </Text>
+                    </View>
                     <Text style={styles.timelineEndTime}>
                       {fmt24(gymClass.endTime)}
                     </Text>
@@ -457,22 +765,17 @@ export default function ClassesScreen() {
                       <Text style={styles.timelineCat}>{gymClass.category}</Text>
                       <View style={styles.timelineMeta}>
                         <SymbolView
-                          name="mappin.circle.fill"
-                          size={11}
-                          tintColor={mutedColor}
-                          fallback={<Text style={styles.metaGlyph}>⊕</Text>}
-                        />
-                        <Text style={styles.timelineMetaText}>{location}</Text>
-                      </View>
-                      <View style={styles.timelineMeta}>
-                        <SymbolView
                           name="person.2.fill"
                           size={11}
-                          tintColor={mutedColor}
+                          tintColor={isFull ? premiumColors.warning : premiumColors.success}
                           fallback={<Text style={styles.metaGlyph}>◎</Text>}
                         />
-                        <Text style={styles.timelineMetaText}>
-                          {spotsLeft} spots left
+                        <Text
+                          style={[
+                            styles.timelineMetaText,
+                            { color: isFull ? premiumColors.warning : premiumColors.success },
+                          ]}>
+                          {isFull ? 'Full' : 'Spots available'}
                         </Text>
                       </View>
                     </View>
@@ -492,7 +795,6 @@ export default function ClassesScreen() {
                       <Text style={styles.instructorName} numberOfLines={1}>
                         {shortName}
                       </Text>
-                      <Text style={styles.instructorLevel}>{gymClass.level}</Text>
                       <Pressable
                         disabled={isFull}
                         onPress={() =>
@@ -527,50 +829,39 @@ export default function ClassesScreen() {
           </View>
         )}
 
-        {/* ── CATEGORY FILTER CHIPS ──────────────────────────── */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipRail}>
-          {SCHEDULE_FILTERS.map((f) => (
-            <Pressable
-              key={f.key}
-              onPress={() => setScheduleFilter(f.key)}
-              style={[styles.chip, scheduleFilter === f.key && styles.chipActive]}>
-              <Text
-                style={[
-                  styles.chipText,
-                  scheduleFilter === f.key && styles.chipTextActive,
-                ]}>
-                {f.label}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        {/* ── MY BOOKINGS CARD ──────────────────────────────────── */}
-        <View style={styles.bookingsCard}>
-          <View style={styles.bookingsLeft}>
-            <Text style={styles.bookingsTitle}>MY BOOKINGS</Text>
-            {nextBooking ? (
-              <>
-                <Text style={styles.bookingsNextDate}>
-                  {fmtVoucherDate(nextBooking.date)}
-                </Text>
-                <Text style={styles.bookingsNextDesc} numberOfLines={2}>
-                  {nextBooking.description}
-                </Text>
-              </>
-            ) : (
-              <Text style={styles.bookingsEmpty}>No upcoming bookings yet.</Text>
-            )}
+        {/* ── BOOKINGS + VOUCHERS ──────────────────────────────────── */}
+        <View style={styles.boxesHeading}>
+          <View style={styles.accentBar} />
+          <View>
+            <Text style={styles.boxesEyebrow}>My activity</Text>
+            <Text style={styles.boxesTitle}>Bookings &amp; Vouchers</Text>
           </View>
-          <Text style={styles.bookingsEmoji}>📅</Text>
         </View>
-
-        {/* ── VOUCHERS + ORDERS — two independent boxes ─────────── */}
         <View style={styles.boxesRow}>
-          {/* VOUCHERS: pending class reservations awaiting admin approval */}
+          <Pressable
+            onPress={() =>
+              setExpandedBox(expandedBox === 'bookings' ? null : 'bookings')
+            }
+            style={[
+              styles.actBox,
+              expandedBox === 'bookings' && styles.actBoxActive,
+            ]}>
+            <Image
+              source={BOOKINGS_SIGN}
+              style={styles.boxWatermark}
+              resizeMode="contain"
+            />
+            <SymbolView
+              name="list.bullet.clipboard"
+              size={24}
+              tintColor={premiumColors.redBright}
+              fallback={<Text style={styles.boxGlyph}>≡</Text>}
+            />
+            <Text style={styles.actBoxCount}>{historyVouchers.length}</Text>
+            <Text style={styles.actBoxLabel}>Bookings</Text>
+            <Text style={styles.actBoxSub}>History</Text>
+          </Pressable>
+
           <Pressable
             onPress={() =>
               setExpandedBox(expandedBox === 'vouchers' ? null : 'vouchers')
@@ -579,6 +870,11 @@ export default function ClassesScreen() {
               styles.actBox,
               expandedBox === 'vouchers' && styles.actBoxActive,
             ]}>
+            <Image
+              source={VOUCHERS_SIGN}
+              style={styles.boxWatermark}
+              resizeMode="contain"
+            />
             <SymbolView
               name="ticket.fill"
               size={24}
@@ -589,29 +885,8 @@ export default function ClassesScreen() {
             <Text style={styles.actBoxLabel}>Vouchers</Text>
             <Text style={styles.actBoxSub}>Pending approval</Text>
           </Pressable>
-
-          {/* ORDERS: confirmed + canceled history */}
-          <Pressable
-            onPress={() =>
-              setExpandedBox(expandedBox === 'orders' ? null : 'orders')
-            }
-            style={[
-              styles.actBox,
-              expandedBox === 'orders' && styles.actBoxActive,
-            ]}>
-            <SymbolView
-              name="list.bullet.clipboard"
-              size={24}
-              tintColor={premiumColors.redBright}
-              fallback={<Text style={styles.boxGlyph}>≡</Text>}
-            />
-            <Text style={styles.actBoxCount}>{historyVouchers.length}</Text>
-            <Text style={styles.actBoxLabel}>Orders</Text>
-            <Text style={styles.actBoxSub}>History</Text>
-          </Pressable>
         </View>
 
-        {/* Vouchers expanded — pending, can cancel */}
         {expandedBox === 'vouchers' ? (
           <View style={styles.expandedPanel}>
             <Text style={styles.expandedTitle}>Pending Vouchers</Text>
@@ -656,10 +931,9 @@ export default function ClassesScreen() {
           </View>
         ) : null}
 
-        {/* Orders expanded — confirmed + canceled history */}
-        {expandedBox === 'orders' ? (
+        {expandedBox === 'bookings' ? (
           <View style={styles.expandedPanel}>
-            <Text style={styles.expandedTitle}>Order History</Text>
+            <Text style={styles.expandedTitle}>Booking History</Text>
             <Text style={styles.expandedSub}>
               Confirmed and canceled class reservations.
             </Text>
@@ -682,7 +956,7 @@ export default function ClassesScreen() {
             {ordersFiltered.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyTitle}>
-                  No {ordersTab.toLowerCase()} orders
+                  No {ordersTab.toLowerCase()} bookings
                 </Text>
                 <Text style={styles.emptyBody}>
                   {ordersTab === 'Confirmed'
@@ -725,35 +999,6 @@ export default function ClassesScreen() {
             )}
           </View>
         ) : null}
-
-        {/* ── WEEKLY DAY PICKER ───────────────────────────────── */}
-        <View style={styles.dayRow}>
-          {weekDays.map((day) => (
-            <Pressable
-              key={day.short}
-              onPress={() => setSelectedDay(day.fullDay)}
-              style={[
-                styles.dayCell,
-                selectedDay === day.fullDay && styles.dayCellActive,
-              ]}>
-              <Text
-                style={[
-                  styles.dayCellShort,
-                  selectedDay === day.fullDay && styles.dayCellTextActive,
-                ]}>
-                {day.short}
-              </Text>
-              <Text
-                style={[
-                  styles.dayCellNum,
-                  selectedDay === day.fullDay && styles.dayCellTextActive,
-                ]}>
-                {day.num}
-              </Text>
-              {day.isToday ? <View style={styles.todayDot} /> : null}
-            </Pressable>
-          ))}
-        </View>
       </ScrollView>
 
       {/* ── BOOKING MODAL ─────────────────────────────────────────── */}
@@ -850,41 +1095,114 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   headerAccent: { color: premiumColors.redBright, fontWeight: '800' },
-  headerIcons: { flexDirection: 'row', gap: 10, marginTop: 8 },
-  iconBtn: {
-    width: 44,
-    height: 44,
+  iconGlyph: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
+
+  // Section icon controls
+  sectionIcons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconBtnSmall: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 22,
+    borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.07)',
   },
-  iconGlyph: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
-  badge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: premiumColors.redBright,
+  iconBtnActive: {
+    borderColor: 'rgba(225,29,46,0.55)',
+    backgroundColor: 'rgba(177,18,38,0.2)',
+  },
+
+  // Glowy liquid search input
+  searchExpanded: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    width: 188,
+    height: 40,
+    borderWidth: 1.5,
+    borderColor: 'rgba(225,29,46,0.60)',
+    borderRadius: 20,
+    backgroundColor: 'rgba(177,18,38,0.10)',
+    paddingHorizontal: 12,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.65,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  searchExpandedInput: {
+    flex: 1,
+    color: premiumColors.text,
+    fontSize: 14,
+    fontWeight: '700',
+    padding: 0,
+  },
+  searchGlyphSmall: { color: premiumColors.textMuted, fontSize: 13, fontWeight: '800' },
+
+  // Dates strip
+  datesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  datesTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', fontStyle: 'italic' },
+  datesControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  datesReset: { color: premiumColors.redBright, fontSize: 12, fontWeight: '800' },
+  weekNavBtn: {
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
-  badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
+  weekNavBtnDisabled: {
+    borderColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+  },
+  weekNavGlyph: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
+  weekNavGlyphDisabled: { color: 'rgba(255,255,255,0.25)' },
+
+  // Paging week strip
+  weekStripScroll: {
+    marginHorizontal: 20,
+    marginBottom: 18,
+  },
+  weekStripContainer: {
+    width: DATE_PAGE_W * 3,
+  },
+  weekPage: {
+    width: DATE_PAGE_W,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
 
   // Carousel
-  carouselScroll: { marginBottom: 14 },
-  carouselSlide: { width: SCREEN_WIDTH, paddingHorizontal: 20 },
+  carouselScroll: { marginBottom: 8 },
+  carouselSlide: { width: SCREEN_WIDTH, paddingHorizontal: 20, paddingVertical: 6 },
+
+  // Outer glow ring (separate from overflow:hidden card so red glow shows)
+  featuredGlowRing: {
+    borderRadius: 32,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.45,
+    shadowRadius: 24,
+    elevation: 14,
+  },
   featuredCard: {
-    height: 310,
-    borderRadius: 26,
+    height: 320,
+    borderRadius: 32,
     overflow: 'hidden',
     justifyContent: 'space-between',
-    ...premiumShadow,
+    borderWidth: 1,
+    borderColor: 'rgba(225, 29, 46, 0.30)',
   },
   featuredTopRow: {
     flexDirection: 'row',
@@ -904,17 +1222,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.8,
   },
-  heartBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
-  },
-  heartGlyph: { color: '#FFFFFF', fontSize: 16 },
   featuredBottom: { padding: 18 },
   featuredTitle: {
     color: '#FFFFFF',
@@ -988,26 +1295,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 18,
   },
-  todayLabel: { color: '#FFFFFF', fontSize: 20, fontWeight: '900', fontStyle: 'italic' },
+  todayLabelBlock: { flex: 1 },
+  todayLabel: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', fontStyle: 'italic' },
   todayDate: { color: mutedColor, fontSize: 12, fontWeight: '700', marginTop: 2 },
-  filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  filterChipText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.4,
-  },
-  filterGlyph: { color: '#FFFFFF', fontSize: 14 },
 
   // Timeline
   timeline: { paddingHorizontal: 20, marginBottom: 20, position: 'relative' },
@@ -1021,8 +1311,14 @@ const styles = StyleSheet.create({
     backgroundColor: premiumColors.red,
     opacity: 0.35,
   },
-  timelineRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 },
-  timelineTimCol: { width: 60, alignItems: 'center', paddingTop: 14 },
+  timelineRow: { flexDirection: 'row', alignItems: 'stretch', marginBottom: 14 },
+  timelineTimCol: {
+    width: 60,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+  },
+  timelineTimTop: { alignItems: 'center' },
   timelineDot: {
     width: 12,
     height: 12,
@@ -1041,10 +1337,9 @@ const styles = StyleSheet.create({
   },
   timelineEndTime: {
     color: mutedColor,
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
     textAlign: 'center',
-    marginTop: 2,
   },
   timelineCard: {
     flex: 1,
@@ -1081,13 +1376,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     marginTop: 5,
-    textAlign: 'center',
-  },
-  instructorLevel: {
-    color: mutedColor,
-    fontSize: 10,
-    fontWeight: '700',
-    marginTop: 2,
     textAlign: 'center',
   },
   timelineBtn: {
@@ -1127,35 +1415,75 @@ const styles = StyleSheet.create({
   chipText: { color: mutedColor, fontSize: 12, fontWeight: '900', letterSpacing: 0.5 },
   chipTextActive: { color: '#0A0B0F' },
 
-  // My Bookings
-  bookingsCard: {
+  // Day picker
+  dayCell: {
+    width: DATE_CELL_W,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  dayCellActive: {
+    backgroundColor: premiumColors.red,
+    borderColor: premiumColors.redBright,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  dayCellShort: {
+    color: mutedColor,
+    fontSize: 9,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  dayCellNum: { color: '#FFFFFF', fontSize: 17, fontWeight: '900', marginTop: 2 },
+  dayCellTextActive: { color: '#FFFFFF' },
+  todayDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: premiumColors.redBright,
+    marginTop: 3,
+  },
+
+  // Boxes heading
+  boxesHeading: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 20,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: premiumColors.glassBorder,
-    borderRadius: 24,
-    backgroundColor: premiumColors.surface,
-    padding: 18,
-    ...premiumShadow,
+    gap: 12,
+    paddingHorizontal: 20,
+    marginBottom: 12,
   },
-  bookingsLeft: { flex: 1 },
-  bookingsTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '900', letterSpacing: 0.6 },
-  bookingsNextDate: {
+  accentBar: {
+    width: 4,
+    height: 34,
+    borderRadius: 999,
+    backgroundColor: premiumColors.redBright,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.36,
+    shadowRadius: 8,
+  },
+  boxesEyebrow: {
     color: premiumColors.redBright,
-    fontSize: 13,
-    fontWeight: '800',
-    marginTop: 9,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    marginBottom: 2,
+    textTransform: 'uppercase',
   },
-  bookingsNextDesc: { color: mutedColor, fontSize: 13, fontWeight: '700', marginTop: 4 },
-  bookingsEmpty: { color: mutedColor, fontSize: 13, fontWeight: '700', marginTop: 9 },
-  bookingsEmoji: { fontSize: 50 },
+  boxesTitle: { color: '#FFFFFF', fontSize: 21, fontWeight: '900' },
 
   // Two boxes
   boxesRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 20, marginBottom: 14 },
   actBox: {
     flex: 1,
+    position: 'relative',
+    overflow: 'hidden',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: premiumColors.glassBorder,
@@ -1164,11 +1492,25 @@ const styles = StyleSheet.create({
     paddingVertical: 22,
     paddingHorizontal: 10,
     gap: 4,
-    ...premiumShadow,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    elevation: 6,
   },
   actBoxActive: {
     borderColor: 'rgba(225, 29, 46, 0.55)',
     backgroundColor: 'rgba(177, 18, 38, 0.12)',
+  },
+  boxWatermark: {
+    position: 'absolute',
+    right: -12,
+    top: -10,
+    width: 80,
+    height: 80,
+    opacity: 0.12,
+    tintColor: '#FFFFFF',
+    transform: [{ rotate: '14deg' }],
   },
   boxGlyph: { color: premiumColors.redBright, fontSize: 22 },
   actBoxCount: { color: '#FFFFFF', fontSize: 30, fontWeight: '900', marginTop: 4 },
@@ -1254,41 +1596,6 @@ const styles = StyleSheet.create({
   },
   tabText: { color: mutedColor, fontSize: 13, fontWeight: '900' },
   tabTextActive: { color: '#FFFFFF' },
-
-  // Day picker
-  dayRow: { flexDirection: 'row', paddingHorizontal: 12, marginTop: 10, gap: 3 },
-  dayCell: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  dayCellActive: {
-    backgroundColor: premiumColors.red,
-    borderColor: premiumColors.redBright,
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  dayCellShort: {
-    color: mutedColor,
-    fontSize: 9,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  dayCellNum: { color: '#FFFFFF', fontSize: 17, fontWeight: '900', marginTop: 2 },
-  dayCellTextActive: { color: '#FFFFFF' },
-  todayDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: premiumColors.redBright,
-    marginTop: 3,
-  },
 
   // Empty
   emptyCard: {

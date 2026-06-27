@@ -186,9 +186,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
     borderRadius: 21,
-    backgroundColor: 'rgba(10, 12, 18, 0.52)',
+    // Transparent inside the bubble — only the thin ring remains, no dark disc.
+    backgroundColor: 'transparent',
     marginLeft: 12,
   },
   backButtonPressed: {

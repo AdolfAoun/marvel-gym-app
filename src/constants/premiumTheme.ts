@@ -35,8 +35,8 @@ export const premiumColors = {
 
 // Reusable gradient stops (use with expo-linear-gradient `colors`).
 export const premiumGradients = {
-  // App background — charcoal depth from top to bottom
-  screen: ['#13151D', '#0A0B0F', '#050608'] as const,
+  // App background — near-black with a very faint red undertone
+  screen: ['#141010', '#0D0909', '#080505'] as const,
   // Frosted card — top-lit translucent panel
   card: ['rgba(44, 47, 59, 0.86)', 'rgba(24, 26, 34, 0.82)'] as const,
   // Subtle red-tinted hero/feature panel

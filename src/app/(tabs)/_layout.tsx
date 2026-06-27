@@ -1,5 +1,6 @@
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
+import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Tabs, useFocusEffect, useRouter } from 'expo-router';
 import type { SFSymbol } from 'expo-symbols';
@@ -125,6 +126,8 @@ function LiquidGlassTabButton({
   label,
   onLongPress,
   onPress,
+  onSettle,
+  onWake,
 }: {
   barPressScale: SharedValue<number>;
   icon: (props: { focused: boolean }) => ReactNode;
@@ -132,6 +135,8 @@ function LiquidGlassTabButton({
   label: string;
   onLongPress: () => void;
   onPress: () => void;
+  onSettle: () => void;
+  onWake: () => void;
 }) {
   const focusProgress = useSharedValue(isFocused ? 1 : 0);
   const pressProgress = useSharedValue(1);
@@ -158,12 +163,14 @@ function LiquidGlassTabButton({
       onLongPress={onLongPress}
       onPress={onPress}
       onPressIn={() => {
+        onWake();
         pressProgress.value = withSpring(0.94, { damping: 18, stiffness: 260 });
         barPressScale.value = withSpring(0.985, { damping: 18, stiffness: 240 });
       }}
       onPressOut={() => {
         pressProgress.value = withSpring(1, { damping: 16, stiffness: 220 });
         barPressScale.value = withSpring(1, { damping: 16, stiffness: 200 });
+        onSettle();
       }}
       style={styles.liquidTabButton}>
       <Animated.View style={[styles.liquidTabButtonInner, iconStyle]}>
@@ -178,11 +185,16 @@ function LiquidGlassTabBar({ state, descriptors, navigation }: BottomTabBarProps
   const { width } = useWindowDimensions();
   const activeIndex = useSharedValue(0);
   const breathProgress = useSharedValue(0);
+  const glintProgress = useSharedValue(0);
   const barPressScale = useSharedValue(1);
+  const idleProgress = useSharedValue(0);
   const dragStartIndexRef = useRef(0);
+  const idleTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isDraggingRef = useRef(false);
   const visibleRoutes = state.routes.filter(
-    (route) => (descriptors[route.key].options as { href?: unknown }).href !== null,
+    (route) =>
+      route.name !== 'help' &&
+      (descriptors[route.key].options as { href?: unknown }).href !== null,
   );
   const focusedRoute = state.routes[state.index];
   const focusedVisibleIndex = Math.max(
@@ -194,6 +206,38 @@ function LiquidGlassTabBar({ state, descriptors, navigation }: BottomTabBarProps
   const bubbleWidth = Math.max(54, Math.min(66, itemWidth - 18));
   const bubbleOffset = visibleTabPadding + (itemWidth - bubbleWidth) / 2;
   const maxVisibleIndex = Math.max(0, visibleRoutes.length - 1);
+  const nativeLiquidGlassAvailable = useMemo(() => {
+    try {
+      return isGlassEffectAPIAvailable();
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const wakeTabBar = useCallback(() => {
+    if (idleTimeoutRef.current) {
+      clearTimeout(idleTimeoutRef.current);
+    }
+
+    idleProgress.value = withSpring(0, {
+      damping: 18,
+      stiffness: 220,
+      mass: 0.85,
+    });
+  }, [idleProgress]);
+
+  const settleTabBar = useCallback(() => {
+    if (idleTimeoutRef.current) {
+      clearTimeout(idleTimeoutRef.current);
+    }
+
+    idleTimeoutRef.current = setTimeout(() => {
+      idleProgress.value = withTiming(1, {
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+      });
+    }, 1200);
+  }, [idleProgress]);
 
   const navigateToVisibleIndex = useCallback(
     (nextIndex: number) => {
@@ -229,6 +273,7 @@ function LiquidGlassTabBar({ state, descriptors, navigation }: BottomTabBarProps
       onMoveShouldSetPanResponderCapture: (_, gestureState) =>
         Math.abs(gestureState.dx) > 7 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
       onPanResponderGrant: () => {
+        wakeTabBar();
         isDraggingRef.current = true;
         dragStartIndexRef.current = focusedVisibleIndex;
         barPressScale.value = withSpring(0.988, { damping: 18, stiffness: 240 });
@@ -257,6 +302,7 @@ function LiquidGlassTabBar({ state, descriptors, navigation }: BottomTabBarProps
           mass: 0.85,
         });
         navigateToVisibleIndex(nextIndex);
+        settleTabBar();
       },
       onPanResponderTerminate: () => {
         isDraggingRef.current = false;
@@ -266,6 +312,7 @@ function LiquidGlassTabBar({ state, descriptors, navigation }: BottomTabBarProps
           stiffness: 180,
           mass: 0.85,
         });
+        settleTabBar();
       },
       onPanResponderTerminationRequest: () => false,
     }),
@@ -276,6 +323,8 @@ function LiquidGlassTabBar({ state, descriptors, navigation }: BottomTabBarProps
       itemWidth,
       maxVisibleIndex,
       navigateToVisibleIndex,
+      settleTabBar,
+      wakeTabBar,
     ],
   );
 
@@ -289,7 +338,18 @@ function LiquidGlassTabBar({ state, descriptors, navigation }: BottomTabBarProps
       stiffness: 180,
       mass: 0.85,
     });
-  }, [activeIndex, focusedVisibleIndex]);
+    wakeTabBar();
+    settleTabBar();
+  }, [activeIndex, focusedVisibleIndex, settleTabBar, wakeTabBar]);
+
+  useEffect(
+    () => () => {
+      if (idleTimeoutRef.current) {
+        clearTimeout(idleTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     breathProgress.value = withRepeat(
@@ -300,19 +360,75 @@ function LiquidGlassTabBar({ state, descriptors, navigation }: BottomTabBarProps
       -1,
       true,
     );
-  }, [breathProgress]);
+    glintProgress.value = withRepeat(
+      withTiming(1, {
+        duration: 3600,
+        easing: Easing.inOut(Easing.cubic),
+      }),
+      -1,
+      true,
+    );
+  }, [breathProgress, glintProgress]);
 
-  const barAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: barPressScale.value }],
+  const barAnimatedStyle = useAnimatedStyle(() => {
+    const idleScale = interpolate(idleProgress.value, [0, 1], [1, 0.94]);
+    const idleLift = interpolate(idleProgress.value, [0, 1], [0, 8]);
+
+    return {
+      opacity: interpolate(idleProgress.value, [0, 1], [1, 0.92]),
+      transform: [
+        { translateY: idleLift },
+        { scale: barPressScale.value * idleScale },
+      ],
+    };
+  });
+
+  const bubblePressedEdgeStyle = useAnimatedStyle(() => ({
+    // Only glows while pressed; fully fades at rest so the bubble keeps a single
+    // clean edge instead of a doubled outline.
+    opacity: interpolate(barPressScale.value, [0.985, 1], [0.9, 0]),
   }));
 
-  const bubbleAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(breathProgress.value, [0, 1], [0.82, 0.96]),
+  const bubbleAnimatedStyle = useAnimatedStyle(() => {
+    const travelStretch = interpolate(
+      Math.abs(activeIndex.value - Math.round(activeIndex.value)),
+      [0, 0.5],
+      [1, 1.16],
+    );
+    const breathingScale = interpolate(breathProgress.value, [0, 1], [0.99, 1.025]);
+
+    return {
+      transform: [
+        { translateX: bubbleOffset + activeIndex.value * itemWidth },
+        { scaleX: travelStretch * interpolate(breathProgress.value, [0, 1], [1.01, 0.985]) },
+        { scaleY: breathingScale },
+      ],
+      width: bubbleWidth,
+    };
+  });
+
+  const bubbleCausticStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(breathProgress.value, [0, 0.5, 1], [0.34, 0.7, 0.42]),
     transform: [
-      { translateX: bubbleOffset + activeIndex.value * itemWidth },
-      { scale: interpolate(breathProgress.value, [0, 1], [1, 1.018]) },
+      { translateX: interpolate(breathProgress.value, [0, 1], [-8, 9]) },
+      { scaleX: interpolate(breathProgress.value, [0, 1], [0.94, 1.1]) },
     ],
-    width: bubbleWidth,
+  }));
+
+  const bubbleSpecularStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(glintProgress.value, [0, 0.48, 1], [0.22, 0.74, 0.28]),
+    transform: [
+      { translateX: interpolate(glintProgress.value, [0, 1], [-bubbleWidth * 0.55, bubbleWidth * 0.55]) },
+      { rotate: '-18deg' },
+    ],
+  }));
+
+  const bubblePrismStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(breathProgress.value, [0, 0.55, 1], [0.48, 0.78, 0.52]),
+    transform: [
+      { translateX: interpolate(breathProgress.value, [0, 1], [-2, 2]) },
+      { scale: interpolate(breathProgress.value, [0, 1], [1, 1.025]) },
+    ],
   }));
 
   return (
@@ -322,15 +438,17 @@ function LiquidGlassTabBar({ state, descriptors, navigation }: BottomTabBarProps
         styles.liquidTabBarHost,
         { bottom: insets.bottom - 15, height: 70 },
       ]}>
-      <Animated.View style={[styles.liquidTabBarShell, barAnimatedStyle]}>
+      <Animated.View
+        style={[styles.liquidTabBarShell, barAnimatedStyle]}
+        {...bubblePanResponder.panHandlers}>
         <BlurView
-          intensity={48}
+          intensity={38}
           tint="dark"
           experimentalBlurMethod="dimezisBlurView"
           style={styles.liquidTabBlur}>
           <LinearGradient
             pointerEvents="none"
-            colors={['rgba(255,255,255,0.08)', 'rgba(12,12,16,0.18)', 'rgba(0,0,0,0.16)']}
+            colors={['rgba(255,255,255,0.055)', 'rgba(12,12,16,0.08)', 'rgba(0,0,0,0.07)']}
             locations={[0, 0.45, 1]}
             style={StyleSheet.absoluteFillObject}
           />
@@ -347,24 +465,91 @@ function LiquidGlassTabBar({ state, descriptors, navigation }: BottomTabBarProps
             end={{ x: 1, y: 0 }}
             style={styles.liquidEdgeHighlight}
           />
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(255,255,255,0.22)', 'rgba(255,255,255,0.02)', 'rgba(255,255,255,0.18)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={styles.liquidSideRefraction}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(255,255,255,0)', 'rgba(130,190,255,0.10)', 'rgba(255,255,255,0)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.liquidWaterSweep}
+          />
           <Animated.View
-            style={[styles.movingBubble, bubbleAnimatedStyle]}
-            {...bubblePanResponder.panHandlers}>
-            <View pointerEvents="none" style={styles.movingBubbleFill} />
+            pointerEvents="none"
+            style={[styles.movingBubble, bubbleAnimatedStyle]}>
+            <BlurView
+              pointerEvents="none"
+              intensity={70}
+              tint="light"
+              experimentalBlurMethod="dimezisBlurView"
+              style={styles.movingBubbleRefractionBlur}
+            />
+            {nativeLiquidGlassAvailable ? (
+              <GlassView
+                glassEffectStyle="clear"
+                tintColor="rgba(255,255,255,0.16)"
+                style={styles.movingBubbleNativeGlass}
+              />
+            ) : null}
+            <View pointerEvents="none" style={styles.movingBubbleLensTint} />
+            <Animated.View pointerEvents="none" style={[styles.movingBubblePrismAura, bubblePrismStyle]}>
+              <View style={styles.movingBubblePrismRed} />
+              <View style={styles.movingBubblePrismGold} />
+              <View style={styles.movingBubblePrismBlue} />
+            </Animated.View>
+            <Animated.View pointerEvents="none" style={[styles.movingBubbleCaustic, bubbleCausticStyle]}>
+              <LinearGradient
+                colors={[
+                  'rgba(255,255,255,0)',
+                  'rgba(255,255,255,0.32)',
+                  'rgba(145,210,255,0.16)',
+                  'rgba(255,255,255,0)',
+                ]}
+                start={{ x: 0, y: 0.2 }}
+                end={{ x: 1, y: 0.8 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+            </Animated.View>
             <LinearGradient
               pointerEvents="none"
-              colors={['rgba(255,255,255,0.20)', 'rgba(255,255,255,0.02)']}
+              colors={['rgba(255,255,255,0.34)', 'rgba(255,255,255,0.055)', 'rgba(255,255,255,0)']}
               start={{ x: 0.25, y: 0 }}
               end={{ x: 0.75, y: 1 }}
               style={styles.movingBubbleHighlight}
+            />
+            <LinearGradient
+              pointerEvents="none"
+              colors={[
+                'rgba(255,255,255,0.56)',
+                'rgba(255,90,110,0.2)',
+                'rgba(130,210,255,0.22)',
+                'rgba(255,220,120,0.16)',
+                'rgba(255,255,255,0.12)',
+              ]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.movingBubbleEdgeWater}
+            />
+            <Animated.View pointerEvents="none" style={[styles.movingBubbleSpecular, bubbleSpecularStyle]} />
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.movingBubblePressedEdge, bubblePressedEdgeStyle]}
             />
           </Animated.View>
           <LinearGradient
             pointerEvents="none"
             colors={[
-              'rgba(225,29,46,0)',
-              'rgba(225,29,46,0.45)',
-              'rgba(225,29,46,0)',
+              'rgba(255,255,255,0)',
+              'rgba(255,70,90,0.40)',
+              'rgba(255,200,90,0.34)',
+              'rgba(120,210,255,0.32)',
+              'rgba(180,120,255,0.34)',
+              'rgba(255,255,255,0)',
             ]}
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
@@ -410,6 +595,8 @@ function LiquidGlassTabBar({ state, descriptors, navigation }: BottomTabBarProps
                   label={label}
                   onLongPress={onLongPress}
                   onPress={onPress}
+                  onSettle={settleTabBar}
+                  onWake={wakeTabBar}
                 />
               );
             })}
@@ -562,9 +749,9 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
+    borderColor: 'rgba(255,255,255,0.13)',
     borderRadius: 36,
-    backgroundColor: 'rgba(12,12,16,0.52)',
+    backgroundColor: 'rgba(12,12,16,0.24)',
   },
   liquidEdgeHighlight: {
     position: 'absolute',
@@ -575,6 +762,27 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 36,
     borderTopRightRadius: 36,
     opacity: 0.52,
+  },
+  liquidSideRefraction: {
+    position: 'absolute',
+    top: 3,
+    bottom: 3,
+    left: 2,
+    right: 2,
+    borderRadius: 34,
+    // No inner border ring; the single outer border on liquidTabBlur is the
+    // only edge line, so the bar no longer shows a doubled outline.
+    borderWidth: 0,
+    opacity: 0.6,
+  },
+  liquidWaterSweep: {
+    position: 'absolute',
+    top: 3,
+    left: 18,
+    right: 18,
+    height: 32,
+    borderRadius: 999,
+    opacity: 0.72,
   },
   liquidTabContent: {
     flex: 1,
@@ -601,28 +809,132 @@ const styles = StyleSheet.create({
     top: (floatingBarHeight - bubbleHeight) / 2,
     height: bubbleHeight,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 0,
     borderRadius: 999,
-    shadowColor: premiumColors.redBright,
+    backgroundColor: 'rgba(255,255,255,0.018)',
+    shadowColor: '#FFFFFF',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
   },
-  movingBubbleFill: {
+  movingBubbleRefractionBlur: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.028)',
+  },
+  movingBubbleNativeGlass: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 999,
+  },
+  movingBubbleLensTint: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 999,
+    backgroundColor: 'rgba(230,245,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  movingBubblePrismAura: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 999,
+  },
+  movingBubblePrismRed: {
+    position: 'absolute',
+    top: 2,
+    left: 0,
+    right: 5,
+    height: 16,
+    borderTopLeftRadius: 999,
+    borderTopRightRadius: 999,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: 'rgba(255,60,92,0.34)',
+  },
+  movingBubblePrismGold: {
+    position: 'absolute',
+    right: 1,
+    bottom: 5,
+    left: 5,
+    height: 17,
+    borderBottomLeftRadius: 999,
+    borderBottomRightRadius: 999,
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderColor: 'rgba(255,219,105,0.24)',
+  },
+  movingBubblePrismBlue: {
+    position: 'absolute',
+    top: 5,
+    right: 0,
+    bottom: 3,
+    width: 20,
+    borderTopRightRadius: 999,
+    borderBottomRightRadius: 999,
+    borderWidth: 1,
+    borderLeftWidth: 0,
+    borderColor: 'rgba(92,198,255,0.32)',
+  },
+  movingBubbleCaustic: {
+    position: 'absolute',
+    top: 8,
+    left: 7,
+    right: 7,
+    height: 20,
+    overflow: 'hidden',
+    borderRadius: 999,
   },
   movingBubbleHighlight: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 2,
+    left: 4,
+    right: 4,
+    height: 29,
     borderRadius: 999,
+    opacity: 0.78,
+  },
+  movingBubbleEdgeWater: {
+    position: 'absolute',
+    top: 1,
+    left: 1,
+    right: 1,
+    bottom: 1,
+    borderRadius: 999,
+    opacity: 0.82,
+  },
+  movingBubbleSpecular: {
+    position: 'absolute',
+    top: 4,
+    bottom: 6,
+    left: '42%',
+    width: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.36)',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.32,
+    shadowRadius: 7,
+  },
+  movingBubblePressedEdge: {
+    position: 'absolute',
+    top: 2,
+    left: 2,
+    right: 2,
+    bottom: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
   bottomRedReflection: {
     position: 'absolute',
-    left: 52,
-    right: 52,
+    left: 24,
+    right: 24,
     bottom: 1,
     height: 2,
+    opacity: 0.9,
   },
   profileButton: {
     width: 34,
