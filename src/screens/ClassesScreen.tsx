@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SymbolView } from 'expo-symbols';
@@ -24,11 +25,17 @@ import { classService, voucherService } from '@/services';
 import type { ClassCategory, GymClass, Voucher } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const DATE_PAGE_W = SCREEN_WIDTH - 40;
-const DATE_CELL_GAP = 4;
-const DATE_CELL_W = Math.floor((DATE_PAGE_W - DATE_CELL_GAP * 6) / 7);
+const DATE_NAV_BUTTON_W = 34;
+const DATE_PAGE_W = SCREEN_WIDTH - 128;
+const DATE_CELL_GAP = 6;
+const DATE_CELL_W = Math.floor((DATE_PAGE_W - DATE_CELL_GAP * 4) / 5);
 const accentColor = premiumColors.red;
 const mutedColor = premiumColors.textMuted;
+
+const SPA_CARD_W = SCREEN_WIDTH - 88;
+const FEAT_CARD_W = SCREEN_WIDTH - 40;
+const FEAT_PAGE_W = FEAT_CARD_W - 2;
+const SPA_CARD_GAP = 12;
 
 const BOOKINGS_SIGN = require('@/assets/images/marvel-logo-startup-sign-dot.png');
 const VOUCHERS_SIGN = require('@/assets/images/marvel-logo-startup-sign-x.png');
@@ -43,6 +50,95 @@ const CATEGORY_IMAGES: Record<ClassCategory, string> = {
   'Extra Classes':
     'https://images.unsplash.com/photo-1571731956672-f2b94d7dd0cb?w=900&q=80',
 };
+
+const SPECIAL_SESSIONS = [
+  {
+    id: 'spa-facial',
+    title: 'Facial',
+    subtitle: 'SKINCARE',
+    description: 'Deep cleansing, hydration & anti-aging treatments tailored to your skin type.',
+    duration: '60 MIN',
+    colors: ['#3A0810', '#1A0407', '#0D0205'] as const,
+  },
+  {
+    id: 'spa-tanning',
+    title: 'Tanning',
+    subtitle: 'SUNBED',
+    description: 'Come for the tan, leave with the glow! Your golden tan is waiting — book your sunbed session now.',
+    duration: '20–30 MIN',
+    colors: ['#1A1200', '#0D0800', '#060400'] as const,
+  },
+  {
+    id: 'spa-mesotherapy',
+    title: 'Mesotherapy',
+    subtitle: 'TREATMENT',
+    description: 'Microinjection therapy delivering vitamins & hyaluronic acid for skin rejuvenation.',
+    duration: '45 MIN',
+    colors: ['#2D0A15', '#150308', '#0A0105'] as const,
+  },
+  {
+    id: 'spa-deep-tissue',
+    title: 'Deep Tissue Massage',
+    subtitle: 'MASSAGE',
+    description: 'Targets deep muscle layers to relieve chronic tension, knots and post-workout soreness.',
+    duration: '60 MIN',
+    colors: ['#2A0D14', '#120408', '#080204'] as const,
+  },
+  {
+    id: 'spa-relaxing',
+    title: 'Relaxing Massage',
+    subtitle: 'MASSAGE',
+    description: 'Full-body Swedish techniques to melt away stress and calm your nervous system.',
+    duration: '60 MIN',
+    colors: ['#1E0B12', '#0E0307', '#060103'] as const,
+  },
+  {
+    id: 'spa-maderotherapy',
+    title: 'Maderotherapy',
+    subtitle: 'BODY TREATMENT',
+    description: 'Cellulite & water retention massage using sculpted natural wood tools.',
+    duration: '90 MIN',
+    colors: ['#320810', '#180409', '#0C0204'] as const,
+  },
+  {
+    id: 'spa-laser',
+    title: 'Laser Hair Removal',
+    subtitle: 'LASER',
+    description: 'Advanced laser technology for smooth, permanent hair reduction on any area.',
+    duration: '30–60 MIN',
+    colors: ['#250811', '#120309', '#080105'] as const,
+  },
+] as const;
+
+const PT_TRAINERS = [
+  {
+    id: 'pt-1',
+    initials: 'AR',
+    name: 'Alex Rodriguez',
+    specialty: 'Strength & Conditioning',
+    availableHours: '07:00 – 14:00',
+    available: true,
+    tagline: 'Power through every plateau.',
+  },
+  {
+    id: 'pt-2',
+    initials: 'SM',
+    name: 'Sara Mansour',
+    specialty: 'Yoga & Mobility',
+    availableHours: '09:00 – 17:00',
+    available: true,
+    tagline: 'Move better. Feel better.',
+  },
+  {
+    id: 'pt-3',
+    initials: 'MH',
+    name: 'Mike Hassan',
+    specialty: 'Boxing & HIIT',
+    availableHours: 'Not available today',
+    available: false,
+    tagline: 'Train harder than yesterday.',
+  },
+] as const;
 
 type ScheduleFilter = 'ALL' | ClassCategory;
 
@@ -59,25 +155,38 @@ const WEEKDAY_FULLS = [
   'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
 ];
 
-// Generate 7 days for a given week offset (0 = current week, -1 = last week, 1 = next week)
 function getWeekDays(weekOffset: number) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const start = new Date(today);
-  start.setDate(today.getDate() + weekOffset * 7);
-  return Array.from({ length: 7 }, (_, i) => {
+  start.setDate(today.getDate() + weekOffset * 5);
+  return Array.from({ length: 5 }, (_, i) => {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
     const offset = Math.round((d.getTime() - today.getTime()) / 86400000);
     return {
       short: WEEKDAY_SHORTS[d.getDay()],
       num: d.getDate(),
-      fullDay: WEEKDAY_FULLS[d.getDay()],
       iso: d.toISOString(),
       offset,
       isToday: offset === 0,
     };
   });
+}
+
+function getDayByOffset(offset: number) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(today);
+  d.setDate(today.getDate() + offset);
+
+  return {
+    short: WEEKDAY_SHORTS[d.getDay()],
+    num: d.getDate(),
+    iso: d.toISOString(),
+    offset,
+    isToday: offset === 0,
+  };
 }
 
 function offsetFromToday(iso: string) {
@@ -142,7 +251,7 @@ function initial(name: string) {
   return name.slice(0, 1).toUpperCase();
 }
 
-// ── Animated heart button ─────────────────────────────────────────────────────
+// ── Animated heart button with haptics ───────────────────────────────────────
 function HeartButton({
   isFav,
   onToggle,
@@ -187,6 +296,10 @@ function HeartButton({
   }, [isFav, breatheScale]);
 
   const handlePress = () => {
+    void (isFav
+      ? Haptics.selectionAsync()
+      : Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+    ).catch(() => undefined);
     Animated.sequence([
       Animated.timing(pressScale, {
         toValue: 1.45,
@@ -209,11 +322,7 @@ function HeartButton({
       onPress={handlePress}
       style={[
         hStyles.btn,
-        {
-          width: btnSize,
-          height: btnSize,
-          borderRadius: btnSize / 2,
-        },
+        { width: btnSize, height: btnSize, borderRadius: btnSize / 2 },
         isFav && hStyles.btnLiked,
         style,
       ]}>
@@ -252,7 +361,6 @@ const hStyles = StyleSheet.create({
   },
   glyph: { color: premiumColors.redBright, fontWeight: '900' },
 });
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ClassesScreen() {
@@ -263,7 +371,6 @@ export default function ClassesScreen() {
     d.setHours(0, 0, 0, 0);
     return d.toISOString();
   });
-  // weekOffset: -1 = last week, 0 = this week, 1 = next week
   const [weekOffset, setWeekOffset] = useState(0);
   const weekScrollRef = useRef<ScrollView>(null);
 
@@ -280,17 +387,18 @@ export default function ClassesScreen() {
   const [search, setSearch] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [specialIndex, setSpecialIndex] = useState(0);
+  const [ptBookPending, setPtBookPending] = useState<string | undefined>(undefined);
 
-  // Pre-compute all 3 weeks (prev / current / next) — static for session
   const allWeeksData = useMemo(() => [-1, 0, 1].map(getWeekDays), []);
 
   const selectedOffset = offsetFromToday(selectedIso);
   const selectedDay = getWeekdayName(selectedIso);
   const normalizedSearch = search.trim().toLowerCase();
 
-  // Sync arrow-triggered week change → animated scroll
+  // Sync weekOffset changes from arrow presses → animated scroll
   useEffect(() => {
-    const pageIdx = weekOffset + 1; // -1→0, 0→1, 1→2
+    const pageIdx = weekOffset + 1;
     weekScrollRef.current?.scrollTo({ x: pageIdx * DATE_PAGE_W, animated: true });
   }, [weekOffset]);
 
@@ -368,6 +476,31 @@ export default function ClassesScreen() {
     await loadData();
   };
 
+  const featuredScrollX = useRef(new Animated.Value(0)).current;
+  const featuredScrollRef = useRef<ScrollView>(null);
+  const autoplayIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const resumeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const currentIndexRef = useRef(0);
+
+  useEffect(() => {
+    if (!carouselItems || carouselItems.length <= 1) return;
+
+    const startAutoplay = () => {
+      if (autoplayIntervalRef.current) clearInterval(autoplayIntervalRef.current);
+      autoplayIntervalRef.current = setInterval(() => {
+        const next = (currentIndexRef.current + 1) % carouselItems.length;
+        currentIndexRef.current = next;
+        featuredScrollRef.current?.scrollTo({ x: next * FEAT_PAGE_W, animated: true });
+      }, 3000);
+    };
+
+    startAutoplay();
+    return () => {
+      if (autoplayIntervalRef.current) clearInterval(autoplayIntervalRef.current);
+      if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
+    };
+  }, [carouselItems]);
+
   if (isLoading) {
     return (
       <PremiumScreenBackground>
@@ -382,6 +515,9 @@ export default function ClassesScreen() {
 
   const carouselItems =
     featuredClasses.length > 0 ? featuredClasses : classes.slice(0, 5);
+
+  const canGoPrev = weekOffset > -1;
+  const canGoNext = weekOffset < 1;
 
   return (
     <PremiumScreenBackground>
@@ -401,226 +537,338 @@ export default function ClassesScreen() {
           </View>
         </View>
 
-        {/* ── FEATURED CAROUSEL ─────────────────────────────────── */}
-        <ScrollView
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          decelerationRate="fast"
-          onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
-            setCarouselIndex(
-              Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH),
-            );
-          }}
-          style={styles.carouselScroll}>
-          {carouselItems.map((gymClass) => {
-            const isReserved = Boolean(gymClass.isRegistered);
-            const isFull = gymClass.status === 'Full' && !isReserved;
-            const isFav = favorites.has(gymClass.id);
-            const imgUri =
-              gymClass.coverImageUrl || CATEGORY_IMAGES[gymClass.category];
-            return (
-              <View key={gymClass.id} style={styles.carouselSlide}>
-                {/* Outer glow ring (separate from overflow:hidden card) */}
-                <View style={styles.featuredGlowRing}>
-                  <View style={styles.featuredCard}>
-                    <Image
-                      source={{ uri: imgUri }}
-                      style={StyleSheet.absoluteFillObject}
-                      resizeMode="cover"
-                    />
-                    {/* Edge vignette — warm red tint at bottom */}
-                    <LinearGradient
-                      pointerEvents="none"
-                      colors={[
-                        'rgba(0,0,0,0.05)',
-                        'rgba(0,0,0,0.0)',
-                        'rgba(40,4,8,0.90)',
-                      ]}
-                      locations={[0, 0.25, 1]}
-                      style={StyleSheet.absoluteFillObject}
-                    />
-                    <View style={styles.featuredTopRow}>
-                      <View style={styles.featuredBadge}>
-                        <Text style={styles.featuredBadgeText}>FEATURED CLASS</Text>
-                      </View>
-                      <HeartButton
-                        isFav={isFav}
-                        onToggle={() => toggleFavorite(gymClass.id)}
+        {/* ── FEATURED — fixed widget, swipe inside to change ──────── */}
+        <View style={styles.featuredOuterLabel}>
+          <View style={styles.featuredOuterAccentBar} />
+          <Text style={styles.featuredOuterLabelText}>MOST POPULAR</Text>
+          <View style={styles.featuredOuterDivider} />
+        </View>
+
+        <View style={styles.featuredWidget}>
+          <View style={styles.featuredCard}>
+            <Animated.ScrollView
+              ref={featuredScrollRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              decelerationRate={0.95}
+              scrollEventThrottle={16}
+              style={{ flex: 1 }}
+              onScrollBeginDrag={() => {
+                if (autoplayIntervalRef.current) clearInterval(autoplayIntervalRef.current);
+                if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
+              }}
+              onScroll={Animated.event(
+                [{ nativeEvent: { contentOffset: { x: featuredScrollX } } }],
+                { useNativeDriver: true },
+              )}
+              onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+                const idx = Math.round(e.nativeEvent.contentOffset.x / FEAT_PAGE_W);
+                currentIndexRef.current = idx;
+                setCarouselIndex(idx);
+                if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
+                resumeTimeoutRef.current = setTimeout(() => {
+                  if (autoplayIntervalRef.current) clearInterval(autoplayIntervalRef.current);
+                  autoplayIntervalRef.current = setInterval(() => {
+                    const next = (currentIndexRef.current + 1) % carouselItems.length;
+                    currentIndexRef.current = next;
+                    featuredScrollRef.current?.scrollTo({ x: next * FEAT_PAGE_W, animated: true });
+                  }, 3000);
+                }, 4000);
+              }}>
+              {carouselItems.map((gymClass, i) => {
+                const isReserved = Boolean(gymClass.isRegistered);
+                const isFull = gymClass.status === 'Full' && !isReserved;
+                const isFav = favorites.has(gymClass.id);
+                const imgUri = gymClass.coverImageUrl || CATEGORY_IMAGES[gymClass.category];
+                const pageScale = featuredScrollX.interpolate({
+                  inputRange: [(i - 1) * FEAT_PAGE_W, i * FEAT_PAGE_W, (i + 1) * FEAT_PAGE_W],
+                  outputRange: [0.7, 1, 0.7],
+                  extrapolate: 'clamp',
+                });
+                return (
+                  <View key={gymClass.id} style={styles.featuredPage}>
+                    <Animated.View style={[StyleSheet.absoluteFillObject, styles.featuredPageInner, { transform: [{ scale: pageScale }] }]}>
+                      <Image source={{ uri: imgUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                      <LinearGradient
+                        pointerEvents="none"
+                        colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.03)', 'rgba(8,3,8,0.88)']}
+                        locations={[0, 0.32, 1]}
+                        style={StyleSheet.absoluteFillObject}
                       />
-                    </View>
-                    <View style={styles.featuredBottom}>
-                      <Text style={styles.featuredTitle}>
-                        {gymClass.title.toUpperCase()}
-                      </Text>
-                      <Text style={styles.featuredDesc} numberOfLines={1}>
-                        Coach {gymClass.instructorName}
-                      </Text>
-                      <View style={styles.statsRow}>
-                        <View style={styles.stat}>
-                          <SymbolView
-                            name="clock"
-                            size={12}
-                            tintColor="rgba(255,255,255,0.72)"
-                            fallback={<Text style={styles.statGlyph}>○</Text>}
-                          />
-                          <Text style={styles.statText}>
-                            {fmtDuration(gymClass.startTime, gymClass.endTime)}
-                          </Text>
-                        </View>
-                        <View style={styles.statDivider} />
-                        <View style={styles.stat}>
-                          <SymbolView
-                            name="person.2.fill"
-                            size={12}
-                            tintColor="rgba(255,255,255,0.72)"
-                            fallback={<Text style={styles.statGlyph}>◎</Text>}
-                          />
-                          <Text style={styles.statText}>
-                            {isFull ? 'FULL' : 'SPOTS AVAILABLE'}
-                          </Text>
-                        </View>
+                      <LinearGradient
+                        pointerEvents="none"
+                        colors={['rgba(255,255,255,0.10)', 'transparent', 'rgba(255,255,255,0.05)']}
+                        start={{ x: 0, y: 0.5 }}
+                        end={{ x: 1, y: 0.5 }}
+                        style={StyleSheet.absoluteFillObject}
+                      />
+                      <View style={styles.featuredTopRow}>
+                        <HeartButton isFav={isFav} onToggle={() => toggleFavorite(gymClass.id)} />
                       </View>
-                      <Pressable
-                        disabled={isFull}
-                        onPress={() =>
-                          setPendingAction({
-                            action: isReserved ? 'cancel' : 'reserve',
-                            gymClass,
-                          })
-                        }
-                        style={({ pressed }) => [
-                          styles.featuredBookBtn,
-                          isFull && styles.featuredBookBtnDisabled,
-                          pressed && !isFull && styles.btnPressed,
-                        ]}>
-                        <Text style={styles.featuredBookBtnText}>
-                          {isReserved
-                            ? 'CANCEL BOOKING'
-                            : isFull
-                              ? 'CLASS FULL'
-                              : 'BOOK NOW'}
+                      <View style={styles.featuredBottom}>
+                        <Text style={styles.featuredTitle}>{gymClass.title.toUpperCase()}</Text>
+                        <Text style={styles.featuredDesc} numberOfLines={1}>
+                          Coach {gymClass.instructorName}
                         </Text>
-                        {!isFull ? (
-                          <Text style={styles.featuredBookBtnArrow}> ›</Text>
-                        ) : null}
-                      </Pressable>
-                    </View>
+                        <View style={styles.statsRow}>
+                          <View style={styles.stat}>
+                            <SymbolView
+                              name="clock"
+                              size={12}
+                              tintColor="rgba(255,255,255,0.72)"
+                              fallback={<Text style={styles.statGlyph}>○</Text>}
+                            />
+                            <Text style={styles.statText}>
+                              {fmtDuration(gymClass.startTime, gymClass.endTime)}
+                            </Text>
+                          </View>
+                          <View style={styles.statDivider} />
+                          <View style={styles.stat}>
+                            <SymbolView
+                              name="person.2.fill"
+                              size={12}
+                              tintColor="rgba(255,255,255,0.72)"
+                              fallback={<Text style={styles.statGlyph}>◎</Text>}
+                            />
+                            <Text style={styles.statText}>
+                              {isFull ? 'FULL' : 'SPOTS AVAILABLE'}
+                            </Text>
+                          </View>
+                        </View>
+                        <Pressable
+                          disabled={isFull}
+                          onPress={() =>
+                            setPendingAction({ action: isReserved ? 'cancel' : 'reserve', gymClass })
+                          }
+                          style={({ pressed }) => [
+                            styles.featuredBookBtn,
+                            isFull && styles.featuredBookBtnDisabled,
+                            pressed && !isFull && styles.btnPressed,
+                          ]}>
+                          <Text style={styles.featuredBookBtnText}>
+                            {isReserved ? 'CANCEL BOOKING' : isFull ? 'CLASS FULL' : 'BOOK NOW'}
+                          </Text>
+                          {!isFull ? <Text style={styles.featuredBookBtnArrow}> ›</Text> : null}
+                        </Pressable>
+                      </View>
+                    </Animated.View>
                   </View>
-                </View>
+                );
+              })}
+            </Animated.ScrollView>
+            <View pointerEvents="none" style={styles.featuredGlassSpecular} />
+          </View>
+
+          {carouselItems.length > 1 ? (() => {
+            const total = carouselItems.length;
+            // Window always starts at carouselIndex, capped so we don't go past total-3
+            const windowStart = Math.min(carouselIndex, Math.max(0, total - 3));
+            // Always render 3 slots; slot indices may exceed total-1 (handled via opacity)
+            const slots = [windowStart, windowStart + 1, windowStart + 2];
+            // 3rd dot fades out as scroll approaches the last page
+            const thirdDotOpacity = featuredScrollX.interpolate({
+              inputRange: [(total - 2) * FEAT_PAGE_W, (total - 1) * FEAT_PAGE_W],
+              outputRange: [1, 0],
+              extrapolate: 'clamp',
+            });
+            return (
+              <View style={styles.pagination}>
+                {slots.map((i, slotPos) => {
+                  const dotScale = featuredScrollX.interpolate({
+                    inputRange: [(i - 1) * FEAT_PAGE_W, i * FEAT_PAGE_W, (i + 1) * FEAT_PAGE_W],
+                    outputRange: [1, 1.5, 1],
+                    extrapolate: 'clamp',
+                  });
+                  const dotColor = featuredScrollX.interpolate({
+                    inputRange: [(i - 1) * FEAT_PAGE_W, i * FEAT_PAGE_W, (i + 1) * FEAT_PAGE_W],
+                    outputRange: ['rgba(255,255,255,0.22)', premiumColors.redBright, 'rgba(255,255,255,0.22)'],
+                    extrapolate: 'clamp',
+                  });
+                  const dotGlow = featuredScrollX.interpolate({
+                    inputRange: [(i - 1) * FEAT_PAGE_W, i * FEAT_PAGE_W, (i + 1) * FEAT_PAGE_W],
+                    outputRange: [0, 0.8, 0],
+                    extrapolate: 'clamp',
+                  });
+                  return (
+                    <Animated.View
+                      key={slotPos}
+                      style={[
+                        styles.dot,
+                        {
+                          transform: [{ scale: dotScale }],
+                          backgroundColor: dotColor,
+                          shadowColor: premiumColors.redBright,
+                          shadowOffset: { width: 0, height: 0 },
+                          shadowOpacity: dotGlow,
+                          shadowRadius: 6,
+                          opacity: slotPos === 2 ? thirdDotOpacity : 1,
+                        },
+                      ]}
+                    />
+                  );
+                })}
               </View>
             );
-          })}
-        </ScrollView>
+          })() : null}
+        </View>
 
-        {/* Pagination dots */}
-        {carouselItems.length > 1 ? (
-          <View style={styles.pagination}>
-            {carouselItems.map((_, i) => (
-              <View
-                key={i}
-                style={[styles.dot, i === carouselIndex && styles.dotActive]}
-              />
-            ))}
+        {/* ── WELLNESS & SPA SESSIONS ───────────────────────────── */}
+        <View style={styles.spaSectionHeading}>
+          <View style={styles.accentBar} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.spaEyebrow}>Marvel the Gym</Text>
+            <Text style={styles.spaHeadingTitle}>Featured</Text>
           </View>
-        ) : null}
-
-        {/* ── DATES (paging week strip — ±1 week only) ─────────── */}
-        <View style={styles.datesHeader}>
-          <View>
-            <Text style={styles.datesTitle}>Dates</Text>
-          </View>
-          <View style={styles.datesControls}>
-            {weekOffset !== 0 ? (
-              <Pressable onPress={() => setWeekOffset(0)} hitSlop={8}>
-                <Text style={styles.datesReset}>This week</Text>
-              </Pressable>
-            ) : null}
-            <Pressable
-              onPress={() => setWeekOffset((w) => Math.max(-1, w - 1))}
-              disabled={weekOffset === -1}
-              style={[
-                styles.weekNavBtn,
-                weekOffset === -1 && styles.weekNavBtnDisabled,
-              ]}>
-              <SymbolView
-                name="chevron.left"
-                size={14}
-                tintColor={weekOffset === -1 ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.9)'}
-                fallback={
-                  <Text style={[styles.weekNavGlyph, weekOffset === -1 && styles.weekNavGlyphDisabled]}>
-                    ‹
-                  </Text>
-                }
-              />
-            </Pressable>
-            <Pressable
-              onPress={() => setWeekOffset((w) => Math.min(1, w + 1))}
-              disabled={weekOffset === 1}
-              style={[
-                styles.weekNavBtn,
-                weekOffset === 1 && styles.weekNavBtnDisabled,
-              ]}>
-              <SymbolView
-                name="chevron.right"
-                size={14}
-                tintColor={weekOffset === 1 ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.9)'}
-                fallback={
-                  <Text style={[styles.weekNavGlyph, weekOffset === 1 && styles.weekNavGlyphDisabled]}>
-                    ›
-                  </Text>
-                }
-              />
-            </Pressable>
+          <View style={styles.spaTagPill}>
+            <Text style={styles.spaTagText}>WELLNESS & SPA</Text>
           </View>
         </View>
 
-        {/* Paging horizontal strip — 3 week pages side by side */}
         <ScrollView
-          ref={weekScrollRef}
           horizontal
-          pagingEnabled
           showsHorizontalScrollIndicator={false}
-          scrollEventThrottle={16}
           decelerationRate="fast"
-          contentOffset={{ x: DATE_PAGE_W, y: 0 }}
+          snapToInterval={SPA_CARD_W + SPA_CARD_GAP}
+          snapToAlignment="start"
+          contentContainerStyle={{ paddingLeft: 20, paddingRight: 8 }}
           onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
-            const page = Math.round(e.nativeEvent.contentOffset.x / DATE_PAGE_W);
-            const newOffset = (page - 1) as -1 | 0 | 1;
-            if (newOffset !== weekOffset) setWeekOffset(newOffset);
+            setSpecialIndex(Math.round(e.nativeEvent.contentOffset.x / (SPA_CARD_W + SPA_CARD_GAP)));
           }}
-          style={styles.weekStripScroll}
-          contentContainerStyle={styles.weekStripContainer}>
-          {allWeeksData.map((week, wIdx) => (
-            <View key={wIdx} style={styles.weekPage}>
-              {week.map((day) => {
-                const selected = day.offset === selectedOffset;
-                return (
-                  <Pressable
-                    key={day.iso}
-                    onPress={() => setSelectedIso(day.iso)}
-                    style={[styles.dayCell, selected && styles.dayCellActive]}>
-                    <Text
-                      style={[
-                        styles.dayCellShort,
-                        selected && styles.dayCellTextActive,
-                      ]}>
-                      {day.short}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.dayCellNum,
-                        selected && styles.dayCellTextActive,
-                      ]}>
-                      {day.num}
-                    </Text>
-                    {day.isToday ? <View style={styles.todayDot} /> : null}
-                  </Pressable>
-                );
-              })}
+          style={styles.specialCarousel}>
+          {SPECIAL_SESSIONS.map((session, idx) => (
+            <View key={session.id} style={styles.specialSlide}>
+              {/* Neon bloom behind card */}
+              <View style={styles.specialCardGlow} />
+              <LinearGradient
+                colors={session.colors}
+                start={{ x: 0.18, y: 0 }}
+                end={{ x: 0.82, y: 1 }}
+                style={styles.specialCard}>
+                {/* Glass highlight at top */}
+                <View pointerEvents="none" style={styles.specialCardHighlight} />
+                {/* Top row */}
+                <View style={styles.specialCardTopRow}>
+                  <Text style={styles.specialSubtitle}>{session.subtitle}</Text>
+                  <View style={styles.specialDurationPill}>
+                    <Text style={styles.specialDurationText}>{session.duration}</Text>
+                  </View>
+                </View>
+                {/* Big title */}
+                <View style={styles.specialCardBody}>
+                  <Text style={styles.specialTitle}>{session.title}</Text>
+                  <Text style={styles.specialDesc}>{session.description}</Text>
+                </View>
+                {/* Slide counter */}
+                <Text style={styles.specialCounter}>
+                  {String(idx + 1).padStart(2, '0')} / {String(SPECIAL_SESSIONS.length).padStart(2, '0')}
+                </Text>
+                {/* CTA */}
+                <Pressable
+                  style={({ pressed }) => [styles.specialBookBtn, pressed && styles.btnPressed]}>
+                  <Text style={styles.specialBookText}>Book Session</Text>
+                  <Text style={styles.specialBookArrow}> ›</Text>
+                </Pressable>
+              </LinearGradient>
             </View>
           ))}
         </ScrollView>
+
+        {/* Dots for special sessions */}
+        <View style={styles.specialDots}>
+          {SPECIAL_SESSIONS.map((_, i) => (
+            <View key={i} style={[styles.dot, i === specialIndex && styles.dotActive]} />
+          ))}
+        </View>
+
+        {/* ── DATES — paging strip with edge arrows ─────────────── */}
+        <View style={styles.datesHeader}>
+          <Text style={styles.datesTitle}>Dates</Text>
+        </View>
+
+        {/* Container: strip + arrows overlaid at edges */}
+        <View style={styles.weekWrapper}>
+          {/* Left arrow — only when not on first page */}
+          <Pressable
+            onPress={() => setWeekOffset((w) => Math.max(-1, w - 1))}
+            style={[styles.weekEdgeBtn, styles.weekEdgeBtnLeft, !canGoPrev && styles.weekEdgeBtnHidden]}
+            disabled={!canGoPrev}
+            hitSlop={6}>
+            <SymbolView
+              name="chevron.left"
+              size={13}
+              tintColor="#FFFFFF"
+              fallback={<Text style={styles.weekEdgeGlyph}>‹</Text>}
+            />
+          </Pressable>
+          {/* Paging scroll strip */}
+          <ScrollView
+            ref={weekScrollRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            scrollEventThrottle={16}
+            decelerationRate="fast"
+            contentOffset={{ x: DATE_PAGE_W, y: 0 }}
+            onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+              const page = Math.round(e.nativeEvent.contentOffset.x / DATE_PAGE_W);
+              const newOffset = (page - 1) as -1 | 0 | 1;
+              if (newOffset !== weekOffset) setWeekOffset(newOffset);
+            }}
+            style={styles.weekStripScroll}
+            contentContainerStyle={styles.weekStripContainer}>
+            {allWeeksData.map((week, wIdx) => (
+              <View key={wIdx} style={styles.weekPage}>
+                {week.map((day) => {
+                  const selected = day.offset === selectedOffset;
+                  return (
+                    <Pressable
+                      key={day.iso}
+                      onPress={() => setSelectedIso(day.iso)}
+                      style={[styles.dayCell, selected && styles.dayCellActive]}>
+                      <Text
+                        style={[
+                          styles.dayCellShort,
+                          selected && styles.dayCellTextActive,
+                        ]}>
+                        {day.short}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.dayCellNum,
+                          selected && styles.dayCellTextActive,
+                        ]}>
+                        {day.num}
+                      </Text>
+                      {day.isToday ? (
+                        <View
+                          style={[
+                            styles.todayDot,
+                            selected && styles.todayDotActive,
+                          ]}
+                        />
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ))}
+          </ScrollView>
+
+          {/* Right arrow — only when not on last page */}
+          <Pressable
+            onPress={() => setWeekOffset((w) => Math.min(1, w + 1))}
+            style={[styles.weekEdgeBtn, styles.weekEdgeBtnRight, !canGoNext && styles.weekEdgeBtnHidden]}
+            disabled={!canGoNext}
+            hitSlop={6}>
+            <SymbolView
+              name="chevron.right"
+              size={13}
+              tintColor="#FFFFFF"
+              fallback={<Text style={styles.weekEdgeGlyph}>›</Text>}
+            />
+          </Pressable>
+        </View>
 
         {/* ── SELECTED-DAY HEADER + SEARCH / FAVORITES ────────── */}
         <View style={styles.todayRow}>
@@ -633,18 +881,12 @@ export default function ClassesScreen() {
             </Text>
           </View>
           <View style={styles.sectionIcons}>
-            <Pressable
-              onPress={() => setShowFavoritesOnly((v) => !v)}
-              style={[styles.iconBtnSmall, showFavoritesOnly && styles.iconBtnActive]}>
-              <SymbolView
-                name={showFavoritesOnly ? 'heart.fill' : 'heart'}
-                size={18}
-                tintColor={showFavoritesOnly ? premiumColors.redBright : 'rgba(255,255,255,0.85)'}
-                fallback={
-                  <Text style={styles.iconGlyph}>{showFavoritesOnly ? '♥' : '♡'}</Text>
-                }
-              />
-            </Pressable>
+            <HeartButton
+              isFav={showFavoritesOnly}
+              onToggle={() => setShowFavoritesOnly((v) => !v)}
+              btnSize={40}
+              iconSize={18}
+            />
             {searchOpen ? (
               <View style={styles.searchExpanded}>
                 <SymbolView
@@ -729,10 +971,12 @@ export default function ClassesScreen() {
           </View>
         ) : (
           <View style={styles.timeline}>
+            <View pointerEvents="none" style={styles.timelineBarGlow} />
             <View style={styles.timelineBar} />
             {todayClasses.map((gymClass) => {
               const isReserved = Boolean(gymClass.isRegistered);
               const isFull = gymClass.status === 'Full' && !isReserved;
+              const isFav = favorites.has(gymClass.id);
               const imgUri =
                 gymClass.coverImageUrl || CATEGORY_IMAGES[gymClass.category];
               const nameParts = gymClass.instructorName.split(' ');
@@ -778,7 +1022,34 @@ export default function ClassesScreen() {
                           {isFull ? 'Full' : 'Spots available'}
                         </Text>
                       </View>
+                      <Pressable
+                        disabled={isFull}
+                        onPress={() =>
+                          setPendingAction({
+                            action: isReserved ? 'cancel' : 'reserve',
+                            gymClass,
+                          })
+                        }
+                        style={({ pressed }) => [
+                          styles.timelineBookNow,
+                          isReserved && styles.timelineBookNowReserved,
+                          isFull && styles.timelineBookNowDisabled,
+                          pressed && !isFull && styles.btnPressed,
+                        ]}>
+                        <Text
+                          style={[
+                            styles.timelineBookNowText,
+                            isReserved && styles.timelineBookNowTextMuted,
+                          ]}>
+                          {isReserved
+                            ? 'VIEW BOOKING'
+                            : isFull
+                              ? 'FULL'
+                              : 'BOOK NOW'}
+                        </Text>
+                      </Pressable>
                     </View>
+                    {/* Right column: avatar + name + heart (stacked, no overlap) */}
                     <View style={styles.timelineRight}>
                       {gymClass.instructorImageUrl ? (
                         <Image
@@ -795,32 +1066,13 @@ export default function ClassesScreen() {
                       <Text style={styles.instructorName} numberOfLines={1}>
                         {shortName}
                       </Text>
-                      <Pressable
-                        disabled={isFull}
-                        onPress={() =>
-                          setPendingAction({
-                            action: isReserved ? 'cancel' : 'reserve',
-                            gymClass,
-                          })
-                        }
-                        style={({ pressed }) => [
-                          styles.timelineBtn,
-                          isReserved && styles.timelineBtnReserved,
-                          isFull && styles.timelineBtnDisabled,
-                          pressed && !isFull && styles.btnPressed,
-                        ]}>
-                        <Text
-                          style={[
-                            styles.timelineBtnText,
-                            isReserved && styles.timelineBtnTextMuted,
-                          ]}>
-                          {isReserved
-                            ? 'VIEW CLASS ›'
-                            : isFull
-                              ? 'FULL'
-                              : 'BOOK NOW ›'}
-                        </Text>
-                      </Pressable>
+                      <HeartButton
+                        isFav={isFav}
+                        onToggle={() => toggleFavorite(gymClass.id)}
+                        btnSize={30}
+                        iconSize={13}
+                        style={styles.timelineHeart}
+                      />
                     </View>
                   </View>
                 </View>
@@ -828,6 +1080,73 @@ export default function ClassesScreen() {
             })}
           </View>
         )}
+
+        {/* ── RESERVE YOUR PT ─────────────────────────────────────── */}
+        <View style={styles.ptSectionWrap}>
+          <View style={styles.ptSectionHeading}>
+            <View style={styles.accentBar} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.ptEyebrow}>1-on-1 Coaching</Text>
+              <Text style={styles.ptHeadingTitle}>Reserve Your PT</Text>
+            </View>
+          </View>
+          <Text style={styles.ptSubText}>
+            Train smarter with a personal coach. Sessions are tailored entirely to your goals.
+          </Text>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.ptRail}>
+            {PT_TRAINERS.map((trainer) => (
+              <Pressable
+                key={trainer.id}
+                onPress={() => setPtBookPending(trainer.id)}
+                style={({ pressed }) => [styles.ptCard, pressed && styles.btnPressed]}>
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.07)', 'rgba(255,255,255,0.01)']}
+                  start={{ x: 0.1, y: 0 }}
+                  end={{ x: 0.9, y: 1 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
+                {/* Available badge */}
+                <View style={[styles.ptAvailBadge, trainer.available && styles.ptAvailBadgeOn]}>
+                  <View style={[styles.ptAvailDot, trainer.available && styles.ptAvailDotOn]} />
+                  <Text style={[styles.ptAvailText, trainer.available && styles.ptAvailTextOn]}>
+                    {trainer.available ? 'Available' : 'Busy'}
+                  </Text>
+                </View>
+                {/* Avatar */}
+                <View style={styles.ptAvatar}>
+                  <Text style={styles.ptAvatarText}>{trainer.initials}</Text>
+                  <View style={styles.ptAvatarRing} />
+                </View>
+                {/* Name & specialty */}
+                <Text style={styles.ptName}>{trainer.name}</Text>
+                <Text style={styles.ptSpecialty}>{trainer.specialty}</Text>
+                <Text style={styles.ptTagline}>{trainer.tagline}</Text>
+                {/* Available time */}
+                <View style={styles.ptStatsRow}>
+                  <SymbolView
+                    name="clock"
+                    size={11}
+                    tintColor={trainer.available ? premiumColors.redBright : mutedColor}
+                    fallback={<Text style={[styles.ptSessionCount, { color: trainer.available ? premiumColors.redBright : mutedColor }]}>○</Text>}
+                  />
+                  <Text style={[styles.ptSessionCount, trainer.available && { color: 'rgba(255,255,255,0.8)' }]}>
+                    {trainer.availableHours}
+                  </Text>
+                </View>
+                {/* CTA */}
+                <View style={[styles.ptBookBtn, trainer.available ? styles.ptBookBtnActive : styles.ptBookBtnDisabled]}>
+                  <Text style={[styles.ptBookText, !trainer.available && styles.ptBookTextMuted]}>
+                    {trainer.available ? 'Book Session' : 'Unavailable'}
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
 
         {/* ── BOOKINGS + VOUCHERS ──────────────────────────────────── */}
         <View style={styles.boxesHeading}>
@@ -846,11 +1165,7 @@ export default function ClassesScreen() {
               styles.actBox,
               expandedBox === 'bookings' && styles.actBoxActive,
             ]}>
-            <Image
-              source={BOOKINGS_SIGN}
-              style={styles.boxWatermark}
-              resizeMode="contain"
-            />
+            <Image source={BOOKINGS_SIGN} style={styles.boxWatermark} resizeMode="contain" />
             <SymbolView
               name="list.bullet.clipboard"
               size={24}
@@ -870,11 +1185,7 @@ export default function ClassesScreen() {
               styles.actBox,
               expandedBox === 'vouchers' && styles.actBoxActive,
             ]}>
-            <Image
-              source={VOUCHERS_SIGN}
-              style={styles.boxWatermark}
-              resizeMode="contain"
-            />
+            <Image source={VOUCHERS_SIGN} style={styles.boxWatermark} resizeMode="contain" />
             <SymbolView
               name="ticket.fill"
               size={24}
@@ -896,32 +1207,20 @@ export default function ClassesScreen() {
             {pendingVouchers.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyTitle}>No pending vouchers</Text>
-                <Text style={styles.emptyBody}>
-                  Book a class to generate a pending voucher.
-                </Text>
+                <Text style={styles.emptyBody}>Book a class to generate a pending voucher.</Text>
               </View>
             ) : (
               <View style={styles.voucherList}>
                 {pendingVouchers.map((v) => (
                   <View key={v.id} style={styles.voucherRow}>
-                    <View
-                      style={[
-                        styles.voucherRail,
-                        { backgroundColor: premiumColors.warning },
-                      ]}
-                    />
+                    <View style={[styles.voucherRail, { backgroundColor: premiumColors.warning }]} />
                     <View style={styles.voucherBody}>
                       <Text style={styles.voucherTitle}>{v.description}</Text>
-                      <Text style={styles.voucherMeta}>
-                        {fmtVoucherDate(v.date)} · Pending
-                      </Text>
+                      <Text style={styles.voucherMeta}>{fmtVoucherDate(v.date)} · Pending</Text>
                     </View>
                     <Pressable
                       onPress={() => handleCancelVoucher(v.id)}
-                      style={({ pressed }) => [
-                        styles.voucherCancelBtn,
-                        pressed && styles.btnPressed,
-                      ]}>
+                      style={({ pressed }) => [styles.voucherCancelBtn, pressed && styles.btnPressed]}>
                       <Text style={styles.voucherCancelText}>Cancel</Text>
                     </Pressable>
                   </View>
@@ -934,20 +1233,14 @@ export default function ClassesScreen() {
         {expandedBox === 'bookings' ? (
           <View style={styles.expandedPanel}>
             <Text style={styles.expandedTitle}>Booking History</Text>
-            <Text style={styles.expandedSub}>
-              Confirmed and canceled class reservations.
-            </Text>
+            <Text style={styles.expandedSub}>Confirmed and canceled class reservations.</Text>
             <View style={styles.tabsRow}>
               {(['Confirmed', 'Canceled'] as const).map((tab) => (
                 <Pressable
                   key={tab}
                   onPress={() => setOrdersTab(tab)}
                   style={[styles.tab, ordersTab === tab && styles.tabActive]}>
-                  <Text
-                    style={[
-                      styles.tabText,
-                      ordersTab === tab && styles.tabTextActive,
-                    ]}>
+                  <Text style={[styles.tabText, ordersTab === tab && styles.tabTextActive]}>
                     {tab}
                   </Text>
                 </Pressable>
@@ -955,9 +1248,7 @@ export default function ClassesScreen() {
             </View>
             {ordersFiltered.length === 0 ? (
               <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>
-                  No {ordersTab.toLowerCase()} bookings
-                </Text>
+                <Text style={styles.emptyTitle}>No {ordersTab.toLowerCase()} bookings</Text>
                 <Text style={styles.emptyBody}>
                   {ordersTab === 'Confirmed'
                     ? 'Approved bookings will appear here.'
@@ -968,28 +1259,13 @@ export default function ClassesScreen() {
               <View style={styles.voucherList}>
                 {ordersFiltered.map((v) => (
                   <View key={v.id} style={styles.voucherRow}>
-                    <View
-                      style={[
-                        styles.voucherRail,
-                        { backgroundColor: statusColor(v.status) },
-                      ]}
-                    />
+                    <View style={[styles.voucherRail, { backgroundColor: statusColor(v.status) }]} />
                     <View style={styles.voucherBody}>
                       <Text style={styles.voucherTitle}>{v.description}</Text>
-                      <Text style={styles.voucherMeta}>
-                        {fmtVoucherDate(v.date)}
-                      </Text>
+                      <Text style={styles.voucherMeta}>{fmtVoucherDate(v.date)}</Text>
                     </View>
-                    <View
-                      style={[
-                        styles.statusChip,
-                        { borderColor: statusColor(v.status) },
-                      ]}>
-                      <Text
-                        style={[
-                          styles.statusChipText,
-                          { color: statusColor(v.status) },
-                        ]}>
+                    <View style={[styles.statusChip, { borderColor: statusColor(v.status) }]}>
+                      <Text style={[styles.statusChipText, { color: statusColor(v.status) }]}>
                         {v.status}
                       </Text>
                     </View>
@@ -1001,24 +1277,52 @@ export default function ClassesScreen() {
         ) : null}
       </ScrollView>
 
+      {/* ── PT BOOKING MODAL ──────────────────────────────────────── */}
+      <Modal transparent visible={Boolean(ptBookPending)} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setPtBookPending(undefined)} />
+          <View style={styles.modalCard}>
+            {ptBookPending ? (
+              <>
+                <Text style={styles.modalKicker}>Personal Training</Text>
+                <Text style={styles.modalTitle}>
+                  {PT_TRAINERS.find((t) => t.id === ptBookPending)?.name}
+                </Text>
+                <Text style={styles.modalMeta}>
+                  {PT_TRAINERS.find((t) => t.id === ptBookPending)?.specialty}
+                </Text>
+                <Text style={styles.modalNote}>
+                  PT session requests are reviewed within 24 hours. Your trainer will confirm a time slot directly with you.
+                </Text>
+                <View style={styles.modalActions}>
+                  <Pressable
+                    onPress={() => setPtBookPending(undefined)}
+                    style={({ pressed }) => [styles.modalSecBtn, pressed && styles.btnPressed]}>
+                    <Text style={styles.modalSecText}>Back</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setPtBookPending(undefined)}
+                    style={({ pressed }) => [styles.modalPrimBtn, pressed && styles.btnPressed]}>
+                    <Text style={styles.modalPrimText}>Request Session</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
       {/* ── BOOKING MODAL ─────────────────────────────────────────── */}
       <Modal transparent visible={Boolean(pendingAction)} animationType="fade">
         <View style={styles.modalOverlay}>
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setPendingAction(undefined)}
-          />
+          <Pressable style={styles.modalBackdrop} onPress={() => setPendingAction(undefined)} />
           <View style={styles.modalCard}>
             {pendingAction ? (
               <>
                 <Text style={styles.modalKicker}>
-                  {pendingAction.action === 'reserve'
-                    ? 'Reserve class'
-                    : 'Cancel reservation'}
+                  {pendingAction.action === 'reserve' ? 'Reserve class' : 'Cancel reservation'}
                 </Text>
-                <Text style={styles.modalTitle}>
-                  {pendingAction.gymClass.title}
-                </Text>
+                <Text style={styles.modalTitle}>{pendingAction.gymClass.title}</Text>
                 <Text style={styles.modalMeta}>
                   Coach {pendingAction.gymClass.instructorName} ·{' '}
                   {fmt24(pendingAction.gymClass.startTime)}
@@ -1031,10 +1335,7 @@ export default function ClassesScreen() {
                 <View style={styles.modalActions}>
                   <Pressable
                     onPress={() => setPendingAction(undefined)}
-                    style={({ pressed }) => [
-                      styles.modalSecBtn,
-                      pressed && styles.btnPressed,
-                    ]}>
+                    style={({ pressed }) => [styles.modalSecBtn, pressed && styles.btnPressed]}>
                     <Text style={styles.modalSecText}>Back</Text>
                   </Pressable>
                   <Pressable
@@ -1046,14 +1347,9 @@ export default function ClassesScreen() {
                         handleReserve(pendingAction.gymClass.id);
                       }
                     }}
-                    style={({ pressed }) => [
-                      styles.modalPrimBtn,
-                      pressed && styles.btnPressed,
-                    ]}>
+                    style={({ pressed }) => [styles.modalPrimBtn, pressed && styles.btnPressed]}>
                     <Text style={styles.modalPrimText}>
-                      {pendingAction.action === 'reserve'
-                        ? 'Confirm'
-                        : 'Cancel booking'}
+                      {pendingAction.action === 'reserve' ? 'Confirm' : 'Cancel booking'}
                     </Text>
                   </Pressable>
                 </View>
@@ -1077,7 +1373,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    marginBottom: 22,
+    marginBottom: 14,
   },
   headerTitle: {
     color: '#FFFFFF',
@@ -1097,7 +1393,7 @@ const styles = StyleSheet.create({
   headerAccent: { color: premiumColors.redBright, fontWeight: '800' },
   iconGlyph: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
 
-  // Section icon controls
+  // Section icons
   sectionIcons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   iconBtnSmall: {
     width: 40,
@@ -1114,7 +1410,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(177,18,38,0.2)',
   },
 
-  // Glowy liquid search input
+  // Glowy liquid search
   searchExpanded: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1141,38 +1437,28 @@ const styles = StyleSheet.create({
   },
   searchGlyphSmall: { color: premiumColors.textMuted, fontSize: 13, fontWeight: '800' },
 
-  // Dates strip
+  // Dates header
   datesHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   datesTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', fontStyle: 'italic' },
-  datesControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  datesReset: { color: premiumColors.redBright, fontSize: 12, fontWeight: '800' },
-  weekNavBtn: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  weekNavBtnDisabled: {
-    borderColor: 'rgba(255,255,255,0.06)',
-    backgroundColor: 'rgba(255,255,255,0.02)',
-  },
-  weekNavGlyph: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
-  weekNavGlyphDisabled: { color: 'rgba(255,255,255,0.25)' },
 
-  // Paging week strip
-  weekStripScroll: {
-    marginHorizontal: 20,
+  // Week strip wrapper — position:relative so arrows overlay correctly
+  weekWrapper: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 20,
     marginBottom: 18,
+  },
+  weekStripScroll: {
+    width: DATE_PAGE_W,
+    flexGrow: 0,
   },
   weekStripContainer: {
     width: DATE_PAGE_W * 3,
@@ -1183,84 +1469,177 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
 
-  // Carousel
-  carouselScroll: { marginBottom: 8 },
-  carouselSlide: { width: SCREEN_WIDTH, paddingHorizontal: 20, paddingVertical: 6 },
-
-  // Outer glow ring (separate from overflow:hidden card so red glow shows)
-  featuredGlowRing: {
-    borderRadius: 32,
+  weekEdgeBtn: {
+    width: DATE_NAV_BUTTON_W,
+    height: DATE_NAV_BUTTON_W,
+    borderRadius: DATE_NAV_BUTTON_W / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(8,5,5,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  weekEdgeBtnLeft: {},
+  weekEdgeBtnRight: {},
+  weekEdgeBtnHidden: { opacity: 0, pointerEvents: 'none' } as ViewStyle,
+  weekEdgeGlyph: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
+  featuredWidget: {
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  featuredPage: {
+    width: FEAT_PAGE_W,
+    height: 220,
+  },
+  featuredPageInner: {
+    justifyContent: 'space-between',
+    borderRadius: 26,
+    overflow: 'hidden',
+  },
+  featuredOuterLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 10,
+    gap: 10,
+  },
+  featuredOuterAccentBar: {
+    width: 3,
+    height: 18,
+    borderRadius: 2,
+    backgroundColor: premiumColors.redBright,
     shadowColor: premiumColors.redBright,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.45,
-    shadowRadius: 24,
-    elevation: 14,
+    shadowOpacity: 0.75,
+    shadowRadius: 8,
+  },
+  featuredOuterLabelText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 2.5,
+  },
+  featuredOuterDivider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  featuredOuterCounter: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  featuredOuterCounterFaint: {
+    color: 'rgba(255,255,255,0.28)',
+    fontWeight: '700',
+  },
+  featuredGlassSpecular: {
+    position: 'absolute',
+    top: 0,
+    left: 18,
+    right: 18,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.55)',
+  },
+  featuredPrevArea: {
+    position: 'absolute',
+    top: 0,
+    left: 20,
+    width: '28%',
+    bottom: 10,
+  },
+  featuredNextArea: {
+    position: 'absolute',
+    top: 0,
+    right: 20,
+    width: '28%',
+    bottom: 10,
+  },
+
+  // Circular red bloom behind card (1px source = large circular halo)
+  featuredCircleGlow: {
+    position: 'absolute',
+    bottom: 30,
+    alignSelf: 'center',
+    width: 2,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: premiumColors.redBright,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 55,
+    elevation: 20,
   },
   featuredCard: {
-    height: 320,
-    borderRadius: 32,
+    height: 220,
+    borderRadius: 28,
     overflow: 'hidden',
-    justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.30)',
+    borderColor: 'rgba(255,255,255,0.22)',
+    ...premiumShadow,
   },
   featuredTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     padding: 16,
   },
   featuredBadge: {
     borderRadius: 999,
-    backgroundColor: premiumColors.red,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(225,29,46,0.75)',
+    backgroundColor: 'rgba(225,29,46,0.10)',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 14,
+    elevation: 8,
   },
   featuredBadgeText: {
     color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.8,
+    fontSize: 12,
+    fontWeight: '500',
+    letterSpacing: 0.3,
   },
-  featuredBottom: { padding: 18 },
+  featuredBottom: { padding: 13 },
   featuredTitle: {
     color: '#FFFFFF',
-    fontSize: 38,
+    fontSize: 26,
     fontWeight: '900',
     fontStyle: 'italic',
     letterSpacing: -0.5,
-    lineHeight: 40,
+    lineHeight: 29,
   },
   featuredDesc: {
     color: 'rgba(255,255,255,0.72)',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    marginTop: 6,
-    lineHeight: 18,
+    marginTop: 4,
+    lineHeight: 16,
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginTop: 14,
+    marginTop: 8,
     flexWrap: 'wrap',
   },
   stat: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   statText: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '800' },
-  statDivider: {
-    width: 1,
-    height: 14,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-  },
+  statDivider: { width: 1, height: 14, backgroundColor: 'rgba(255,255,255,0.25)' },
   statGlyph: { color: 'rgba(255,255,255,0.7)', fontSize: 10 },
   featuredBookBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 16,
-    borderRadius: 18,
+    marginTop: 10,
+    borderRadius: 14,
     backgroundColor: premiumColors.red,
-    paddingVertical: 15,
+    paddingVertical: 10,
     ...premiumGlow,
   },
   featuredBookBtnDisabled: {
@@ -1268,24 +1647,31 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     elevation: 0,
   },
-  featuredBookBtnText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-  },
-  featuredBookBtnArrow: { color: '#FFFFFF', fontSize: 20, fontWeight: '900' },
+  featuredBookBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', letterSpacing: 0.6 },
+  featuredBookBtnArrow: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
   btnPressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
 
   // Pagination
   pagination: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
     gap: 6,
-    marginBottom: 26,
+    marginTop: 16,
+    marginBottom: 18,
   },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.22)' },
-  dotActive: { width: 22, backgroundColor: premiumColors.redBright },
+  dot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: 'rgba(255,255,255,0.22)' },
+  dotActive: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: premiumColors.redBright,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    elevation: 4,
+  },
 
   // Today header
   todayRow: {
@@ -1301,15 +1687,34 @@ const styles = StyleSheet.create({
 
   // Timeline
   timeline: { paddingHorizontal: 20, marginBottom: 20, position: 'relative' },
+  timelineBarGlow: {
+    position: 'absolute',
+    left: 48,
+    top: 7,
+    bottom: 12,
+    width: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 42, 61, 0.08)',
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 3,
+  },
   timelineBar: {
     position: 'absolute',
-    left: 56,
-    top: 10,
-    bottom: 10,
+    left: 48,
+    top: 7,
+    bottom: 12,
     width: 2,
     borderRadius: 1,
-    backgroundColor: premiumColors.red,
-    opacity: 0.35,
+    backgroundColor: premiumColors.redBright,
+    opacity: 0.7,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.95,
+    shadowRadius: 8,
+    elevation: 9,
   },
   timelineRow: { flexDirection: 'row', alignItems: 'stretch', marginBottom: 14 },
   timelineTimCol: {
@@ -1320,32 +1725,28 @@ const styles = StyleSheet.create({
   },
   timelineTimTop: { alignItems: 'center' },
   timelineDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: premiumColors.red,
-    borderWidth: 2.5,
-    borderColor: '#FFFFFF',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: premiumColors.redBright,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.92)',
     marginBottom: 6,
     zIndex: 1,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 9,
+    elevation: 8,
   },
-  timelineStartTime: {
-    color: premiumColors.red,
-    fontSize: 15,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  timelineEndTime: {
-    color: mutedColor,
-    fontSize: 15,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
+  timelineStartTime: { color: premiumColors.red, fontSize: 15, fontWeight: '900', textAlign: 'center' },
+  timelineEndTime: { color: mutedColor, fontSize: 15, fontWeight: '800', textAlign: 'center' },
   timelineCard: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    position: 'relative',
     borderWidth: 1,
     borderColor: premiumColors.glassBorder,
     borderRadius: 20,
@@ -1354,18 +1755,23 @@ const styles = StyleSheet.create({
     ...premiumShadow,
   },
   timelineThumb: { width: 64, height: 64, borderRadius: 32 },
-  timelineBody: { flex: 1 },
+  timelineBody: { flex: 1, paddingRight: 24 },
   timelineTitle: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
   timelineCat: { color: premiumColors.redBright, fontSize: 11, fontWeight: '800', marginTop: 3 },
   timelineMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 },
   timelineMetaText: { color: mutedColor, fontSize: 11, fontWeight: '700' },
   metaGlyph: { color: mutedColor, fontSize: 10 },
-  timelineRight: { alignItems: 'center', width: 86 },
-  instructorAvatar: { width: 38, height: 38, borderRadius: 19 },
+  timelineRight: {
+    width: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+  },
+  instructorAvatar: { width: 42, height: 42, borderRadius: 21 },
   instructorAvatarFallback: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1375,15 +1781,52 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '800',
-    marginTop: 5,
+    marginTop: 4,
     textAlign: 'center',
   },
+  timelineHeart: {
+    marginTop: 6,
+    right: 8,
+    zIndex: 2,
+  },
+  timelineBookNow: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 34,
+    marginTop: 9,
+    borderRadius: 12,
+    backgroundColor: premiumColors.red,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    ...premiumGlow,
+  },
+  timelineBookNowReserved: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  timelineBookNowDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  timelineBookNowText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  timelineBookNowTextMuted: { color: mutedColor },
   timelineBtn: {
-    marginTop: 8,
+    display: 'none',
+    marginTop: 5,
     borderRadius: 10,
     backgroundColor: premiumColors.red,
     paddingHorizontal: 8,
-    paddingVertical: 7,
+    paddingVertical: 6,
     ...premiumGlow,
   },
   timelineBtnReserved: {
@@ -1415,12 +1858,12 @@ const styles = StyleSheet.create({
   chipText: { color: mutedColor, fontSize: 12, fontWeight: '900', letterSpacing: 0.5 },
   chipTextActive: { color: '#0A0B0F' },
 
-  // Day picker
+  // Day picker — smaller cells
   dayCell: {
     width: DATE_CELL_W,
     alignItems: 'center',
-    paddingVertical: 10,
-    borderRadius: 14,
+    paddingVertical: 7,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
     backgroundColor: 'rgba(255,255,255,0.04)',
@@ -1434,13 +1877,8 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 4,
   },
-  dayCellShort: {
-    color: mutedColor,
-    fontSize: 9,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  dayCellNum: { color: '#FFFFFF', fontSize: 17, fontWeight: '900', marginTop: 2 },
+  dayCellShort: { color: mutedColor, fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
+  dayCellNum: { color: '#FFFFFF', fontSize: 15, fontWeight: '900', marginTop: 2 },
   dayCellTextActive: { color: '#FFFFFF' },
   todayDot: {
     width: 4,
@@ -1448,6 +1886,14 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: premiumColors.redBright,
     marginTop: 3,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 5,
+  },
+  todayDotActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
   },
 
   // Boxes heading
@@ -1499,8 +1945,8 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   actBoxActive: {
-    borderColor: 'rgba(225, 29, 46, 0.55)',
-    backgroundColor: 'rgba(177, 18, 38, 0.12)',
+    borderColor: 'rgba(225,29,46,0.55)',
+    backgroundColor: 'rgba(177,18,38,0.12)',
   },
   boxWatermark: {
     position: 'absolute',
@@ -1528,13 +1974,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   expandedTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '900', marginBottom: 4 },
-  expandedSub: {
-    color: mutedColor,
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 14,
-    lineHeight: 17,
-  },
+  expandedSub: { color: mutedColor, fontSize: 12, fontWeight: '700', marginBottom: 14, lineHeight: 17 },
   voucherList: { gap: 10 },
   voucherRow: {
     flexDirection: 'row',
@@ -1551,9 +1991,9 @@ const styles = StyleSheet.create({
   voucherMeta: { color: mutedColor, fontSize: 11, fontWeight: '700', marginTop: 3 },
   voucherCancelBtn: {
     borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.3)',
+    borderColor: 'rgba(225,29,46,0.3)',
     borderRadius: 10,
-    backgroundColor: 'rgba(177, 18, 38, 0.1)',
+    backgroundColor: 'rgba(177,18,38,0.1)',
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginRight: 12,
@@ -1607,13 +2047,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   emptyTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
-  emptyBody: {
-    color: mutedColor,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 18,
-    marginTop: 5,
-  },
+  emptyBody: { color: mutedColor, fontSize: 13, fontWeight: '700', lineHeight: 18, marginTop: 5 },
 
   // Modal
   modalOverlay: {
@@ -1622,10 +2056,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(4,5,8,0.72)',
-  },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4,5,8,0.72)' },
   modalCard: {
     width: '100%',
     borderWidth: 1,
@@ -1676,4 +2107,354 @@ const styles = StyleSheet.create({
     ...premiumGlow,
   },
   modalPrimText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+
+  // ── Spa section heading ──────────────────────────────────────────────────
+  spaSectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  spaEyebrow: {
+    color: premiumColors.redBright,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  spaHeadingTitle: {
+    color: '#FFFFFF',
+    fontSize: 21,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+  },
+  spaTagPill: {
+    borderWidth: 1,
+    borderColor: 'rgba(225,29,46,0.45)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(225,29,46,0.09)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  spaTagText: {
+    color: premiumColors.redBright,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+
+  // ── Swipeable special sessions ────────────────────────────────────────────
+  specialCarousel: { marginBottom: 8 },
+  specialSlide: {
+    width: SPA_CARD_W,
+    marginRight: SPA_CARD_GAP,
+    paddingBottom: 8,
+  },
+  specialCardGlow: {
+    position: 'absolute',
+    bottom: 28,
+    alignSelf: 'center',
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: premiumColors.redBright,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 60,
+    elevation: 20,
+  },
+  specialCard: {
+    height: 195,
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(225,29,46,0.55)',
+    padding: 16,
+    justifyContent: 'space-between',
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 22,
+    elevation: 12,
+  },
+  specialCardHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 22,
+    right: 22,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+  },
+  specialCardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  specialSubtitle: {
+    color: premiumColors.redBright,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+  },
+  specialDurationPill: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  specialDurationText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  specialCardBody: { flex: 1, justifyContent: 'center', paddingVertical: 4 },
+  specialTitle: {
+    color: '#FFFFFF',
+    fontSize: 26,
+    fontWeight: '900',
+    fontStyle: 'italic',
+    letterSpacing: -0.5,
+    lineHeight: 30,
+  },
+  specialDesc: {
+    color: 'rgba(255,255,255,0.62)',
+    fontSize: 11,
+    fontWeight: '600',
+    lineHeight: 16,
+    marginTop: 6,
+  },
+  specialCounter: {
+    color: 'rgba(255,255,255,0.28)',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  specialBookBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(225,29,46,0.65)',
+    borderRadius: 14,
+    backgroundColor: 'rgba(225,29,46,0.15)',
+    paddingVertical: 9,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  specialBookText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  specialBookArrow: {
+    color: premiumColors.redBright,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  specialDots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    marginBottom: 20,
+  },
+
+  // ── Reserve Your PT ──────────────────────────────────────────────────────
+  ptSectionWrap: { marginBottom: 28 },
+  ptSectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  ptEyebrow: {
+    color: premiumColors.redBright,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  ptHeadingTitle: {
+    color: '#FFFFFF',
+    fontSize: 21,
+    fontWeight: '900',
+  },
+  ptSubText: {
+    color: mutedColor,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 19,
+    paddingHorizontal: 20,
+    marginBottom: 18,
+  },
+  ptRail: {
+    paddingHorizontal: 20,
+    gap: 14,
+    paddingBottom: 4,
+  },
+  ptCard: {
+    width: 210,
+    position: 'relative',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 26,
+    backgroundColor: 'rgba(14,16,22,0.82)',
+    padding: 18,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    elevation: 6,
+  },
+  ptAvailBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    marginBottom: 16,
+  },
+  ptAvailBadgeOn: {
+    borderColor: 'rgba(34,197,94,0.4)',
+    backgroundColor: 'rgba(34,197,94,0.08)',
+  },
+  ptAvailDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: mutedColor,
+  },
+  ptAvailDotOn: {
+    backgroundColor: '#22C55E',
+    shadowColor: '#22C55E',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+  },
+  ptAvailText: {
+    color: mutedColor,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  ptAvailTextOn: { color: '#22C55E' },
+  ptAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(177,18,38,0.18)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(225,29,46,0.55)',
+    marginBottom: 14,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 14,
+  },
+  ptAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '900',
+    textShadowColor: 'rgba(225,29,46,0.6)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
+  ptAvatarRing: {
+    position: 'absolute',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 1,
+    borderColor: 'rgba(225,29,46,0.22)',
+  },
+  ptName: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: -0.2,
+  },
+  ptSpecialty: {
+    color: premiumColors.redBright,
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 3,
+  },
+  ptTagline: {
+    color: 'rgba(255,255,255,0.48)',
+    fontSize: 11,
+    fontWeight: '600',
+    fontStyle: 'italic',
+    marginTop: 5,
+    lineHeight: 16,
+  },
+  ptStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 14,
+  },
+  ptRating: {
+    color: '#FFD700',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  ptStatDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  ptSessionCount: {
+    color: mutedColor,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  ptBookBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  ptBookBtnActive: {
+    backgroundColor: premiumColors.red,
+    borderColor: premiumColors.redBright,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  ptBookBtnDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  ptBookText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  ptBookTextMuted: { color: mutedColor },
 });

@@ -259,3 +259,24 @@ Web Bundled 314ms node_modules\expo-router\entry.js (701 modules)
     at TypeScriptParserMixin.parseFunctionBody (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12117:24)
     at TypeScriptParserMixin.parseFunctionBodyAndFinish (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:12103:10)
     at TypeScriptParserMixin.parseFunctionBodyAndFinish (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@babel\parser\lib\index.js:9189:18)
+C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\expo\node_modules\@expo\cli\build\src\utils\errors.js:130
+    throw error;
+    ^
+
+Error: ENOENT: no such file or directory, watch 'C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\.expo-haptics-pIjhIcdh\android\src\main\java'
+    at FSWatcher.<computed> (node:internal/fs/watchers:254:19)
+    at Object.watch (node:fs:2539:36)
+    at FallbackWatcher._watchdir (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@expo\metro\node_modules\metro-file-map\src\watchers\FallbackWatcher.js:119:33)
+    at C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@expo\metro\node_modules\metro-file-map\src\watchers\FallbackWatcher.js:219:22
+    at Walker.<anonymous> (C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\@expo\metro\node_modules\metro-file-map\src\watchers\FallbackWatcher.js:358:5)
+    at Walker.emit (node:events:508:28)
+    at C:\Users\Adolf Aoun\Desktop\marvel-gym-app\node_modules\walker\lib\walker.js:69:16
+    at FSReqCallback.oncomplete (node:fs:185:23) {
+  errno: -4058,
+  syscall: 'watch',
+  code: 'ENOENT',
+  path: 'C:\\Users\\Adolf Aoun\\Desktop\\marvel-gym-app\\node_modules\\.expo-haptics-pIjhIcdh\\android\\src\\main\\java',
+  filename: 'C:\\Users\\Adolf Aoun\\Desktop\\marvel-gym-app\\node_modules\\.expo-haptics-pIjhIcdh\\android\\src\\main\\java'
+}
+
+Node.js v24.11.1

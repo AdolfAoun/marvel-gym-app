@@ -1,6 +1,5 @@
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { premiumColors } from '@/constants/premiumTheme';
@@ -23,13 +22,7 @@ function BackHeaderButton() {
         router.replace('/(tabs)');
       }}
       style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}>
-      <SymbolView
-        name="chevron.left"
-        size={22}
-        tintColor="#FFFFFF"
-        weight="bold"
-        fallback={<Text style={styles.backFallback}>&lt;</Text>}
-      />
+      <Text style={styles.backArrow}>‹</Text>
     </Pressable>
   );
 }
@@ -196,10 +189,11 @@ const styles = StyleSheet.create({
     opacity: 0.72,
     transform: [{ scale: 0.94 }],
   },
-  backFallback: {
+  backArrow: {
     color: '#FFFFFF',
-    fontSize: 26,
-    fontWeight: '700',
-    lineHeight: 28,
+    fontSize: 34,
+    fontWeight: '600',
+    lineHeight: 36,
+    marginTop: -2,
   },
 });

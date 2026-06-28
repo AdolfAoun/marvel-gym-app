@@ -130,7 +130,7 @@ export default function HelpScreen() {
             </View>
           </View>
 
-        <View style={styles.sectionHeading}>
+        <View style={[styles.sectionHeading, { marginTop: 28 }]}>
           <View style={styles.accentBar} />
           <View style={styles.sectionHeadingText}>
             <Text style={styles.sectionEyebrow}>Contact Us</Text>
@@ -138,24 +138,27 @@ export default function HelpScreen() {
           </View>
         </View>
         <View style={styles.contactRow}>
-            <Pressable
-              onPress={() => handleContact('https://wa.me/96179197997')}
-              style={({ pressed }) => [
-                styles.contactButton,
-                pressed && styles.buttonPressed,
-              ]}>
-              <Text style={styles.contactButtonText}>WhatsApp</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => handleContact('tel:+96179197997')}
-              style={({ pressed }) => [
-                styles.contactButton,
-                styles.contactButtonDark,
-                pressed && styles.buttonPressed,
-              ]}>
-              <Text style={styles.contactButtonTextDark}>Phone call</Text>
-            </Pressable>
-          </View>
+          {/* WhatsApp — gradient like Sign In button on Welcome screen */}
+          <Pressable
+            onPress={() => handleContact('https://wa.me/96179197997')}
+            style={({ pressed }) => [styles.contactBtnWrap, pressed && styles.buttonPressed]}>
+            <LinearGradient
+              colors={['#FF2638', '#B11226', '#2A0308']}
+              locations={[0, 0.58, 1]}
+              start={{ x: 0.08, y: 0 }}
+              end={{ x: 0.92, y: 1 }}
+              style={styles.contactGradientBtn}>
+              <View pointerEvents="none" style={styles.contactBtnGloss} />
+              <Text style={styles.contactBtnText}>WhatsApp</Text>
+            </LinearGradient>
+          </Pressable>
+          {/* Phone — ghost outlined like Continue as Guest */}
+          <Pressable
+            onPress={() => handleContact('tel:+96179197997')}
+            style={({ pressed }) => [styles.contactGhostBtn, pressed && styles.buttonPressed]}>
+            <Text style={styles.contactGhostText}>Phone Call</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </PremiumScreenBackground>
   );
@@ -292,31 +295,64 @@ const styles = StyleSheet.create({
   },
   contactRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
     marginTop: 16,
+    marginBottom: 8,
   },
-  contactButton: {
-    minHeight: 48,
+  // Sign-In gradient button (WhatsApp)
+  contactBtnWrap: {
     flex: 1,
+    borderRadius: 999,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.30,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  contactGradientBtn: {
+    minHeight: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.18)',
-    borderRadius: 16,
-    backgroundColor: accentColor,
+    overflow: 'hidden',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,91,106,0.72)',
+    borderRadius: 999,
   },
-  contactButtonDark: {
-    backgroundColor: premiumColors.surfaceSoft,
+  contactBtnGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '42%',
+    backgroundColor: 'rgba(255,255,255,0.075)',
   },
-  contactButtonText: {
+  contactBtnText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '900',
+    letterSpacing: 0.3,
   },
-  contactButtonTextDark: {
+  // Ghost outlined button (Phone) like Continue as Guest
+  contactGhostBtn: {
+    flex: 1,
+    minHeight: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.4,
+    borderColor: 'rgba(255,35,55,0.78)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(7,2,5,0.45)',
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 4,
+  },
+  contactGhostText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '900',
+    letterSpacing: 0.3,
   },
   stepRow: {
     flexDirection: 'row',

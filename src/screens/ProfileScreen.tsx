@@ -1,4 +1,3 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
@@ -16,12 +15,7 @@ import {
 } from 'react-native';
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
-import { MarvelMarks } from '@/components/PremiumUI';
-import {
-  premiumColors,
-  premiumGradients,
-  premiumShadow,
-} from '@/constants/premiumTheme';
+import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
 import {
   authService,
   avatarService,
@@ -339,13 +333,7 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
-        <LinearGradient
-          colors={premiumGradients.redPanel}
-          start={{ x: 0.1, y: 0 }}
-          end={{ x: 0.9, y: 1 }}
-          style={styles.profileTop}>
-          <View pointerEvents="none" style={styles.profileGloss} />
-          <MarvelMarks variant="corner" color="#FFFFFF" />
+        <View style={styles.profileTop}>
           <Pressable
             onPress={() => setIsPhotoSheetVisible(true)}
             style={({ pressed }) => [styles.avatar, pressed && styles.buttonPressed]}>
@@ -373,7 +361,7 @@ export default function ProfileScreen() {
             {member.firstName} {member.lastName}
           </Text>
           <Text style={styles.phoneText}>{member.phone || 'Member profile'}</Text>
-        </LinearGradient>
+        </View>
 
         <View style={styles.actionRow}>
           <Pressable
@@ -682,20 +670,21 @@ const styles = StyleSheet.create({
   },
   profileTop: {
     position: 'relative',
-    overflow: 'hidden',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-    borderRadius: 28,
-    marginBottom: 10,
+    borderColor: 'rgba(225,29,46,0.28)',
+    borderRadius: 32,
+    marginBottom: 14,
+    marginHorizontal: 4,
     paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 22,
-    shadowColor: premiumColors.red,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.4,
-    shadowRadius: 26,
-    elevation: 10,
+    paddingTop: 28,
+    paddingBottom: 24,
+    backgroundColor: 'rgba(8,4,5,0.72)',
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.32,
+    shadowRadius: 32,
+    elevation: 14,
   },
   profileGloss: {
     position: 'absolute',
@@ -720,8 +709,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.55)',
     borderRadius: 54,
     backgroundColor: 'rgba(0, 0, 0, 0.22)',
     shadowColor: '#000000',
@@ -921,17 +908,22 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.28)',
-    borderRadius: 16,
-    backgroundColor: premiumColors.surfaceSoft,
+    borderWidth: 1.4,
+    borderColor: 'rgba(225,29,46,0.55)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(7,2,5,0.45)',
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 4,
   },
   cancelButton: {
-    borderColor: 'rgba(177, 18, 38, 0.32)',
-    backgroundColor: 'rgba(177, 18, 38, 0.08)',
+    borderColor: 'rgba(225,29,46,0.72)',
+    backgroundColor: 'rgba(177,18,38,0.12)',
   },
   secondaryButtonText: {
-    color: accentColor,
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -940,11 +932,22 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,91,106,0.72)',
+    borderRadius: 999,
     backgroundColor: accentColor,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.42,
+    shadowRadius: 22,
+    elevation: 8,
   },
   doneButtonDisabled: {
-    backgroundColor: premiumColors.surfaceSoft,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   doneButtonText: {
     color: '#FFFFFF',
@@ -955,18 +958,23 @@ const styles = StyleSheet.create({
     color: premiumColors.textFaint,
   },
   signOutButton: {
-    minHeight: 50,
+    minHeight: 52,
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.2)',
-    borderRadius: 18,
-    backgroundColor: premiumColors.surfaceSoft,
-    paddingHorizontal: 46,
+    borderWidth: 1.4,
+    borderColor: 'rgba(225,29,46,0.55)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(7,2,5,0.45)',
+    paddingHorizontal: 52,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    elevation: 6,
   },
   signOutText: {
-    color: premiumColors.redBright,
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -1062,16 +1070,21 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   photoChoiceButton: {
-    minHeight: 54,
+    minHeight: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.22)',
-    borderRadius: 18,
-    backgroundColor: premiumColors.surfaceSoft,
+    borderWidth: 1.4,
+    borderColor: 'rgba(225,29,46,0.55)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(7,2,5,0.45)',
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
+    elevation: 4,
   },
   photoChoiceText: {
-    color: premiumColors.text,
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -1080,13 +1093,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.2)',
-    borderRadius: 18,
-    backgroundColor: premiumColors.surfaceSoft,
+    borderColor: 'rgba(225,29,46,0.28)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(177,18,38,0.08)',
   },
   removePhotoButtonDisabled: {
-    borderColor: 'rgba(148, 163, 184, 0.16)',
-    opacity: 0.54,
+    borderColor: 'rgba(148,163,184,0.12)',
+    opacity: 0.40,
   },
   removePhotoText: {
     color: premiumColors.redBright,
@@ -1097,11 +1110,19 @@ const styles = StyleSheet.create({
     color: premiumColors.textFaint,
   },
   photoCancelButton: {
-    minHeight: 52,
+    minHeight: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,91,106,0.72)',
+    borderRadius: 999,
     backgroundColor: accentColor,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.40,
+    shadowRadius: 20,
+    elevation: 8,
   },
   photoCancelText: {
     color: '#FFFFFF',
@@ -1111,20 +1132,20 @@ const styles = StyleSheet.create({
   confirmRow: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 18,
+    marginTop: 20,
   },
   confirmSecondary: {
     minHeight: 52,
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.24)',
-    borderRadius: 18,
-    backgroundColor: premiumColors.surfaceSoft,
+    borderWidth: 1.4,
+    borderColor: 'rgba(225,29,46,0.55)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(7,2,5,0.45)',
   },
   confirmSecondaryText: {
-    color: premiumColors.redBright,
+    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -1133,8 +1154,16 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,91,106,0.72)',
+    borderRadius: 999,
     backgroundColor: accentColor,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.40,
+    shadowRadius: 18,
+    elevation: 7,
   },
   confirmPrimaryText: {
     color: '#FFFFFF',

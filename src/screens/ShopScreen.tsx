@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -16,7 +17,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import type { NativeScrollEvent, NativeSyntheticEvent, ViewStyle } from 'react-native';
+import type { ViewStyle } from 'react-native';
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import {
@@ -35,7 +36,6 @@ import type {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // ShopScreen content has 20px horizontal padding, so the carousel pages by the
 // inner content width rather than the full screen width.
-const CAROUSEL_WIDTH = SCREEN_WIDTH - 40;
 const accentColor = premiumColors.red;
 const mutedColor = premiumColors.textMuted;
 
@@ -169,6 +169,10 @@ function HeartButton({
   }, [isFav, breatheScale]);
 
   const handlePress = () => {
+    void (isFav
+      ? Haptics.selectionAsync()
+      : Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+    ).catch(() => undefined);
     Animated.sequence([
       Animated.timing(pressScale, {
         toValue: 1.45,
@@ -254,6 +258,9 @@ export default function ShopScreen() {
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [expandedBox, setExpandedBox] = useState<'vouchers' | 'orders' | null>(null);
 
+  const shopFadeAnim = useRef(new Animated.Value(1)).current;
+  const shopIndexRef = useRef(0);
+
   const loadData = useCallback(async () => {
     const [nextProducts, nextVouchers] = await Promise.all([
       productService.getProducts(),
@@ -269,6 +276,16 @@ export default function ShopScreen() {
       loadData();
     }, [loadData]),
   );
+
+  const transitionToShopSlide = useCallback((newIndex: number) => {
+    Animated.timing(shopFadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+      setCarouselIndex(newIndex);
+      shopIndexRef.current = newIndex;
+      Animated.timing(shopFadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+    });
+  }, [shopFadeAnim]);
+
+  useEffect(() => { shopIndexRef.current = carouselIndex; }, [carouselIndex]);
 
   const normalizedSearch = search.trim().toLowerCase();
 
@@ -294,6 +311,15 @@ export default function ShopScreen() {
       .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
       .slice(0, 5);
   }, [products]);
+
+  useEffect(() => {
+    if (featuredProducts.length <= 1) return undefined;
+    const timer = setInterval(() => {
+      const next = (shopIndexRef.current + 1) % featuredProducts.length;
+      transitionToShopSlide(next);
+    }, 3500);
+    return () => clearInterval(timer);
+  }, [featuredProducts.length, transitionToShopSlide]);
 
   const categoryCounts = useMemo(() => {
     const counts = new Map<ShopCategory, number>();
@@ -379,134 +405,105 @@ export default function ShopScreen() {
           </View>
         </View>
 
-        {/* Featured items carousel */}
-        {featuredProducts.length > 0 ? (
-          <>
-            <ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              decelerationRate="fast"
-              onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
-                setCarouselIndex(
-                  Math.round(e.nativeEvent.contentOffset.x / CAROUSEL_WIDTH),
-                );
-              }}
-              style={styles.carouselScroll}>
-              {featuredProducts.map((product) => {
-                const imageUri = getDisplayProductImageUri(product);
-                const isFavorite = favorites.has(product.id);
-                const discount =
-                  product.compareAtPrice && product.compareAtPrice > product.price
-                    ? Math.round(
-                        ((product.compareAtPrice - product.price) /
-                          product.compareAtPrice) *
-                          100,
-                      )
-                    : undefined;
-                return (
-                  <View key={product.id} style={styles.carouselSlide}>
-                    {/* Outer glow ring separated from overflow:hidden card */}
-                    <View style={styles.featuredGlowRing}>
-                    <View style={styles.featuredCard}>
-                      {imageUri ? (
-                        <Image
-                          source={{ uri: imageUri }}
-                          style={StyleSheet.absoluteFillObject}
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View
-                          style={[
-                            StyleSheet.absoluteFillObject,
-                            styles.featuredFallback,
-                          ]}>
-                          <Text style={styles.featuredFallbackText}>
-                            {getInitials(product.name)}
-                          </Text>
-                        </View>
-                      )}
-                      <LinearGradient
-                        pointerEvents="none"
-                        colors={[
-                          'rgba(0,0,0,0.05)',
-                          'rgba(0,0,0,0.0)',
-                          'rgba(40,4,8,0.90)',
-                        ]}
-                        locations={[0, 0.25, 1]}
-                        style={StyleSheet.absoluteFillObject}
-                      />
-                      <View style={styles.featuredTopRow}>
-                        <View style={styles.featuredBadge}>
-                          <Text style={styles.featuredBadgeText}>FEATURED ITEM</Text>
-                        </View>
-                        <HeartButton
-                          isFav={isFavorite}
-                          onToggle={() => toggleFavorite(product.id)}
-                        />
-                      </View>
-                      <View style={styles.featuredBottom}>
-                        <Text style={styles.featuredTitle} numberOfLines={1}>
-                          {product.name}
-                        </Text>
-                        <Text style={styles.featuredDesc} numberOfLines={2}>
-                          {product.description}
-                        </Text>
-                        <View style={styles.statsRow}>
-                          <Text style={styles.featuredPrice}>
-                            {formatPrice(product.price)}
-                          </Text>
-                          {product.compareAtPrice ? (
-                            <Text style={styles.featuredCompare}>
-                              {formatPrice(product.compareAtPrice)}
-                            </Text>
-                          ) : null}
-                          {discount ? (
-                            <View style={styles.featuredDiscount}>
-                              <Text style={styles.featuredDiscountText}>
-                                -{discount}%
-                              </Text>
-                            </View>
-                          ) : product.rating ? (
-                            <View style={styles.featuredRatingChip}>
-                              <Text style={styles.featuredRatingText}>
-                                ★ {product.rating.toFixed(1)}
-                              </Text>
-                            </View>
-                          ) : null}
-                        </View>
-                        <Pressable
-                          onPress={() => {
-                            setPendingVoucherProduct(product);
-                            setVoucherQuantity(1);
-                          }}
-                          style={({ pressed }) => [
-                            styles.featuredBookBtn,
-                            pressed && styles.buttonPressed,
-                          ]}>
-                          <Text style={styles.featuredBookBtnText}>SHOP NOW</Text>
-                          <Text style={styles.featuredBookBtnArrow}> ›</Text>
-                        </Pressable>
-                      </View>
+        {/* Featured items — auto-cycling fade widget */}
+        {featuredProducts.length > 0 && featuredProducts[carouselIndex] ? (() => {
+          const product = featuredProducts[carouselIndex];
+          const imageUri = getDisplayProductImageUri(product);
+          const isFavorite = favorites.has(product.id);
+          const discount =
+            product.compareAtPrice && product.compareAtPrice > product.price
+              ? Math.round(
+                  ((product.compareAtPrice - product.price) / product.compareAtPrice) * 100,
+                )
+              : undefined;
+          return (
+            <View style={styles.featuredWidget}>
+              <View style={styles.featuredCircleGlow} />
+              <Animated.View style={{ opacity: shopFadeAnim }}>
+                <View style={styles.featuredCard}>
+                  {imageUri ? (
+                    <Image
+                      source={{ uri: imageUri }}
+                      style={StyleSheet.absoluteFillObject}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={[StyleSheet.absoluteFillObject, styles.featuredFallback]}>
+                      <Text style={styles.featuredFallbackText}>
+                        {getInitials(product.name)}
+                      </Text>
                     </View>
-                    </View>
-                  </View>
-                );
-              })}
-            </ScrollView>
-
-            {featuredProducts.length > 1 ? (
-              <View style={styles.pagination}>
-                {featuredProducts.map((_, i) => (
-                  <View
-                    key={i}
-                    style={[styles.dot, i === carouselIndex && styles.dotActive]}
+                  )}
+                  <LinearGradient
+                    pointerEvents="none"
+                    colors={[
+                      'rgba(255,255,255,0.15)',
+                      'rgba(255,255,255,0.02)',
+                      'rgba(10,3,8,0.88)',
+                    ]}
+                    locations={[0, 0.30, 1]}
+                    style={StyleSheet.absoluteFillObject}
                   />
-                ))}
-              </View>
-            ) : null}
-          </>
-        ) : null}
+                  <View pointerEvents="none" style={styles.featuredGlassSpecular} />
+                  <LinearGradient
+                    pointerEvents="none"
+                    colors={['rgba(255,255,255,0.10)', 'transparent', 'rgba(255,255,255,0.05)']}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  <View style={styles.featuredTopRow}>
+                    <HeartButton
+                      isFav={isFavorite}
+                      onToggle={() => toggleFavorite(product.id)}
+                    />
+                  </View>
+                  <View style={styles.featuredBottom}>
+                    <Text style={styles.featuredTitle} numberOfLines={1}>
+                      {product.name}
+                    </Text>
+                    <Text style={styles.featuredDesc} numberOfLines={2}>
+                      {product.description}
+                    </Text>
+                    <View style={styles.statsRow}>
+                      <Text style={styles.featuredPrice}>
+                        {formatPrice(product.price)}
+                      </Text>
+                      {product.compareAtPrice ? (
+                        <Text style={styles.featuredCompare}>
+                          {formatPrice(product.compareAtPrice)}
+                        </Text>
+                      ) : null}
+                      {discount ? (
+                        <View style={styles.featuredDiscount}>
+                          <Text style={styles.featuredDiscountText}>-{discount}%</Text>
+                        </View>
+                      ) : product.rating ? (
+                        <View style={styles.featuredRatingChip}>
+                          <Text style={styles.featuredRatingText}>
+                            ★ {product.rating.toFixed(1)}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <Pressable
+                      onPress={() => {
+                        setPendingVoucherProduct(product);
+                        setVoucherQuantity(1);
+                      }}
+                      style={({ pressed }) => [
+                        styles.featuredBookBtn,
+                        pressed && styles.buttonPressed,
+                      ]}>
+                      <Text style={styles.featuredBookBtnText}>SHOP NOW</Text>
+                      <Text style={styles.featuredBookBtnArrow}> ›</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </Animated.View>
+            </View>
+          );
+        })() : null}
 
         {/* Shop by Category */}
         <View style={styles.sectionHeading}>
@@ -576,24 +573,18 @@ export default function ShopScreen() {
         <View style={styles.sectionHeading}>
           <View style={styles.accentBar} />
           <View style={styles.sectionHeadingText}>
-            <Text style={styles.sectionEyebrow}>
-              {showFavoritesOnly ? 'Favorites' : selectedCategory}
+            <Text style={styles.sectionEyebrow}>{selectedCategory}</Text>
+            <Text style={styles.sectionHeadingTitle}>
+              {showFavoritesOnly ? 'Favorites' : 'Available Products'}
             </Text>
-            <Text style={styles.sectionHeadingTitle}>Available Products</Text>
           </View>
           <View style={styles.sectionIcons}>
-            <Pressable
-              onPress={() => setShowFavoritesOnly((v) => !v)}
-              style={[styles.iconBtnSmall, showFavoritesOnly && styles.iconBtnActive]}>
-              <SymbolView
-                name={showFavoritesOnly ? 'heart.fill' : 'heart'}
-                size={17}
-                tintColor={showFavoritesOnly ? '#FFFFFF' : 'rgba(255,255,255,0.85)'}
-                fallback={
-                  <Text style={styles.iconGlyph}>{showFavoritesOnly ? '♥' : '♡'}</Text>
-                }
-              />
-            </Pressable>
+            <HeartButton
+              isFav={showFavoritesOnly}
+              onToggle={() => setShowFavoritesOnly((v) => !v)}
+              btnSize={38}
+              iconSize={17}
+            />
             {searchOpen ? (
               <View style={styles.searchExpanded}>
                 <SymbolView
@@ -1087,17 +1078,34 @@ const styles = StyleSheet.create({
   },
   searchGlyphSmall: { color: premiumColors.textMuted, fontSize: 12, fontWeight: '800' },
 
-  // Featured carousel
-  carouselScroll: { marginBottom: 8 },
-  carouselSlide: { width: CAROUSEL_WIDTH, paddingVertical: 6 },
-  // Outer glow ring (separate from overflow:hidden so red glow shows)
-  featuredGlowRing: {
-    borderRadius: 32,
+  // Featured auto-fade widget
+  featuredWidget: {
+    marginBottom: 8,
+    paddingBottom: 10,
+    position: 'relative',
+  },
+  featuredGlassSpecular: {
+    position: 'absolute',
+    top: 0,
+    left: 18,
+    right: 18,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  // Circular red bloom behind the card (1×1 dot, huge shadowRadius = oval halo)
+  featuredCircleGlow: {
+    position: 'absolute',
+    bottom: 30,
+    alignSelf: 'center',
+    width: 2,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: premiumColors.redBright,
     shadowColor: premiumColors.redBright,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.45,
-    shadowRadius: 24,
-    elevation: 14,
+    shadowOpacity: 0.9,
+    shadowRadius: 55,
+    elevation: 20,
   },
   featuredCard: {
     width: '100%',
@@ -1106,7 +1114,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.30)',
+    borderColor: 'rgba(255,255,255,0.22)',
+    ...premiumShadow,
   },
   featuredFallback: {
     backgroundColor: premiumColors.surface,
@@ -1117,7 +1126,7 @@ const styles = StyleSheet.create({
   featuredTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     padding: 16,
   },
   featuredBadge: {

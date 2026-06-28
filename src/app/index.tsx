@@ -49,7 +49,7 @@ export default function IndexRoute() {
     <View style={styles.container}>
       <StatusBar style="light" />
       <Image
-        source={require('@/assets/images/prototype-three-finger-back-pose-background.png')}
+        source={require('@/assets/images/MarvelPhoto1.jpg')}
         style={styles.backgroundImage}
         resizeMode="cover"
       />

@@ -11,7 +11,7 @@ export type EntrySlide = {
 let entrySlides: EntrySlide[] = [
   {
     id: 'entry-photo-1',
-    image: require('../../assets/images/MarvelPhoto1.jpg'),
+    image: require('../../assets/images/prototype-three-finger-back-pose-background.png'),
     label: 'Welcome Photo 1',
     caption: 'Welcome to Marvel Gym',
     captionSub: 'Where champions are made.',

@@ -14,21 +14,67 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
-import { MarvelMarks } from '@/components/PremiumUI';
-import {
-  premiumColors,
-  premiumGradients,
-  premiumShadow,
-} from '@/constants/premiumTheme';
+import { premiumColors, premiumShadow, premiumGlow } from '@/constants/premiumTheme';
 import { machineGuideService } from '@/services';
 import type { MachineGuide } from '@/types';
 
-const accentColor = premiumColors.red;
-const wineColor = premiumColors.redBright;
-const backgroundColor = premiumColors.background;
-const surfaceColor = premiumColors.surface;
-const textColor = premiumColors.text;
-const mutedColor = premiumColors.textMuted;
+// ─── Neon palette per muscle group ──────────────────────────────────────────
+const MUSCLE_COLORS: Record<string, string> = {
+  Chest: '#00D4FF',
+  Back: '#9B59FF',
+  Shoulders: '#FF8C00',
+  Arms: '#00FF88',
+  Legs: '#FFD700',
+  Core: '#FF2D78',
+};
+
+const MUSCLE_TINTS: Record<string, string> = {
+  Chest: 'rgba(0,212,255,0.10)',
+  Back: 'rgba(155,89,255,0.10)',
+  Shoulders: 'rgba(255,140,0,0.10)',
+  Arms: 'rgba(0,255,136,0.10)',
+  Legs: 'rgba(255,215,0,0.10)',
+  Core: 'rgba(255,45,120,0.10)',
+};
+
+const MUSCLE_GLOW: Record<string, string> = {
+  Chest: 'rgba(0,212,255,0.32)',
+  Back: 'rgba(155,89,255,0.32)',
+  Shoulders: 'rgba(255,140,0,0.32)',
+  Arms: 'rgba(0,255,136,0.32)',
+  Legs: 'rgba(255,215,0,0.32)',
+  Core: 'rgba(255,45,120,0.32)',
+};
+
+// ─── Unsplash image lookup ───────────────────────────────────────────────────
+const MACHINE_IMAGES: Record<string, string> = {
+  'Leg Extension Machine':
+    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&q=80',
+  'Leg Press Machine':
+    'https://images.unsplash.com/photo-1571731956672-f2b94d7dd0cb?w=600&q=80',
+  'Seated Leg Curl':
+    'https://images.unsplash.com/photo-1517963879433-6ad2b056d712?w=600&q=80',
+  'Smith Machine':
+    'https://images.unsplash.com/photo-1540497077202-7c8a3999166f?w=600&q=80',
+  'Cable Crossover':
+    'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600&q=80',
+  'Chest Press Machine':
+    'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=600&q=80',
+  'Lat Pulldown':
+    'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=600&q=80',
+  'Seated Row Machine':
+    'https://images.unsplash.com/photo-1485395578879-6ba080fdddaa?w=600&q=80',
+};
+
+const FALLBACK_IMAGE =
+  'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&q=80';
+
+function getMachineImage(name: string, imageUri?: string): string {
+  if (imageUri) return imageUri;
+  return MACHINE_IMAGES[name] ?? FALLBACK_IMAGE;
+}
+
+// ─── Order ───────────────────────────────────────────────────────────────────
 const muscleOrder: MachineGuide['muscleGroup'][] = [
   'Chest',
   'Back',
@@ -38,11 +84,12 @@ const muscleOrder: MachineGuide['muscleGroup'][] = [
   'Core',
 ];
 
+// ─── Component ───────────────────────────────────────────────────────────────
 export default function MachineGuideScreen() {
   const [guides, setGuides] = useState<MachineGuide[]>([]);
   const [selectedGroup, setSelectedGroup] =
     useState<MachineGuide['muscleGroup']>('Chest');
-  const [selectedGuide, setSelectedGuide] = useState<MachineGuide>();
+  const [selectedGuide, setSelectedGuide] = useState<MachineGuide | undefined>();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -71,12 +118,21 @@ export default function MachineGuideScreen() {
     return guides.filter((guide) => guide.muscleGroup === selectedGroup);
   }, [guides, selectedGroup]);
 
+  const activeColor = MUSCLE_COLORS[selectedGroup] ?? premiumColors.redBright;
+  const activeTint = MUSCLE_TINTS[selectedGroup] ?? 'rgba(177,18,38,0.10)';
+  const activeGlow = MUSCLE_GLOW[selectedGroup] ?? premiumColors.redBright;
+
+  const selectedMuscleColor =
+    selectedGuide ? (MUSCLE_COLORS[selectedGuide.muscleGroup] ?? premiumColors.redBright) : premiumColors.redBright;
+  const selectedMuscleTint =
+    selectedGuide ? (MUSCLE_TINTS[selectedGuide.muscleGroup] ?? 'rgba(177,18,38,0.10)') : 'rgba(177,18,38,0.10)';
+
   if (isLoading) {
     return (
       <PremiumScreenBackground>
         <StatusBar style="light" />
         <View style={styles.loadingState}>
-          <ActivityIndicator color={accentColor} />
+          <ActivityIndicator color={premiumColors.redBright} size="large" />
           <Text style={styles.loadingText}>Loading machine guide...</Text>
         </View>
       </PremiumScreenBackground>
@@ -86,511 +142,672 @@ export default function MachineGuideScreen() {
   return (
     <PremiumScreenBackground>
       <StatusBar style="light" />
+
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        <LinearGradient
-          colors={premiumGradients.redPanel}
-          start={{ x: 0.1, y: 0 }}
-          end={{ x: 0.9, y: 1 }}
-          style={styles.heroCard}>
-          <View pointerEvents="none" style={styles.heroGloss} />
-          <MarvelMarks variant="corner" color="#FFFFFF" />
-          <Text style={styles.kicker}>Equipment Guide</Text>
-          <Text style={styles.heroTitle}>Machine Guide</Text>
-          <Text style={styles.heroBody}>
-            Choose a muscle group, then open a machine for setup cues.
+
+        {/* ── Page Header ─────────────────────────────────────────────── */}
+        <View style={styles.pageHeader}>
+          <Text style={styles.pageEyebrow}>MARVEL GYM</Text>
+          <Text style={styles.pageTitle}>MACHINE{'\n'}GUIDE</Text>
+          <Text style={styles.pageSubtitle}>
+            Select a muscle group and tap any machine for setup cues and form tips.
           </Text>
-          <View style={styles.aiPill}>
-            <Text style={styles.aiPillText}>AI Coach Coming Soon</Text>
-          </View>
-        </LinearGradient>
-
-        <View style={styles.sectionHeading}>
-          <View style={styles.accentBar} />
-          <View style={styles.sectionHeadingText}>
-            <Text style={styles.sectionEyebrow}>Target</Text>
-            <Text style={styles.sectionHeadingTitle}>Muscle groups</Text>
-          </View>
+          <View style={styles.headerDivider} />
         </View>
-        <View style={styles.categoryGrid}>
-            {availableGroups.map((group) => {
-              const isSelected = selectedGroup === group;
-              const count = guides.filter(
-                (guide) => guide.muscleGroup === group,
-              ).length;
 
-              return (
-                <Pressable
-                  key={group}
-                  onPress={() => setSelectedGroup(group)}
+        {/* ── Muscle Group Chips ───────────────────────────────────────── */}
+        <View style={styles.chipSectionLabel}>
+          <Text style={styles.chipSectionTitle}>Target Muscle Group</Text>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsRow}
+          style={styles.chipsScroller}>
+          {availableGroups.map((group) => {
+            const isSelected = selectedGroup === group;
+            const color = MUSCLE_COLORS[group] ?? premiumColors.redBright;
+            const tint = MUSCLE_TINTS[group] ?? 'rgba(177,18,38,0.10)';
+            const glow = MUSCLE_GLOW[group] ?? 'rgba(177,18,38,0.28)';
+            const count = guides.filter((g) => g.muscleGroup === group).length;
+
+            return (
+              <Pressable
+                key={group}
+                onPress={() => setSelectedGroup(group)}
+                style={({ pressed }) => [
+                  styles.chip,
+                  isSelected && {
+                    backgroundColor: tint,
+                    borderColor: color,
+                    shadowColor: glow,
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 1,
+                    shadowRadius: 14,
+                    elevation: 8,
+                  },
+                  !isSelected && styles.chipInactive,
+                  pressed && { opacity: 0.72 },
+                ]}>
+                <Text
                   style={[
-                    styles.categoryCard,
-                    isSelected && styles.categoryCardSelected,
+                    styles.chipLabel,
+                    { color: isSelected ? color : premiumColors.textMuted },
+                    isSelected && { fontWeight: '900' },
                   ]}>
-                  <Text
-                    style={[
-                      styles.categoryTitle,
-                      isSelected && styles.categoryTitleSelected,
-                    ]}>
-                    {group}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.categoryCount,
-                      isSelected && styles.categoryCountSelected,
-                    ]}>
-                    {count} machines
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+                  {group}
+                </Text>
+                <Text
+                  style={[
+                    styles.chipCount,
+                    { color: isSelected ? color : premiumColors.textFaint },
+                  ]}>
+                  {count}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
 
-        <View style={styles.sectionHeading}>
-          <View style={styles.accentBar} />
-          <View style={styles.sectionHeadingText}>
-            <Text style={styles.sectionEyebrow}>Machines</Text>
-            <Text style={styles.sectionHeadingTitle}>{selectedGroup}</Text>
+        {/* ── Machines Section Header ──────────────────────────────────── */}
+        <View style={styles.machinesSectionHeader}>
+          <View style={[styles.accentBar, { backgroundColor: activeColor }]} />
+          <View style={styles.machinesSectionText}>
+            <Text style={[styles.machinesSectionEyebrow, { color: activeColor }]}>
+              {selectedGroup.toUpperCase()}
+            </Text>
+            <Text style={styles.machinesSectionTitle}>Machines</Text>
           </View>
-          <Text style={styles.sectionHint}>{selectedGuides.length} available</Text>
+          <View style={[styles.countBadge, { backgroundColor: activeTint, borderColor: activeColor }]}>
+            <Text style={[styles.countBadgeText, { color: activeColor }]}>
+              {selectedGuides.length}
+            </Text>
+          </View>
         </View>
 
+        {/* ── Machines Grid (2 columns) ────────────────────────────────── */}
         <View style={styles.machineGrid}>
-          {selectedGuides.map((guide) => (
-            <Pressable
-              key={guide.id}
-              onPress={() => setSelectedGuide(guide)}
-              style={({ pressed }) => [
-                styles.machineCard,
-                pressed && styles.buttonPressed,
-              ]}>
-              <View style={styles.machineImage}>
-                {guide.imageUri ? (
+          {selectedGuides.map((guide) => {
+            const imageUri = getMachineImage(guide.name, guide.imageUri);
+            const color = MUSCLE_COLORS[guide.muscleGroup] ?? premiumColors.redBright;
+            const tint = MUSCLE_TINTS[guide.muscleGroup] ?? 'rgba(177,18,38,0.10)';
+            const glow = MUSCLE_GLOW[guide.muscleGroup] ?? 'rgba(177,18,38,0.28)';
+
+            return (
+              <Pressable
+                key={guide.id}
+                onPress={() => setSelectedGuide(guide)}
+                style={({ pressed }) => [
+                  styles.machineCard,
+                  {
+                    shadowColor: glow,
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: pressed ? 0.5 : 0.3,
+                    shadowRadius: 18,
+                    elevation: 8,
+                    borderColor: pressed ? color : premiumColors.border,
+                    opacity: pressed ? 0.88 : 1,
+                  },
+                ]}>
+                {/* Colored left accent bar */}
+                <View style={[styles.cardAccentBar, { backgroundColor: color }]} />
+
+                {/* Machine image */}
+                <View style={styles.machineImageContainer}>
                   <Image
-                    source={{ uri: guide.imageUri }}
+                    source={{ uri: imageUri }}
                     style={styles.machinePhoto}
                     resizeMode="cover"
                   />
-                ) : (
-                  <Text style={styles.machineImageText}>{guide.imageLabel}</Text>
-                )}
-              </View>
-              <Text style={styles.machineName}>{guide.name}</Text>
-              <Text style={styles.machineTarget}>{guide.target}</Text>
-            </Pressable>
-          ))}
+                  {/* Gradient overlay */}
+                  <LinearGradient
+                    colors={['transparent', 'rgba(10,11,15,0.72)']}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  {/* Muscle tag */}
+                  <View style={[styles.muscleTag, { backgroundColor: tint, borderColor: color }]}>
+                    <Text style={[styles.muscleTagText, { color }]}>
+                      {guide.muscleGroup}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Card info */}
+                <View style={styles.machineCardBody}>
+                  <Text style={styles.machineName} numberOfLines={2}>
+                    {guide.name}
+                  </Text>
+                  <Text style={styles.machineTarget} numberOfLines={1}>
+                    {guide.target}
+                  </Text>
+                  <View style={styles.tapHint}>
+                    <View style={[styles.tapDot, { backgroundColor: color }]} />
+                    <Text style={[styles.tapHintText, { color }]}>View guide</Text>
+                  </View>
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
+
       </ScrollView>
 
-      <Modal transparent visible={Boolean(selectedGuide)} animationType="fade">
-        <SafeAreaView
-          edges={['top', 'right', 'bottom', 'left']}
-          style={styles.modalOverlay}>
+      {/* ── Detail Modal ─────────────────────────────────────────────── */}
+      <Modal
+        transparent
+        visible={Boolean(selectedGuide)}
+        animationType="slide"
+        statusBarTranslucent>
+        <View style={styles.modalOverlay}>
           <Pressable
-            style={styles.modalBackdrop}
+            style={StyleSheet.absoluteFillObject}
             onPress={() => setSelectedGuide(undefined)}
           />
-          <View style={styles.detailCard}>
+
+          <View style={styles.detailSheet}>
+            {/* Close handle */}
+            <View style={styles.sheetHandle} />
+
+            {/* Close button */}
             <Pressable
               onPress={() => setSelectedGuide(undefined)}
               style={({ pressed }) => [
                 styles.closeButton,
-                pressed && styles.buttonPressed,
+                pressed && { opacity: 0.7 },
               ]}
               accessibilityLabel="Close machine details">
-              <Text style={styles.closeButtonText}>X</Text>
+              <Text style={styles.closeButtonText}>✕</Text>
             </Pressable>
 
-            <View style={styles.detailTopRow}>
-              <View style={styles.detailImage}>
-                {selectedGuide?.imageUri ? (
-                  <Image
-                    source={{ uri: selectedGuide.imageUri }}
-                    style={styles.detailPhoto}
-                    resizeMode="cover"
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Hero image */}
+              {selectedGuide && (
+                <>
+                  <View style={styles.modalImageContainer}>
+                    <Image
+                      source={{ uri: getMachineImage(selectedGuide.name, selectedGuide.imageUri) }}
+                      style={styles.modalHeroImage}
+                      resizeMode="cover"
+                    />
+                    <LinearGradient
+                      colors={['transparent', 'rgba(10,11,15,0.92)']}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                    {/* Neon tint overlay */}
+                    <View
+                      style={[
+                        StyleSheet.absoluteFillObject,
+                        { backgroundColor: selectedMuscleTint },
+                      ]}
+                    />
+                  </View>
+
+                  {/* Machine info header */}
+                  <View style={styles.modalInfoHeader}>
+                    <View
+                      style={[
+                        styles.modalGroupPill,
+                        {
+                          backgroundColor: selectedMuscleTint,
+                          borderColor: selectedMuscleColor,
+                        },
+                      ]}>
+                      <Text
+                        style={[styles.modalGroupPillText, { color: selectedMuscleColor }]}>
+                        {selectedGuide.muscleGroup}
+                      </Text>
+                    </View>
+
+                    <Text style={styles.modalMachineName}>{selectedGuide.name}</Text>
+
+                    <View style={styles.modalTargetRow}>
+                      <View
+                        style={[styles.targetDot, { backgroundColor: selectedMuscleColor }]}
+                      />
+                      <Text style={styles.modalTargetText}>
+                        Targets: {selectedGuide.target}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Divider */}
+                  <View
+                    style={[
+                      styles.modalDivider,
+                      { backgroundColor: selectedMuscleColor, opacity: 0.28 },
+                    ]}
                   />
-                ) : (
-                  <Text style={styles.detailImageText}>
-                    {selectedGuide?.imageLabel}
-                  </Text>
-                )}
-              </View>
-              <View style={styles.detailCopy}>
-                <Text style={styles.modalKicker}>
-                  Muscle Targeted: {selectedGuide?.target}
-                </Text>
-                <Text style={styles.modalTitle}>{selectedGuide?.name}</Text>
-              </View>
-            </View>
 
-            <Text style={styles.machineDescription}>
-              {selectedGuide?.description}
-            </Text>
+                  {/* Description */}
+                  <View style={styles.modalSection}>
+                    <Text style={styles.modalSectionLabel}>About</Text>
+                    <Text style={styles.modalDescription}>
+                      {selectedGuide.description}
+                    </Text>
+                  </View>
 
-            <View style={styles.instructionList}>
-              {selectedGuide?.instructions.map((instruction) => (
-                <View key={instruction} style={styles.instructionRow}>
-                  <View style={styles.instructionDot} />
-                  <Text style={styles.instructionText}>{instruction}</Text>
-                </View>
-              ))}
-            </View>
+                  {/* Instructions */}
+                  <View style={styles.modalSection}>
+                    <Text style={styles.modalSectionLabel}>Step-by-Step</Text>
+                    <View style={styles.instructionList}>
+                      {selectedGuide.instructions.map((step, idx) => (
+                        <View key={`${idx}-${step.slice(0, 16)}`} style={styles.instructionRow}>
+                          <View
+                            style={[
+                              styles.stepNumber,
+                              { backgroundColor: selectedMuscleTint, borderColor: selectedMuscleColor },
+                            ]}>
+                            <Text
+                              style={[styles.stepNumberText, { color: selectedMuscleColor }]}>
+                              {idx + 1}
+                            </Text>
+                          </View>
+                          <Text style={styles.instructionText}>{step}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+
+                  {/* Bottom spacer */}
+                  <View style={{ height: 32 }} />
+                </>
+              )}
+            </ScrollView>
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
     </PremiumScreenBackground>
   );
 }
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 72,
-    paddingBottom: 42,
-  },
+  // Loading
   loadingState: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    gap: 14,
   },
   loadingText: {
-    color: mutedColor,
+    color: premiumColors.textMuted,
     fontSize: 14,
     fontWeight: '700',
+    letterSpacing: 0.4,
   },
-  heroCard: {
-    position: 'relative',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-    borderRadius: 28,
-    padding: 22,
-    marginBottom: 18,
-    shadowColor: premiumColors.red,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.4,
-    shadowRadius: 26,
-    elevation: 10,
+
+  // Main scroll
+  content: {
+    paddingTop: 60,
+    paddingBottom: 130,
   },
-  heroGloss: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+
+  // ── Page Header
+  pageHeader: {
+    paddingHorizontal: 22,
+    marginBottom: 28,
   },
-  heroGlow: {
-    position: 'absolute',
-    right: -60,
-    top: -70,
-    width: 200,
-    height: 200,
-    borderRadius: 120,
-    backgroundColor: 'rgba(255, 120, 130, 0.22)',
-  },
-  kicker: {
-    color: 'rgba(255, 255, 255, 0.78)',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-  },
-  heroTitle: {
-    color: '#FFFFFF',
-    fontSize: 32,
-    fontWeight: '900',
-    lineHeight: 37,
-    marginTop: 6,
-    textShadowColor: 'rgba(0, 0, 0, 0.25)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
-  },
-  heroBody: {
-    color: '#FCE7EA',
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 20,
-    marginTop: 10,
-  },
-  aiPill: {
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
-    marginTop: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  aiPillText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  card: {
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 26,
-    backgroundColor: surfaceColor,
-    padding: 16,
-    marginBottom: 18,
-    ...premiumShadow,
-  },
-  sectionHeading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 14,
-  },
-  accentBar: {
-    width: 4,
-    height: 36,
-    borderRadius: 3,
-    backgroundColor: premiumColors.redBright,
-  },
-  sectionHeadingText: {
-    flex: 1,
-  },
-  sectionEyebrow: {
+  pageEyebrow: {
     color: premiumColors.redBright,
     fontSize: 11,
     fontWeight: '900',
-    letterSpacing: 1.2,
-    marginBottom: 2,
-    textTransform: 'uppercase',
+    letterSpacing: 3,
+    marginBottom: 6,
   },
-  sectionHeadingTitle: {
-    color: textColor,
-    fontSize: 21,
+  pageTitle: {
+    color: premiumColors.text,
+    fontSize: 44,
     fontWeight: '900',
+    fontStyle: 'italic',
+    lineHeight: 48,
+    letterSpacing: -1,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 8,
   },
-  cardLabel: {
-    color: accentColor,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0,
-    marginBottom: 8,
-    textTransform: 'uppercase',
+  pageSubtitle: {
+    color: premiumColors.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 19,
+    marginTop: 10,
+    maxWidth: 280,
   },
-  categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+  headerDivider: {
+    height: 1,
+    backgroundColor: premiumColors.border,
+    marginTop: 20,
   },
-  categoryCard: {
-    minHeight: 78,
-    flexBasis: '30%',
-    flexGrow: 1,
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
-    borderRadius: 20,
-    backgroundColor: premiumColors.surfaceSoft,
-    padding: 12,
-  },
-  categoryCardSelected: {
-    borderColor: accentColor,
-    backgroundColor: accentColor,
-  },
-  categoryTitle: {
-    color: textColor,
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  categoryTitleSelected: {
-    color: '#FFFFFF',
-  },
-  categoryCount: {
-    color: mutedColor,
-    fontSize: 11,
-    fontWeight: '800',
-    marginTop: 8,
-  },
-  categoryCountSelected: {
-    color: '#FCE7EA',
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 12,
+
+  // ── Chips
+  chipSectionLabel: {
+    paddingHorizontal: 22,
     marginBottom: 12,
   },
-  sectionTitle: {
-    color: textColor,
-    fontSize: 20,
+  chipSectionTitle: {
+    color: premiumColors.textFaint,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  chipsScroller: {
+    marginBottom: 28,
+  },
+  chipsRow: {
+    paddingHorizontal: 20,
+    gap: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1.5,
+  },
+  chipInactive: {
+    backgroundColor: premiumColors.surfaceSoft,
+    borderColor: premiumColors.border,
+  },
+  chipLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  chipCount: {
+    fontSize: 11,
+    fontWeight: '800',
+    minWidth: 14,
+    textAlign: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    overflow: 'hidden',
+  },
+
+  // ── Machines section header
+  machinesSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 22,
+    gap: 12,
+    marginBottom: 16,
+  },
+  accentBar: {
+    width: 4,
+    height: 38,
+    borderRadius: 3,
+  },
+  machinesSectionText: {
+    flex: 1,
+  },
+  machinesSectionEyebrow: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginBottom: 2,
+  },
+  machinesSectionTitle: {
+    color: premiumColors.text,
+    fontSize: 22,
     fontWeight: '900',
   },
-  sectionHint: {
-    color: mutedColor,
-    flexShrink: 1,
-    fontSize: 12,
-    fontWeight: '800',
-    textAlign: 'right',
+  countBadge: {
+    minWidth: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
   },
+  countBadgeText: {
+    fontSize: 12,
+    fontWeight: '900',
+  },
+
+  // ── Machine grid (2 columns)
   machineGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 14,
+    paddingHorizontal: 16,
   },
   machineCard: {
-    minHeight: 142,
-    flexBasis: '30%',
+    flexBasis: '47%',
     flexGrow: 1,
-    borderWidth: 1,
-    borderColor: premiumColors.border,
+    maxWidth: '50%',
     borderRadius: 22,
-    backgroundColor: surfaceColor,
-    padding: 12,
+    borderWidth: 1,
+    backgroundColor: premiumColors.surface,
+    overflow: 'hidden',
     ...premiumShadow,
   },
-  machineImage: {
-    height: 58,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-    backgroundColor: premiumColors.surfaceSoft,
-    marginBottom: 10,
+  cardAccentBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    zIndex: 2,
+    borderTopLeftRadius: 22,
+    borderBottomLeftRadius: 22,
   },
-  machineImageText: {
-    color: accentColor,
-    fontSize: 17,
-    fontWeight: '900',
+  machineImageContainer: {
+    height: 136,
+    width: '100%',
+    overflow: 'hidden',
+    position: 'relative',
   },
   machinePhoto: {
     width: '100%',
     height: '100%',
   },
+  muscleTag: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  muscleTagText: {
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  machineCardBody: {
+    padding: 12,
+    paddingLeft: 16,
+  },
   machineName: {
-    color: textColor,
+    color: premiumColors.text,
     fontSize: 13,
     fontWeight: '900',
     lineHeight: 17,
+    marginBottom: 4,
   },
   machineTarget: {
-    color: mutedColor,
+    color: premiumColors.textMuted,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
     lineHeight: 15,
-    marginTop: 5,
+    marginBottom: 8,
   },
-  buttonPressed: {
-    opacity: 0.76,
+  tapHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
+  tapDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
+  tapHintText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+
+  // ── Modal / Detail sheet
   modalOverlay: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(24, 26, 32, 0.42)',
-    padding: 20,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.72)',
   },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  detailCard: {
-    position: 'relative',
-    width: '100%',
-    maxWidth: 430,
+  detailSheet: {
+    backgroundColor: '#0E0F14',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    borderTopWidth: 1,
+    borderColor: premiumColors.glassBorder,
     maxHeight: '92%',
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 28,
-    backgroundColor: premiumColors.surface,
-    padding: 20,
-    ...premiumShadow,
+    paddingBottom: 16,
+    overflow: 'hidden',
+  },
+  sheetHandle: {
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: premiumColors.border,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 4,
   },
   closeButton: {
     position: 'absolute',
-    right: 14,
-    top: 14,
-    zIndex: 2,
+    right: 16,
+    top: 16,
+    zIndex: 10,
     width: 34,
     height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: premiumColors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 17,
-    backgroundColor: premiumColors.surfaceSoft,
   },
   closeButtonText: {
-    color: wineColor,
-    fontSize: 13,
-    fontWeight: '900',
+    color: premiumColors.textMuted,
+    fontSize: 14,
+    fontWeight: '700',
   },
-  detailTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingRight: 34,
+  modalImageContainer: {
+    height: 220,
+    width: '100%',
+    overflow: 'hidden',
+    position: 'relative',
+    marginTop: 8,
   },
-  detailImage: {
-    width: 68,
-    height: 68,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 21,
-    backgroundColor: accentColor,
-  },
-  detailImageText: {
-    color: '#FFFFFF',
-    fontSize: 21,
-    fontWeight: '900',
-  },
-  detailPhoto: {
+  modalHeroImage: {
     width: '100%',
     height: '100%',
   },
-  detailCopy: {
-    flex: 1,
+  modalInfoHeader: {
+    paddingHorizontal: 22,
+    paddingTop: 20,
+    gap: 8,
   },
-  modalKicker: {
-    color: accentColor,
-    fontSize: 11,
+  modalGroupPill: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  modalGroupPillText: {
+    fontSize: 10,
     fontWeight: '900',
-    letterSpacing: 0,
-    marginBottom: 5,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
-  modalTitle: {
-    color: textColor,
-    fontSize: 22,
+  modalMachineName: {
+    color: premiumColors.text,
+    fontSize: 28,
     fontWeight: '900',
-    lineHeight: 27,
+    lineHeight: 32,
+    letterSpacing: -0.5,
   },
-  machineDescription: {
-    color: mutedColor,
+  modalTargetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  targetDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  modalTargetText: {
+    color: premiumColors.textMuted,
     fontSize: 13,
     fontWeight: '700',
-    lineHeight: 19,
-    marginTop: 16,
+  },
+  modalDivider: {
+    height: 1,
+    marginHorizontal: 22,
+    marginTop: 20,
+    marginBottom: 4,
+  },
+  modalSection: {
+    paddingHorizontal: 22,
+    paddingTop: 18,
+    gap: 10,
+  },
+  modalSectionLabel: {
+    color: premiumColors.textFaint,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  modalDescription: {
+    color: premiumColors.textMuted,
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 21,
   },
   instructionList: {
-    gap: 9,
-    marginTop: 14,
+    gap: 12,
   },
   instructionRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
+    gap: 12,
   },
-  instructionDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: accentColor,
-    marginTop: 6,
+  stepNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    marginTop: 1,
+  },
+  stepNumberText: {
+    fontSize: 12,
+    fontWeight: '900',
   },
   instructionText: {
     flex: 1,
-    color: mutedColor,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 19,
+    color: premiumColors.textMuted,
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 21,
   },
 });

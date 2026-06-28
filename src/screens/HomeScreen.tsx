@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar } from 'expo-status-bar';
-import { useFocusEffect, useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -26,15 +26,14 @@ import {
 } from '@/constants/premiumTheme';
 import {
   activityService,
-  avatarService,
   classService,
+  FREEZE_WEEKLY_PRICE,
   journeyService,
   memberService,
   membershipService,
+  MONTHLY_MEMBERSHIP_PRICE,
   notificationService,
   voucherService,
-  FREEZE_WEEKLY_PRICE,
-  MONTHLY_MEMBERSHIP_PRICE,
 } from '@/services';
 import type {
   AppNotification,
@@ -61,6 +60,7 @@ const minRenewMonths = 1;
 
 const machineGuideSign = require('@/assets/images/marvel-logo-startup-sign-x.png');
 const aiHelpSign = require('@/assets/images/marvel-logo-startup-sign-divide.png');
+const homeHeroBackground = require('@/assets/images/headerhomeback.png');
 
 type MembershipModal = 'freeze' | 'renew';
 
@@ -406,7 +406,6 @@ export default function HomeScreen() {
   const isFrozen = status === 'Frozen';
   const canShowQr = status === 'Active';
   const expiryDate = formatDate(membership?.endDate);
-  const memberAvatar = avatarService.getMemberAvatarDisplay(member);
   const selectedActivityDay =
     activitySchedule.find((item) => item.id === selectedActivityDayId) ??
     activitySchedule[0];
@@ -581,47 +580,53 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.heroCard}>
-          <LinearGradient
-            pointerEvents="none"
-            colors={[
-              'rgba(255,255,255,0.10)',
-              'rgba(225,29,46,0.08)',
-              'rgba(255,255,255,0)',
-            ]}
-            start={{ x: 0.05, y: 0 }}
-            end={{ x: 0.95, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-          <View pointerEvents="none" style={styles.heroGloss} />
+        <View style={styles.heroHeader}>
           <View style={styles.heroTopRow}>
             <View style={styles.heroTextBlock}>
               <Text style={styles.kicker}>Welcome back</Text>
               <Text style={styles.title}>{member?.firstName ?? 'Member'}</Text>
-              <Text style={styles.subtitle}>Consistency is key.</Text>
-            </View>
-            <View style={styles.avatarBadge}>
-              {memberAvatar.imageUri ? (
-                <Image
-                  source={{ uri: memberAvatar.imageUri }}
-                  style={styles.avatarImage}
-                  resizeMode="cover"
-                />
-              ) : (
-                <Text style={styles.avatarText}>{memberAvatar.fallbackLabel}</Text>
-              )}
+              <Text style={styles.subtitle}>Ready to push your limits today?</Text>
             </View>
           </View>
 
-          <View style={styles.heroMetaRow}>
-            <View style={styles.statusBadgeOnRed}>
-              <View style={[styles.statusDot, { backgroundColor: statusTone }]} />
-              <Text style={styles.statusTextOnRed}>{status ?? 'Pending'}</Text>
+          <LinearGradient
+            colors={[
+              'rgba(255,255,255,0.11)',
+              'rgba(13,16,24,0.82)',
+              'rgba(2,4,10,0.72)',
+            ]}
+            start={{ x: 0.05, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroMembershipPanel}>
+            <View style={styles.heroMembershipIconWrap}>
+              <Image
+                source={machineGuideSign}
+                style={styles.heroMembershipIcon}
+                resizeMode="contain"
+              />
             </View>
-            <Text style={styles.heroExpiryText}>
-              {plan?.name ?? 'Current Membership'}
-            </Text>
-          </View>
+            <View style={styles.heroMembershipDetails}>
+              <Text style={styles.heroMembershipLabel}>Membership Status</Text>
+              <View style={styles.heroStatusLine}>
+                <View style={[styles.statusDot, { backgroundColor: statusTone }]} />
+                <Text style={styles.heroStatusText}>{(status ?? 'Pending').toUpperCase()}</Text>
+              </View>
+              <Text style={styles.heroPlanText}>{plan?.name ?? 'Current Membership'}</Text>
+            </View>
+            <View style={styles.heroExpiryBlock}>
+              <Text style={styles.heroExpiryLabel}>Expires</Text>
+              <Text style={styles.heroExpiryDate}>{expiryDate}</Text>
+            </View>
+            <View style={styles.heroCalendarBadge}>
+              <SymbolView
+                name="calendar"
+                size={20}
+                tintColor="#FFFFFF"
+                weight="semibold"
+                fallback={<Text style={styles.heroCalendarFallback}>C</Text>}
+              />
+            </View>
+          </LinearGradient>
         </View>
 
         <View style={styles.sectionHeading}>
@@ -639,9 +644,9 @@ export default function HomeScreen() {
         <View style={styles.ringStage}>
           <LinearGradient
             colors={[
-              'rgba(255, 255, 255, 0.12)',
-              'rgba(255, 255, 255, 0.055)',
-              'rgba(177, 18, 38, 0.1)',
+              'rgba(8,5,5,0.82)',
+              'rgba(5,3,3,0.90)',
+              'rgba(12,4,6,0.78)',
             ]}
             start={{ x: 0.08, y: 0 }}
             end={{ x: 0.92, y: 1 }}
@@ -690,6 +695,7 @@ export default function HomeScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.actionRailScroll}
           contentContainerStyle={styles.actionRail}>
           <View style={styles.actionGridInner}>
             <Pressable
@@ -1263,7 +1269,7 @@ const styles = StyleSheet.create({
   content: {
     position: 'relative',
     paddingHorizontal: 20,
-    paddingTop: 72,
+    paddingTop: 84,
     paddingBottom: 132,
   },
   loadingState: {
@@ -1277,41 +1283,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  heroCard: {
+  heroHeader: {
     position: 'relative',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    borderRadius: 28,
-    backgroundColor: 'rgba(18, 20, 28, 0.72)',
-    padding: 18,
-    marginBottom: 22,
-    shadowColor: premiumColors.red,
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.22,
-    shadowRadius: 26,
-    elevation: 8,
+    marginHorizontal: -20,
+    marginTop: -84,
+    marginBottom: 0,
+    paddingTop: 122,
+    paddingHorizontal: 20,
+    paddingBottom: 0,
   },
-  heroGloss: {
+  heroImageWrapper: {
     position: 'absolute',
-    top: 0,
-    left: 18,
-    right: 18,
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    top: -18,
+    left: 0,
+    right: 0,
+    height: 374,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
   },
-  heroSheen: {
-    position: 'absolute',
-    top: -70,
-    right: -50,
-    width: 200,
-    height: 200,
-    borderRadius: 120,
-    backgroundColor: 'rgba(255, 120, 130, 0.22)',
+  heroBackgroundImage: {
+    width: '100%',
+    height: 374,
+    opacity: 0.86,
   },
   heroTopRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 16,
   },
@@ -1319,91 +1316,134 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   kicker: {
-    color: 'rgba(255, 255, 255, 0.78)',
+    color: 'rgba(255, 255, 255, 0.76)',
     fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 1.5,
+    letterSpacing: 3,
     textTransform: 'uppercase',
   },
   title: {
     color: '#FFFFFF',
-    fontSize: 34,
+    fontSize: 42,
     fontWeight: '900',
     letterSpacing: 0,
     marginTop: 4,
-    textShadowColor: 'rgba(0, 0, 0, 0.25)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.72)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 14,
   },
   subtitle: {
-    color: 'rgba(255, 255, 255, 0.74)',
-    fontSize: 15,
-    fontWeight: '800',
-    lineHeight: 20,
-    marginTop: 6,
-  },
-  avatarBadge: {
-    width: 54,
-    height: 54,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.45)',
-    borderRadius: 27,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-  },
-  avatarText: {
-    color: '#FFFFFF',
+    color: 'rgba(255, 255, 255, 0.9)',
     fontSize: 16,
-    fontWeight: '900',
-  },
-  heroMetaRow: {
-    minHeight: 38,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    borderTopWidth: 0,
-    marginTop: 14,
-    paddingTop: 0,
-  },
-  statusBadgeOnRed: {
-    minHeight: 34,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.075)',
-    paddingHorizontal: 12,
+    fontWeight: '800',
+    lineHeight: 22,
+    marginTop: 6,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 10,
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
-  statusTextOnRed: {
+  heroMembershipPanel: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 32,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    backgroundColor: 'rgba(5, 7, 12, 0.58)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.34,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  heroMembershipIconWrap: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 35, 58, 0.8)',
+    borderRadius: 20,
+    backgroundColor: 'rgba(225, 29, 46, 0.11)',
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.46,
+    shadowRadius: 18,
+  },
+  heroMembershipIcon: {
+    width: 19,
+    height: 19,
+    tintColor: '#FFFFFF',
+  },
+  heroMembershipDetails: {
+    flex: 1,
+    minWidth: 0,
+  },
+  heroMembershipLabel: {
+    color: 'rgba(255, 255, 255, 0.62)',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+  },
+  heroStatusLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 3,
+  },
+  heroStatusText: {
     color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  heroPlanText: {
+    color: 'rgba(255, 255, 255, 0.76)',
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  heroExpiryBlock: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    maxWidth: 78,
+  },
+  heroExpiryLabel: {
+    color: 'rgba(255, 255, 255, 0.58)',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+  },
+  heroExpiryDate: {
+    color: premiumColors.redBright,
     fontSize: 12,
     fontWeight: '900',
-  },
-  heroExpiryText: {
-    flex: 1,
-    color: 'rgba(255, 255, 255, 0.82)',
-    fontSize: 12,
-    fontWeight: '800',
+    marginTop: 4,
     textAlign: 'right',
+  },
+  heroCalendarBadge: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 13,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  heroCalendarFallback: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
   },
   progressCard: {
     borderWidth: 1,
@@ -1465,13 +1505,13 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: 'rgba(225,29,46,0.22)',
     borderRadius: 28,
     width: '100%',
     padding: 20,
     shadowColor: '#E11D2E',
     shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.16,
+    shadowOpacity: 0.22,
     shadowRadius: 28,
     elevation: 7,
   },
@@ -1622,8 +1662,12 @@ const styles = StyleSheet.create({
     paddingRight: 4,
   },
   actionRail: {
-    paddingRight: 4,
+    paddingHorizontal: 20,
+    paddingRight: 20,
     marginBottom: 22,
+  },
+  actionRailScroll: {
+    marginHorizontal: -20,
   },
   actionGridInner: {
     flexDirection: 'row',
