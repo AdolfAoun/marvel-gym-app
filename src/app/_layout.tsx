@@ -68,6 +68,23 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="payment-vouchers"
+        options={{
+          headerShown: true,
+          headerBackButtonDisplayMode: 'minimal',
+          headerBackTitle: '',
+          headerBackVisible: false,
+          headerLeft: () => <BackHeaderButton />,
+          headerTitle: '',
+          headerBackground: () => null,
+          headerTransparent: true,
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: 'transparent' },
+          headerTintColor: accentColor,
+          title: '',
+        }}
+      />
+      <Stack.Screen
         name="shop-orders"
         options={{
           headerShown: true,
@@ -178,10 +195,6 @@ const styles = StyleSheet.create({
     height: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-    borderRadius: 21,
-    // Transparent inside the bubble — only the thin ring remains, no dark disc.
     backgroundColor: 'transparent',
     marginLeft: 12,
   },
@@ -191,9 +204,13 @@ const styles = StyleSheet.create({
   },
   backArrow: {
     color: '#FFFFFF',
-    fontSize: 34,
-    fontWeight: '600',
-    lineHeight: 36,
-    marginTop: -2,
+    fontSize: 42,
+    fontWeight: '900',
+    includeFontPadding: false,
+    lineHeight: 42,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    width: 42,
+    marginLeft:-13,
   },
 });

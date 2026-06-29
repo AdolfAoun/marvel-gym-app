@@ -1,4 +1,3 @@
-import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { Href } from 'expo-router';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -46,7 +45,6 @@ import type {
   MembershipStatus,
   StudentVerificationStatus,
   Voucher,
-  VoucherStatus,
 } from '@/types';
 
 const accentColor = premiumColors.red;
@@ -55,7 +53,6 @@ const backgroundColor = premiumColors.background;
 const surfaceColor = premiumColors.surface;
 const textColor = premiumColors.text;
 const mutedColor = premiumColors.textMuted;
-const voucherStatuses: VoucherStatus[] = ['Pending', 'Confirmed', 'Canceled'];
 const weeklyFreezePrice = FREEZE_WEEKLY_PRICE;
 const maxRenewMonths = 12;
 const minRenewMonths = 1;
@@ -63,30 +60,6 @@ const minRenewMonths = 1;
 const machineGuideSign = require('@/assets/images/marvel-logo-startup-sign-x.png');
 const aiHelpSign = require('@/assets/images/marvel-logo-startup-sign-divide.png');
 const homeHeroBackground = require('@/assets/images/headerhomeback.png');
-
-// Per-letter blend between near-black maroon and bright red, so the member
-// name reads like the Marvel wordmark on the loading screen — every shade of
-// black-into-red across the letters.
-const NAME_BLEND_STOPS: [number, number, number][] = [
-  [44, 6, 12],
-  [177, 18, 38],
-  [255, 56, 72],
-  [225, 29, 46],
-  [36, 5, 11],
-];
-
-function nameLetterColor(t: number) {
-  const clamped = Math.min(1, Math.max(0, t));
-  const seg = clamped * (NAME_BLEND_STOPS.length - 1);
-  const i = Math.min(NAME_BLEND_STOPS.length - 2, Math.floor(seg));
-  const f = seg - i;
-  const a = NAME_BLEND_STOPS[i];
-  const b = NAME_BLEND_STOPS[i + 1];
-  const r = Math.round(a[0] + (b[0] - a[0]) * f);
-  const g = Math.round(a[1] + (b[1] - a[1]) * f);
-  const bl = Math.round(a[2] + (b[2] - a[2]) * f);
-  return `rgb(${r}, ${g}, ${bl})`;
-}
 
 type MembershipModal = 'freeze' | 'renew';
 
@@ -208,18 +181,6 @@ function getCrowdLevelLabel(count: number) {
   return 'Peak';
 }
 
-function getVoucherStatusColor(status: VoucherStatus) {
-  if (status === 'Confirmed') {
-    return '#22C55E';
-  }
-
-  if (status === 'Canceled') {
-    return '#8B95A5';
-  }
-
-  return '#F59E0B';
-}
-
 function formatDate(value?: string) {
   if (!value) {
     return 'Not available yet';
@@ -260,8 +221,6 @@ export default function HomeScreen() {
   const [activitySchedule, setActivitySchedule] = useState<GymActivityDay[]>([]);
   const [selectedActivityDayId, setSelectedActivityDayId] = useState('');
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
-  const [selectedVoucherStatus, setSelectedVoucherStatus] =
-    useState<VoucherStatus>('Pending');
   const [membershipModal, setMembershipModal] = useState<MembershipModal>();
   const [selectedFreezeWeeks, setSelectedFreezeWeeks] = useState(1);
   const [selectedRenewMonths, setSelectedRenewMonths] = useState(1);
@@ -337,7 +296,6 @@ export default function HomeScreen() {
       },
     }),
   ).current;
-
   useEffect(() => {
     const loadDashboard = async () => {
       const [
@@ -449,9 +407,21 @@ export default function HomeScreen() {
       : studentVerificationStatus === 'Pending Verification'
         ? 'Student verification pending. Student pricing applies after approval.'
         : '';
-  const visibleVouchers = vouchers.filter(
-    (voucher) => voucher.status === selectedVoucherStatus,
+  const paymentVouchers = vouchers.filter(
+    (voucher) =>
+      voucher.type === 'Membership Renewal' ||
+      voucher.type === 'Membership Freeze' ||
+      voucher.type === 'Shop Reservation',
   );
+  const reservationVouchers = vouchers.filter(
+    (voucher) => voucher.type === 'Class Reservation',
+  );
+  const pendingPaymentVoucherCount = paymentVouchers.filter(
+    (voucher) => voucher.status === 'Pending',
+  ).length;
+  const pendingReservationCount = reservationVouchers.filter(
+    (voucher) => voucher.status === 'Pending',
+  ).length;
 
   const refreshVouchers = async () => {
     const currentVouchers = await voucherService.getVouchers();
@@ -572,19 +542,6 @@ export default function HomeScreen() {
     }
   };
 
-  const handleCancelVoucher = async (voucherId: string) => {
-    const canceledVoucher = await voucherService.cancelVoucher(voucherId);
-
-    if (!canceledVoucher) {
-      setFeedback('Voucher could not be canceled.');
-      return;
-    }
-
-    await refreshVouchers();
-    setSelectedVoucherStatus('Canceled');
-    setFeedback(`${canceledVoucher.id} was canceled.`);
-  };
-
   if (isLoading) {
     return (
       <PremiumScreenBackground>
@@ -605,6 +562,29 @@ export default function HomeScreen() {
     inputRange: [0, 1],
     outputRange: [22, 0],
   });
+  const isFreezeSheet = membershipModal === 'freeze';
+  const sheetAccent = isFreezeSheet ? '#60A5FA' : '#C084FC';
+  const sheetAccentSoft = isFreezeSheet ? 'rgba(96, 165, 250, 0.16)' : 'rgba(192, 132, 252, 0.16)';
+  const sheetAccentBorder =
+    isFreezeSheet ? 'rgba(96, 165, 250, 0.34)' : 'rgba(192, 132, 252, 0.34)';
+  const sheetKicker = isFreezeSheet ? (isFrozen ? 'Extend Freeze' : 'Freeze Membership') : 'Renew Membership';
+  const sheetCaption = isFreezeSheet ? 'Pause plan' : 'Increase validity';
+  const sheetTitle = isFreezeSheet
+    ? (isFrozen ? 'Keep your break going.' : 'Pause your membership with a cleaner request flow.')
+    : 'Choose how long you want to extend your plan.';
+  const sheetBody = isFreezeSheet
+    ? 'Freeze requests stay pending until cash confirmation at the counter.'
+    : 'Renewal requests stay pending until cash confirmation at the counter.';
+  const sheetUnitValue = isFreezeSheet ? selectedFreezeWeeks : selectedRenewMonths;
+  const sheetUnitLabel = isFreezeSheet
+    ? `week${selectedFreezeWeeks > 1 ? 's' : ''}`
+    : `month${selectedRenewMonths > 1 ? 's' : ''}`;
+  const sheetTotal = isFreezeSheet ? selectedFreezeAmount : selectedRenewAmount;
+  const sheetUnitPrice = isFreezeSheet ? weeklyFreezePrice : monthlyRenewalPrice;
+  const sheetPrimaryAction = isFreezeSheet ? handleCreateFreezeVoucher : handleCreateRenewVoucher;
+  const sheetPrimaryLabel = isCreatingVoucher ? 'Creating...' : 'Create voucher';
+  const sheetSymbolName = isFreezeSheet ? 'snowflake' : 'sparkles';
+  const sheetSymbolFallback = isFreezeSheet ? '❄' : '✦';
 
   return (
     <PremiumScreenBackground>
@@ -612,69 +592,112 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.heroHeader}>
+        <View style={styles.heroCard}>
+          <View pointerEvents="none" style={styles.heroGloss} />
           <View style={styles.heroTopRow}>
             <View style={styles.heroTextBlock}>
               <Text style={styles.kicker}>Welcome back</Text>
-              {/* Gradient FILL inside each glyph (black↔red sweep) via a mask,
-                  so every letter itself contains a mix of black and red. */}
-              <MaskedView
-                style={styles.nameMaskWrap}
-                maskElement={
-                  <Text style={[styles.nameGlyph, styles.nameMaskInk]}>
-                    {member?.firstName ?? 'Member'}
-                  </Text>
-                }>
-                <LinearGradient
-                  colors={['#2A0408', '#B11226', '#FF3B4D', '#E11D2E', '#2A0408']}
-                  locations={[0, 0.28, 0.5, 0.72, 1]}
-                  start={{ x: 0.5, y: 0 }}
-                  end={{ x: 0.5, y: 1 }}>
-                  <Text style={[styles.nameGlyph, styles.nameGlyphHidden]}>
-                    {member?.firstName ?? 'Member'}
-                  </Text>
-                </LinearGradient>
-              </MaskedView>
-              <Text style={styles.subtitle}>Ready to push your limits today?</Text>
+              <Text style={styles.title}>{member?.firstName ?? 'Member'}</Text>
+              <Text style={styles.subtitle}>Consistency is key.</Text>
+            </View>
+            <View style={styles.avatarBadge}>
+              {member?.profileImageUri ? (
+                <Image
+                  source={{ uri: member.profileImageUri }}
+                  style={styles.avatarImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text style={styles.avatarText}>
+                  {(member?.firstName?.[0] ?? '') + (member?.lastName?.[0] ?? '') ||
+                    'M'}
+                </Text>
+              )}
             </View>
           </View>
 
+          <View style={styles.heroMetaRow}>
+            <View style={styles.statusBadgeOnRed}>
+              <View style={[styles.statusDot, { backgroundColor: statusTone }]} />
+              <Text style={styles.statusTextOnRed}>{status ?? 'Pending'}</Text>
+            </View>
+            <Text style={styles.heroExpiryText}>
+              Member since {formatDate(membership?.startDate)}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.sectionHeading}>
+          <View style={styles.accentBar} />
+          <View style={styles.sectionHeadingText}>
+            <Text style={styles.sectionEyebrow}>Membership</Text>
+            <Text style={styles.sectionHeadingTitle}>Days Remaining</Text>
+          </View>
+          <View style={styles.expiryPill}>
+            <Text style={styles.expiryPillLabel}>Expires</Text>
+            <Text style={styles.expiryPillText}>{expiryDate}</Text>
+          </View>
+        </View>
+
+        <View style={styles.ringStage}>
           <LinearGradient
             colors={[
-              'rgba(255,255,255,0.11)',
-              'rgba(13,16,24,0.82)',
-              'rgba(2,4,10,0.72)',
+              'rgba(5, 7, 12, 0.92)',
+              'rgba(17, 7, 32, 0.9)',
+              'rgba(138,43,226,0.18)',
             ]}
-            start={{ x: 0.05, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.heroMembershipPanel}>
-            <View style={styles.heroPanelTopRow}>
-              <View style={styles.heroMembershipDetails}>
-                <Text style={styles.heroMembershipLabel}>Membership Status</Text>
-                <View style={styles.heroStatusLine}>
-                  <View style={[styles.statusDot, { backgroundColor: statusTone }]} />
-                  <Text style={styles.heroStatusText}>{(status ?? 'Pending').toUpperCase()}</Text>
-                </View>
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.daysGlassCard}>
+            <LinearGradient
+              pointerEvents="none"
+              colors={[
+                'rgba(0, 0, 0, 0)',
+                'rgba(192,132,252,0.08)',
+                'rgba(192,132,252,0.16)',
+              ]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={styles.daysAuroraBand}
+            />
+            <LinearGradient
+              pointerEvents="none"
+              colors={[
+                'rgba(255, 255, 255, 0)',
+                'rgba(216, 180, 254, 0.16)',
+                'rgba(192,132,252,0.04)',
+              ]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={[styles.daysCrystalFacet, styles.daysCrystalFacetTop]}
+            />
+            <LinearGradient
+              pointerEvents="none"
+              colors={[
+                'rgba(192,132,252,0.02)',
+                'rgba(216, 180, 254, 0.12)',
+                'rgba(255, 255, 255, 0)',
+              ]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={[styles.daysCrystalFacet, styles.daysCrystalFacetBottom]}
+            />
+            <View style={styles.daysTopRow}>
+              <View>
+                <Text style={[styles.daysNumber, { color: countdownColor }]}>
+                  {daysRemaining}
+                </Text>
+                <Text style={styles.daysLabel}>Days Remaining</Text>
               </View>
-              <View style={styles.heroExpiryBlock}>
-                <Text style={styles.heroExpiryLabel}>Expires</Text>
-                <Text style={styles.heroExpiryDate}>{expiryDate}</Text>
-              </View>
-              <View style={styles.heroCalendarBadge}>
-                <SymbolView
-                  name="calendar"
-                  size={20}
-                  tintColor="#FFFFFF"
-                  weight="semibold"
-                  fallback={<Text style={styles.heroCalendarFallback}>C</Text>}
-                />
+              <View style={styles.daysStatusPill}>
+                <View style={[styles.statusDot, { backgroundColor: statusTone }]} />
+                <Text style={styles.daysStatusText}>{status ?? 'Pending'}</Text>
               </View>
             </View>
-
-            <View style={styles.heroProgressTrack}>
+            <View style={styles.membershipTrack}>
               <View
                 style={[
-                  styles.heroProgressFill,
+                  styles.membershipTrackFill,
                   {
                     backgroundColor: countdownColor,
                     width: `${Math.round(membershipProgress * 100)}%`,
@@ -682,11 +705,11 @@ export default function HomeScreen() {
                 ]}
               />
             </View>
-
-            <View style={styles.heroMetaRow}>
-              <Text style={[styles.heroMetaStrong, { color: countdownColor }]}>
-                {daysRemaining} days left
+            <View style={styles.daysMetaRow}>
+              <Text style={styles.daysMetaText}>
+                {Math.round(membershipProgress * 100)}% of plan remaining
               </Text>
+              <Text style={styles.daysMetaText}>{expiryDate}</Text>
             </View>
           </LinearGradient>
         </View>
@@ -806,7 +829,7 @@ export default function HomeScreen() {
                 {
                   scale: featureScrollX.interpolate({
                     inputRange: [-featurePageW, 0, featurePageW],
-                    outputRange: [0.84, 1, 0.84],
+                    outputRange: [0.72, 1, 0.72],
                     extrapolate: 'clamp',
                   }),
                 },
@@ -856,7 +879,7 @@ export default function HomeScreen() {
                 {
                   scale: featureScrollX.interpolate({
                     inputRange: [0, featurePageW, featurePageW * 2],
-                    outputRange: [0.84, 1, 0.84],
+                    outputRange: [0.72, 1, 0.72],
                     extrapolate: 'clamp',
                   }),
                 },
@@ -897,6 +920,58 @@ export default function HomeScreen() {
               <Text style={styles.featureTitle}>How to use the app</Text>
               <Text style={styles.featureBody}>
                 Instructions, AI assistant, and contact.
+              </Text>
+            </Pressable>
+          </Animated.View>
+
+          <Animated.View
+            style={{
+              width: featureCardWidth,
+              transform: [
+                {
+                  scale: featureScrollX.interpolate({
+                    inputRange: [featurePageW, featurePageW * 2, featurePageW * 3],
+                    outputRange: [0.72, 1, 0.72],
+                    extrapolate: 'clamp',
+                  }),
+                },
+              ],
+            }}>
+            <Pressable
+              onPress={() => router.push('/ai-plan' as Href)}
+              style={({ pressed }) => [
+                styles.featureCard,
+                pressed && styles.featurePressed,
+              ]}>
+              <LinearGradient
+                pointerEvents="none"
+                colors={['#1A0A2E', '#110720', '#0A0414']}
+                start={{ x: 0.1, y: 0 }}
+                end={{ x: 0.9, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <Image
+                source={aiHelpSign}
+                style={[styles.featureWatermark, styles.featureWatermarkAi]}
+                resizeMode="contain"
+              />
+              <View style={styles.featureTopRow}>
+                <View style={[styles.featureIconBadge, styles.featureIconBadgeAiPlan]}>
+                  <SymbolView
+                    name="sparkles"
+                    size={22}
+                    tintColor="#FFFFFF"
+                    weight="semibold"
+                    fallback={<Text style={styles.featureBadgeText}>✦</Text>}
+                  />
+                </View>
+              </View>
+              <Text style={[styles.featureKicker, styles.featureKickerAiPlan]}>
+                AI Planner
+              </Text>
+              <Text style={styles.featureTitle}>Tailor your own plan using AI</Text>
+              <Text style={styles.featureBody}>
+                Set your goals and chat with AI to build your plan.
               </Text>
             </Pressable>
           </Animated.View>
@@ -956,82 +1031,85 @@ export default function HomeScreen() {
           <View style={styles.sectionHeading}>
             <View style={styles.accentBar} />
             <View style={styles.sectionHeadingText}>
-              <Text style={styles.sectionEyebrow}>Payments</Text>
-              <Text style={styles.sectionHeadingTitle}>Vouchers</Text>
+              <Text style={styles.sectionEyebrow}>Requests</Text>
+              <Text style={styles.sectionHeadingTitle}>Activity</Text>
             </View>
             <Text style={styles.sectionHint}>{vouchers.length} total</Text>
           </View>
 
-          <View style={styles.voucherTabs}>
-            <GlowingChips
-              items={voucherStatuses.map((voucherStatus) => ({
-                key: voucherStatus,
-                label: voucherStatus,
-                dotColor: getVoucherStatusColor(voucherStatus),
-                trailingLabel: String(
-                  vouchers.filter((voucher) => voucher.status === voucherStatus).length,
-                ),
-              }))}
-              selectedKey={selectedVoucherStatus}
-              onSelect={(key) => setSelectedVoucherStatus(key as VoucherStatus)}
-              unselectedChipStyle={styles.voucherTabUnselected}
-            />
-          </View>
-
-          {visibleVouchers.length === 0 ? (
-            <Text style={styles.emptyVoucherText}>
-              No {selectedVoucherStatus.toLowerCase()} vouchers.
-            </Text>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.voucherRail}>
-              {visibleVouchers.map((voucher) => {
-              const canCancelVoucher =
-                voucher.status === 'Pending' &&
-                (voucher.type === 'Membership Freeze' ||
-                  voucher.type === 'Membership Renewal');
-
-              return (
-                <View key={voucher.id} style={styles.voucherCard}>
-                  <View style={styles.voucherTear} />
-                  <View style={styles.voucherContent}>
-                    <Text style={styles.voucherType}>{voucher.type}</Text>
-                    <Text style={styles.voucherDescription}>
-                      {voucher.description}
-                    </Text>
-                    <Text style={styles.voucherMeta}>
-                      {formatVoucherDate(voucher.date)} - {voucher.id}
-                    </Text>
-                    {canCancelVoucher && (
-                      <Pressable
-                        onPress={() => handleCancelVoucher(voucher.id)}
-                        style={({ pressed }) => [
-                          styles.voucherCancelButton,
-                          pressed && styles.buttonPressed,
-                        ]}>
-                        <Text style={styles.voucherCancelText}>Cancel request</Text>
-                      </Pressable>
-                    )}
-                  </View>
-                  <View style={styles.voucherAmountBlock}>
-                    <Text style={styles.voucherAmount}>
-                      ${voucher.amount.toFixed(2)}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.voucherStatus,
-                        { color: getVoucherStatusColor(voucher.status) },
-                      ]}>
-                      {voucher.status}
-                    </Text>
-                  </View>
+          <View style={styles.requestLinksGrid}>
+            <Pressable
+              onPress={() => router.push('/payment-vouchers')}
+              style={({ pressed }) => [
+                styles.requestLinkCard,
+                styles.requestLinkCardPayments,
+                pressed && styles.buttonPressed,
+              ]}>
+              <LinearGradient
+                pointerEvents="none"
+                colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0)', 'rgba(0,0,0,0.08)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <View style={styles.requestLinkTopRow}>
+                <View style={[styles.requestLinkIconWrap, styles.requestLinkIconWrapPayments]}>
+                  <SymbolView
+                    name="ticket.fill"
+                    size={18}
+                    tintColor="#FFFFFF"
+                    fallback={<Text style={styles.requestLinkIconFallback}>T</Text>}
+                  />
                 </View>
-              );
-            })}
-            </ScrollView>
-          )}
+                <View style={styles.requestLinkCountPill}>
+                  <Text style={styles.requestLinkCountText}>{paymentVouchers.length}</Text>
+                </View>
+              </View>
+              <Text style={styles.requestLinkTitle}>Vouchers</Text>
+              <Text style={styles.requestLinkBody}>
+                Renewals, freezes, and shop requests paid at the counter.
+              </Text>
+              <Text style={styles.requestLinkMeta}>
+                {pendingPaymentVoucherCount} pending
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => router.push('/class-bookings')}
+              style={({ pressed }) => [
+                styles.requestLinkCard,
+                styles.requestLinkCardReservations,
+                pressed && styles.buttonPressed,
+              ]}>
+              <LinearGradient
+                pointerEvents="none"
+                colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0)', 'rgba(0,0,0,0.08)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <View style={styles.requestLinkTopRow}>
+                <View style={[styles.requestLinkIconWrap, styles.requestLinkIconWrapReservations]}>
+                  <SymbolView
+                    name="calendar.badge.clock"
+                    size={18}
+                    tintColor="#FFFFFF"
+                    fallback={<Text style={styles.requestLinkIconFallback}>R</Text>}
+                  />
+                </View>
+                <View style={styles.requestLinkCountPill}>
+                  <Text style={styles.requestLinkCountText}>{reservationVouchers.length}</Text>
+                </View>
+              </View>
+              <Text style={styles.requestLinkTitle}>My Reservations</Text>
+              <Text style={styles.requestLinkBody}>
+                See every pending, confirmed, and canceled class booking.
+              </Text>
+              <Text style={styles.requestLinkMeta}>
+                {pendingReservationCount} pending
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.sectionHeading}>
@@ -1089,147 +1167,134 @@ export default function HomeScreen() {
               {...sheetPanResponder.panHandlers}
             />
             <View style={styles.modalDragZone}>
+              <View style={styles.modalHandle} />
+            </View>
+            <View style={styles.modalHeaderRow}>
+              <View style={[styles.modalIconWrap, { borderColor: sheetAccentBorder, backgroundColor: sheetAccentSoft }]}>
+                <SymbolView
+                  name={sheetSymbolName}
+                  size={18}
+                  tintColor="#FFFFFF"
+                  fallback={<Text style={styles.modalIconFallback}>{sheetSymbolFallback}</Text>}
+                />
+              </View>
+              <View style={styles.modalHeaderText}>
+                <Text style={[styles.modalKicker, { color: sheetAccent }]}>{sheetKicker}</Text>
+                <Text style={styles.modalTitle}>{sheetTitle}</Text>
+              </View>
               <Pressable
                 onPress={closeMembershipModal}
-                style={styles.modalHandle}
+                style={styles.modalCloseButton}
                 accessibilityLabel="Close sheet"
-                accessibilityRole="button"
+                accessibilityRole="button">
+                <Text style={styles.modalCloseText}>×</Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.modalBody}>{sheetBody}</Text>
+
+            <View style={[styles.modalHeroCard, { borderColor: sheetAccentBorder }]}>
+              <LinearGradient
+                pointerEvents="none"
+                colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0)', 'rgba(0,0,0,0.08)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <View style={styles.modalHeroTopRow}>
+                <View>
+                  <Text style={styles.modalHeroLabel}>{sheetCaption}</Text>
+                  <Text style={styles.modalHeroValue}>
+                    ${sheetUnitPrice}
+                    <Text style={styles.modalHeroUnit}> / {isFreezeSheet ? 'week' : 'month'}</Text>
+                  </Text>
+                </View>
+                <View style={[styles.modalMiniPill, { borderColor: sheetAccentBorder, backgroundColor: sheetAccentSoft }]}>
+                  <Text style={[styles.modalMiniPillText, { color: sheetAccent }]}>{status ?? 'Pending'}</Text>
+                </View>
+              </View>
+              {renewalPricingNote && !isFreezeSheet ? (
+                <Text style={[styles.modalNote, { color: sheetAccent }]}>{renewalPricingNote}</Text>
+              ) : null}
+            </View>
+
+            <View style={styles.modalStatsRow}>
+              <View style={styles.modalStatCard}>
+                <Text style={styles.modalStatLabel}>{isFreezeSheet ? 'Duration' : 'Extension'}</Text>
+                <Text style={styles.modalStatValue}>{sheetUnitValue}</Text>
+                <Text style={styles.modalStatCaption}>{sheetUnitLabel}</Text>
+              </View>
+              <View style={styles.modalStatCard}>
+                <Text style={styles.modalStatLabel}>Total</Text>
+                <Text style={styles.modalStatValue}>${sheetTotal.toFixed(0)}</Text>
+                <Text style={styles.modalStatCaption}>cash voucher</Text>
+              </View>
+            </View>
+
+            <View style={styles.stepperRow}>
+              <Pressable
+                onPress={() =>
+                  isFreezeSheet
+                    ? setSelectedFreezeWeeks((value) => Math.max(1, value - 1))
+                    : setSelectedRenewMonths((value) => Math.max(minRenewMonths, value - 1))
+                }
+                style={styles.stepperButton}>
+                <Text style={[styles.stepperButtonText, { color: sheetAccent }]}>-</Text>
+              </Pressable>
+              <View style={styles.stepperValueCard}>
+                <Text style={styles.stepperValue}>{sheetUnitValue}</Text>
+                <Text style={styles.stepperLabel}>{sheetUnitLabel}</Text>
+              </View>
+              <Pressable
+                onPress={() =>
+                  isFreezeSheet
+                    ? setSelectedFreezeWeeks((value) => Math.min(12, value + 1))
+                    : setSelectedRenewMonths((value) => Math.min(maxRenewMonths, value + 1))
+                }
+                style={styles.stepperButton}>
+                <Text style={[styles.stepperButtonText, { color: sheetAccent }]}>+</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.durationTrack}>
+              <View
+                style={[
+                  styles.durationFill,
+                  {
+                    backgroundColor: sheetAccent,
+                    width: `${(sheetUnitValue / (isFreezeSheet ? 12 : maxRenewMonths)) * 100}%`,
+                  },
+                ]}
               />
             </View>
 
-            {membershipModal === 'freeze' ? (
-              <>
-                <Text style={styles.modalKicker}>
-                  {isFrozen ? 'Extend Freeze' : 'Freeze Membership'}
-                </Text>
-                <Text style={styles.modalTitle}>
-                  {isFrozen ? 'Extend the current freeze.' : 'Request a membership freeze.'}
-                </Text>
-                <Text style={styles.modalBody}>
-                  Freeze for up to 12 weeks at $10/week. Requests are kept on hold until cash confirmation at the counter.
-                </Text>
-
-                <View style={styles.stepperRow}>
-                  <Pressable
-                    onPress={() =>
-                      setSelectedFreezeWeeks((value) => Math.max(1, value - 1))
-                    }
-                    style={styles.stepperButton}>
-                    <Text style={styles.stepperButtonText}>-</Text>
-                  </Pressable>
-                  <View style={styles.stepperValueCard}>
-                    <Text style={styles.stepperValue}>{selectedFreezeWeeks}</Text>
-                    <Text style={styles.stepperLabel}>
-                      week{selectedFreezeWeeks > 1 ? 's' : ''}
-                    </Text>
-                  </View>
-                  <Pressable
-                    onPress={() =>
-                      setSelectedFreezeWeeks((value) => Math.min(12, value + 1))
-                    }
-                    style={styles.stepperButton}>
-                    <Text style={styles.stepperButtonText}>+</Text>
-                  </Pressable>
-                </View>
-
-                <Text style={styles.modalTotal}>
-                  Total: ${selectedFreezeAmount.toFixed(2)}
-                </Text>
-
-                <View style={styles.modalActionRow}>
-                  <Pressable
-                    disabled={isCreatingVoucher}
-                    onPress={() => closeMembershipModal()}
-                    style={({ pressed }) => [
-                      styles.modalSecondaryButton,
-                      pressed && styles.buttonPressed,
-                    ]}>
-                    <Text style={styles.modalSecondaryText}>Cancel</Text>
-                  </Pressable>
-                  <Pressable
-                    disabled={isCreatingVoucher}
-                    onPress={handleCreateFreezeVoucher}
-                    style={({ pressed }) => [
-                      styles.modalPrimaryButton,
-                      pressed && styles.buttonPressed,
-                    ]}>
-                    <Text style={styles.modalPrimaryText}>Create voucher</Text>
-                  </Pressable>
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={styles.modalKicker}>Renew / Extend Membership</Text>
-                <Text style={styles.modalTitle}>Choose any duration.</Text>
-                <Text style={styles.modalBody}>
-                  {`Renew for up to 12 months at $${monthlyRenewalPrice}/month. Requests are kept on hold until cash confirmation at the counter.`}
-                </Text>
-                {renewalPricingNote ? (
-                  <Text style={styles.modalNote}>{renewalPricingNote}</Text>
-                ) : null}
-
-                <View style={styles.stepperRow}>
-                  <Pressable
-                    onPress={() =>
-                      setSelectedRenewMonths((value) =>
-                        Math.max(minRenewMonths, value - 1),
-                      )
-                    }
-                    style={styles.stepperButton}>
-                    <Text style={styles.stepperButtonText}>-</Text>
-                  </Pressable>
-                  <View style={styles.stepperValueCard}>
-                    <Text style={styles.stepperValue}>{selectedRenewMonths}</Text>
-                    <Text style={styles.stepperLabel}>
-                      month{selectedRenewMonths > 1 ? 's' : ''}
-                    </Text>
-                  </View>
-                  <Pressable
-                    onPress={() =>
-                      setSelectedRenewMonths((value) =>
-                        Math.min(maxRenewMonths, value + 1),
-                      )
-                    }
-                    style={styles.stepperButton}>
-                    <Text style={styles.stepperButtonText}>+</Text>
-                  </Pressable>
-                </View>
-
-                <View style={styles.durationTrack}>
-                  <View
-                    style={[
-                      styles.durationFill,
-                      { width: `${(selectedRenewMonths / maxRenewMonths) * 100}%` },
-                    ]}
-                  />
-                </View>
-
-                <Text style={styles.modalTotal}>
-                  Total: ${selectedRenewAmount.toFixed(2)}
-                </Text>
-
-                <View style={styles.modalActionRow}>
-                  <Pressable
-                    disabled={isCreatingVoucher}
-                    onPress={() => closeMembershipModal()}
-                    style={({ pressed }) => [
-                      styles.modalSecondaryButton,
-                      pressed && styles.buttonPressed,
-                    ]}>
-                    <Text style={styles.modalSecondaryText}>Cancel</Text>
-                  </Pressable>
-                  <Pressable
-                    disabled={isCreatingVoucher}
-                    onPress={handleCreateRenewVoucher}
-                    style={({ pressed }) => [
-                      styles.modalPrimaryButton,
-                      pressed && styles.buttonPressed,
-                    ]}>
-                    <Text style={styles.modalPrimaryText}>Create voucher</Text>
-                  </Pressable>
-                </View>
-              </>
-            )}
+            <View style={styles.modalFooterRow}>
+              <View>
+                <Text style={styles.modalFooterLabel}>Ready to request</Text>
+                <Text style={styles.modalTotal}>${sheetTotal.toFixed(2)}</Text>
+              </View>
+              <View style={styles.modalActionRow}>
+                <Pressable
+                  disabled={isCreatingVoucher}
+                  onPress={closeMembershipModal}
+                  style={({ pressed }) => [
+                    styles.modalSecondaryButton,
+                    pressed && styles.buttonPressed,
+                  ]}>
+                  <Text style={styles.modalSecondaryText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  disabled={isCreatingVoucher}
+                  onPress={sheetPrimaryAction}
+                  style={({ pressed }) => [
+                    styles.modalPrimaryButton,
+                    { backgroundColor: sheetAccent, shadowColor: sheetAccent },
+                    pressed && styles.buttonPressed,
+                  ]}>
+                  <Text style={styles.modalPrimaryText}>{sheetPrimaryLabel}</Text>
+                </Pressable>
+              </View>
+            </View>
           </Animated.View>
         </Animated.View>
       </Modal>
@@ -1338,32 +1403,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  heroHeader: {
+  heroCard: {
     position: 'relative',
-    marginHorizontal: -20,
-    marginTop: -84,
-    marginBottom: 0,
-    paddingTop: 100,
-    paddingHorizontal: 20,
-    paddingBottom: 0,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 28,
+    backgroundColor: 'rgba(15, 17, 23, 0.74)',
+    padding: 18,
+    marginBottom: 22,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.22,
+    shadowRadius: 28,
+    elevation: 8,
   },
-  heroImageWrapper: {
+  heroGloss: {
     position: 'absolute',
-    top: -18,
-    left: 0,
-    right: 0,
-    height: 374,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  heroBackgroundImage: {
-    width: '100%',
-    height: 374,
-    opacity: 0.86,
+    top: 0,
+    left: 18,
+    right: 18,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
   },
   heroTopRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 16,
   },
@@ -1371,99 +1436,84 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   kicker: {
-    color: 'rgba(255, 255, 255, 0.76)',
+    color: 'rgba(255, 255, 255, 0.78)',
     fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 3,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   title: {
-    color: premiumColors.redBright,
-    fontSize: 42,
+    color: '#FFFFFF',
+    fontSize: 34,
     fontWeight: '900',
     letterSpacing: 0,
     marginTop: 4,
-  },
-  nameMaskWrap: {
-    alignSelf: 'flex-start',
-    marginTop: 4,
-  },
-  nameGlyph: {
-    fontSize: 42,
-    fontWeight: '900',
-    letterSpacing: 0,
-    lineHeight: 50,
-  },
-  // Opaque ink → defines the glyph shape the gradient shows through.
-  nameMaskInk: {
-    color: '#000000',
-  },
-  // Sizes the gradient to the text without being visible itself.
-  nameGlyphHidden: {
-    opacity: 0,
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   subtitle: {
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 15,
     fontWeight: '800',
-    lineHeight: 22,
+    lineHeight: 20,
     marginTop: 6,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 10,
   },
-  statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-  },
-  heroMembershipPanel: {
-    marginTop: 32,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 22,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: 'rgba(5, 7, 12, 0.58)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.34,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  heroPanelTopRow: {
-    flexDirection: 'row',
+  avatarBadge: {
+    width: 54,
+    height: 54,
     alignItems: 'center',
-    gap: 10,
-  },
-  heroProgressTrack: {
-    height: 8,
+    justifyContent: 'center',
+    borderWidth: 0,
+    borderColor: 'transparent',
+    borderRadius: 27,
+    backgroundColor: 'transparent',
     overflow: 'hidden',
-    borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.095)',
-    marginTop: 16,
   },
-  heroProgressFill: {
+  avatarImage: {
+    width: '100%',
     height: '100%',
-    borderRadius: 999,
+  },
+  avatarText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
   },
   heroMetaRow: {
+    minHeight: 38,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
-    marginTop: 9,
+    gap: 10,
+    borderTopWidth: 0,
+    marginTop: 12,
+    paddingTop: 0,
   },
-  heroMetaStrong: {
-    fontSize: 11,
+  statusBadgeOnRed: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    paddingHorizontal: 12,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusTextOnRed: {
+    color: '#FFFFFF',
+    fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 0.3,
-    textTransform: 'uppercase',
   },
-  heroMetaText: {
-    color: 'rgba(255, 255, 255, 0.62)',
-    flexShrink: 1,
-    fontSize: 11,
+  heroExpiryText: {
+    flex: 1,
+    color: 'rgba(255, 255, 255, 0.82)',
+    fontSize: 12,
     fontWeight: '800',
     textAlign: 'right',
   },
@@ -1478,86 +1528,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     paddingHorizontal: 20,
-  },
-  heroMembershipIconWrap: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 35, 58, 0.8)',
-    borderRadius: 20,
-    backgroundColor: 'rgba(225, 29, 46, 0.11)',
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.46,
-    shadowRadius: 18,
-  },
-  heroMembershipIcon: {
-    width: 19,
-    height: 19,
-    tintColor: '#FFFFFF',
-  },
-  heroMembershipDetails: {
-    flex: 1,
-    minWidth: 0,
-  },
-  heroMembershipLabel: {
-    color: 'rgba(255, 255, 255, 0.62)',
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 1.6,
-    textTransform: 'uppercase',
-  },
-  heroStatusLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 3,
-  },
-  heroStatusText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  heroPlanText: {
-    color: 'rgba(255, 255, 255, 0.76)',
-    fontSize: 11,
-    fontWeight: '800',
-    marginTop: 2,
-  },
-  heroExpiryBlock: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    maxWidth: 78,
-  },
-  heroExpiryLabel: {
-    color: 'rgba(255, 255, 255, 0.58)',
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 1.6,
-    textTransform: 'uppercase',
-  },
-  heroExpiryDate: {
-    color: premiumColors.redBright,
-    fontSize: 12,
-    fontWeight: '900',
-    marginTop: 4,
-    textAlign: 'right',
-  },
-  heroCalendarBadge: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 13,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  heroCalendarFallback: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '900',
   },
   progressCard: {
     borderWidth: 1,
@@ -1619,15 +1589,38 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(225,29,46,0.22)',
+    borderColor: 'rgba(192,132,252,0.34)',
     borderRadius: 28,
     width: '100%',
     padding: 20,
-    shadowColor: '#E11D2E',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.22,
-    shadowRadius: 28,
-    elevation: 7,
+    shadowColor: '#C084FC',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 22,
+    elevation: 5,
+  },
+  daysAuroraBand: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: '72%',
+    opacity: 0.72,
+  },
+  daysCrystalFacet: {
+    position: 'absolute',
+    right: -18,
+    width: 230,
+    height: 1,
+    backgroundColor: 'rgba(216, 180, 254, 0.1)',
+  },
+  daysCrystalFacetTop: {
+    top: 36,
+    transform: [{ rotate: '-17deg' }],
+  },
+  daysCrystalFacetBottom: {
+    bottom: 34,
+    transform: [{ rotate: '14deg' }],
   },
   daysGlassHighlight: {
     position: 'absolute',
@@ -2001,6 +1994,13 @@ const styles = StyleSheet.create({
   featureKickerAi: {
     color: '#FF8088',
   },
+  featureIconBadgeAiPlan: {
+    borderColor: 'rgba(192,132,252,0.5)',
+    backgroundColor: 'rgba(138,43,226,0.22)',
+  },
+  featureKickerAiPlan: {
+    color: '#C084FC',
+  },
   featureTitle: {
     color: '#FFFFFF',
     fontSize: 16,
@@ -2102,6 +2102,87 @@ const styles = StyleSheet.create({
   },
   voucherSection: {
     marginBottom: 16,
+  },
+  requestLinksGrid: {
+    gap: 12,
+  },
+  requestLinkCard: {
+    position: 'relative',
+    overflow: 'hidden',
+    minHeight: 138,
+    borderWidth: 1,
+    borderRadius: 24,
+    padding: 16,
+    ...premiumShadow,
+  },
+  requestLinkCardPayments: {
+    borderColor: 'rgba(192, 132, 252, 0.24)',
+    backgroundColor: 'rgba(29, 18, 45, 0.72)',
+  },
+  requestLinkCardReservations: {
+    borderColor: 'rgba(225, 29, 46, 0.2)',
+    backgroundColor: 'rgba(28, 14, 18, 0.72)',
+  },
+  requestLinkTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  requestLinkIconWrap: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 14,
+  },
+  requestLinkIconWrapPayments: {
+    borderColor: 'rgba(192, 132, 252, 0.42)',
+    backgroundColor: 'rgba(192, 132, 252, 0.18)',
+  },
+  requestLinkIconWrapReservations: {
+    borderColor: 'rgba(225, 29, 46, 0.38)',
+    backgroundColor: 'rgba(225, 29, 46, 0.16)',
+  },
+  requestLinkIconFallback: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  requestLinkCountPill: {
+    minWidth: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 8,
+  },
+  requestLinkCountText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  requestLinkTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  requestLinkBody: {
+    color: 'rgba(255, 255, 255, 0.74)',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
+    marginTop: 6,
+    maxWidth: '92%',
+  },
+  requestLinkMeta: {
+    color: 'rgba(255, 255, 255, 0.88)',
+    fontSize: 11,
+    fontWeight: '900',
+    marginTop: 12,
+    textTransform: 'uppercase',
   },
   emptyVoucherText: {
     color: mutedColor,
@@ -2302,7 +2383,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     backgroundColor: premiumColors.surface,
     paddingHorizontal: 22,
     paddingTop: 14,
@@ -2366,8 +2447,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: -22,
-    minHeight: 46,
-    marginBottom: 8,
+    minHeight: 32,
+    marginBottom: 10,
   },
   modalTopDragHitbox: {
     position: 'absolute',
@@ -2378,41 +2459,152 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   modalKicker: {
-    color: accentColor,
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0,
-    marginBottom: 6,
+    marginBottom: 3,
     textTransform: 'uppercase',
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  modalHeaderText: {
+    flex: 1,
+  },
+  modalIconWrap: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 15,
+  },
+  modalIconFallback: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  modalCloseButton: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  modalCloseText: {
+    color: premiumColors.textMuted,
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 18,
   },
   modalTitle: {
     color: textColor,
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '900',
-    lineHeight: 29,
+    lineHeight: 31,
   },
   modalBody: {
     color: mutedColor,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
-    marginTop: 10,
+    marginTop: 12,
+  },
+  modalHeroCard: {
+    position: 'relative',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    marginTop: 18,
+    padding: 16,
+  },
+  modalHeroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  modalHeroLabel: {
+    color: premiumColors.textMuted,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  modalHeroValue: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: '900',
+    marginTop: 3,
+  },
+  modalHeroUnit: {
+    color: premiumColors.textMuted,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  modalMiniPill: {
+    minHeight: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 11,
+  },
+  modalMiniPillText: {
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
   },
   modalNote: {
-    color: premiumColors.redBright,
+    color: '#C084FC',
     fontSize: 12,
     fontWeight: '900',
     lineHeight: 18,
     marginTop: 10,
+  },
+  modalStatsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  modalStatCard: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  modalStatLabel: {
+    color: premiumColors.textFaint,
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  modalStatValue: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '900',
+    marginTop: 4,
+  },
+  modalStatCaption: {
+    color: premiumColors.textMuted,
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 2,
   },
   stepperRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 24,
-    backgroundColor: premiumColors.surfaceSoft,
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
     marginTop: 18,
     padding: 10,
   },
@@ -2422,7 +2614,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 18,
-    backgroundColor: premiumColors.surfaceSoft,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   stepperButtonText: {
     color: accentColor,
@@ -2434,7 +2626,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 0,
     borderRadius: 20,
-    backgroundColor: premiumColors.background,
+    backgroundColor: 'rgba(8, 10, 16, 0.72)',
     paddingVertical: 12,
   },
   stepperValue: {
@@ -2460,17 +2652,29 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: accentColor,
   },
+  modalFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 14,
+    marginTop: 18,
+  },
+  modalFooterLabel: {
+    color: premiumColors.textMuted,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
   modalTotal: {
     color: textColor,
-    fontSize: 17,
+    fontSize: 26,
     fontWeight: '900',
-    marginTop: 16,
-    textAlign: 'right',
+    marginTop: 3,
   },
   modalActionRow: {
+    flex: 1,
     flexDirection: 'row',
     gap: 10,
-    marginTop: 16,
   },
   modalSecondaryButton: {
     minHeight: 54,
@@ -2478,12 +2682,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.24)',
-    borderRadius: 18,
-    backgroundColor: premiumColors.surfaceSoft,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   modalSecondaryText: {
-    color: wineColor,
+    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -2492,7 +2696,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 18,
+    borderRadius: 20,
     backgroundColor: accentColor,
     shadowColor: accentColor,
     shadowOffset: { width: 0, height: 12 },

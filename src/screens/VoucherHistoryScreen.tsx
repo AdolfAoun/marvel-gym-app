@@ -19,7 +19,7 @@ import type { Voucher, VoucherStatus, VoucherType } from '@/types';
 type VoucherHistoryTab = 'All' | VoucherStatus;
 
 type VoucherHistoryScreenProps = {
-  type: VoucherType;
+  type: VoucherType | VoucherType[];
   eyebrow: string;
   title: string;
   description: string;
@@ -61,13 +61,14 @@ export default function VoucherHistoryScreen({
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<VoucherHistoryTab>('All');
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const acceptedTypes = useMemo(() => (Array.isArray(type) ? type : [type]), [type]);
 
   const loadVouchers = useCallback(async () => {
     const memberVouchers = await voucherService.getVouchers();
 
-    setVouchers(memberVouchers.filter((voucher) => voucher.type === type));
+    setVouchers(memberVouchers.filter((voucher) => acceptedTypes.includes(voucher.type)));
     setIsLoading(false);
-  }, [type]);
+  }, [acceptedTypes]);
 
   useFocusEffect(
     useCallback(() => {

@@ -3,12 +3,11 @@ import { BlurView } from 'expo-blur';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs } from 'expo-router';
 import type { SFSymbol } from 'expo-symbols';
 import { SymbolView } from 'expo-symbols';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Image,
   PanResponder,
   Platform,
   Pressable,
@@ -21,8 +20,6 @@ import Animated, {
   type SharedValue,
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
-  withSequence,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
@@ -32,7 +29,6 @@ import { premiumColors } from '@/constants/premiumTheme';
 
 const accentColor = premiumColors.redBright;
 const inactiveColor = 'rgba(255,255,255,0.55)';
-const profileIconImage = require('@/assets/images/profileicon.png');
 
 const FAB_W = 40;
 const FAB_H = 80;
@@ -62,18 +58,23 @@ function TabIcon({
   );
 }
 
-function ProfileHeaderButton() {
-  const router = useRouter();
-
+function ProfileTabIcon({ focused }: { focused: boolean }) {
   return (
-    <Pressable
-      accessibilityLabel="Open profile"
-      hitSlop={12}
-      onPress={() => router.push('/profile')}
-      style={({ pressed }) => [styles.profileButton, pressed && styles.profileButtonPressed]}>
-      <Image source={profileIconImage} style={styles.profileButtonImage} resizeMode="contain" />
-    </Pressable>
+    <TabIcon
+      activeIcon="person.crop.circle.fill"
+      fallback="P"
+      focused={focused}
+      icon="person.crop.circle"
+    />
   );
+}
+
+function GlassTabIconWrap({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  return <Animated.View style={styles.glassTabIconWrap}>{children}</Animated.View>;
 }
 
 function getTabLabel(options: BottomTabBarProps['descriptors'][string]['options'], routeName: string) {
@@ -266,6 +267,7 @@ function HalfCircleFABBar({ state, descriptors, navigation }: BottomTabBarProps)
 function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const [barWidth, setBarWidth] = useState(0);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   const visibleRoutes = state.routes.filter(
     (route) =>
@@ -282,15 +284,19 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const tabCount = Math.max(1, visibleRoutes.length);
   const tabWidth = barWidth > 0 ? (barWidth - innerPadding * 2) / tabCount : 0;
 
-  // pillX = pill left offset; grow = 0..1 selection/drag swell; wobble loops
-  // 0↔1 to make the bubble's edges flow while held; barScale shrinks the whole
-  // bar toward 0.9 when it's left untouched.
+  // pillX = pill left offset; pillGrow expands the active bubble when selected;
+  // barScale/barDrop handle idle position, barFloat is steady while held, and
+  // pillWobble gives the dragged pill a tiny droplet-like response.
   const pillX = useSharedValue(0);
-  const grow = useSharedValue(0);
-  const wobble = useSharedValue(0.5);
+  const pillGrow = useSharedValue(1);
+  const pillCompact = useSharedValue(0);
+  const pillWobble = useSharedValue(0);
   const barScale = useSharedValue(1);
+  const barDrop = useSharedValue(0);
+  const barFloat = useSharedValue(0);
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef(0);
+  const previewIndexRef = useRef<number | null>(null);
   const shrinkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Latest geometry/routes for the PanResponder closures (created once).
@@ -323,26 +329,42 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   // Pop the bar back to full size and (re)arm the idle-shrink timer.
   const wakeBar = useCallback(() => {
     barScale.value = withSpring(1, { damping: 16, stiffness: 200 });
+    barDrop.value = withSpring(0, { damping: 18, stiffness: 210 });
+    barFloat.value = withSpring(0, { damping: 18, stiffness: 210 });
+    pillCompact.value = withSpring(0, { damping: 18, stiffness: 210 });
     if (shrinkTimer.current) clearTimeout(shrinkTimer.current);
+    if (isDraggingRef.current) {
+      shrinkTimer.current = null;
+      return;
+    }
     shrinkTimer.current = setTimeout(() => {
-      barScale.value = withTiming(0.9, {
+      if (isDraggingRef.current) {
+        shrinkTimer.current = null;
+        return;
+      }
+      barScale.value = withTiming(0.82, {
+        duration: 320,
+        easing: Easing.out(Easing.cubic),
+      });
+      barDrop.value = withTiming(0, {
+        duration: 320,
+        easing: Easing.out(Easing.cubic),
+      });
+      pillCompact.value = withTiming(1.28, {
         duration: 320,
         easing: Easing.out(Easing.cubic),
       });
     }, 2600);
-  }, [barScale]);
+  }, [barScale, barDrop, barFloat, pillCompact]);
 
-  // Quick bubble pop + settle when a tab is tapped (without dragging).
-  const pulseBubble = useCallback(() => {
-    grow.value = withSequence(
-      withTiming(1, { duration: 140 }),
-      withSpring(0, { damping: 16, stiffness: 200 }),
-    );
-    wobble.value = withSequence(
-      withTiming(1, { duration: 160 }),
-      withTiming(0.5, { duration: 240 }),
-    );
-  }, [grow, wobble]);
+  const updatePreviewIndex = useCallback(
+    (index: number | null) => {
+      if (previewIndexRef.current === index) return;
+      previewIndexRef.current = index;
+      setPreviewIndex(index);
+    },
+    [],
+  );
 
   useEffect(() => {
     wakeBar();
@@ -354,13 +376,19 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   // Glide the pill to the active tab on selection/layout changes (not mid-drag).
   useEffect(() => {
     if (tabWidth > 0 && !isDraggingRef.current) {
+      pillGrow.value = 0.72;
       pillX.value = withSpring(innerPadding + activeIndex * tabWidth, {
         damping: 18,
         stiffness: 200,
         mass: 0.8,
       });
+      pillGrow.value = withSpring(1, {
+        damping: 15,
+        stiffness: 240,
+        mass: 0.7,
+      });
     }
-  }, [activeIndex, tabWidth, pillX]);
+  }, [activeIndex, tabWidth, pillX, pillGrow]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -368,15 +396,22 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         Math.abs(gesture.dx) > 6 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
       onPanResponderGrant: () => {
         isDraggingRef.current = true;
-        grow.value = withSpring(1, { damping: 14, stiffness: 180 });
-        // Edges keep "flowing" like a soap bubble while the finger is down.
-        wobble.value = withRepeat(
-          withTiming(1, { duration: 620, easing: Easing.inOut(Easing.ease) }),
-          -1,
-          true,
-        );
         dragStartRef.current = pillX.value;
         wakeBar();
+        updatePreviewIndex(activeIndex);
+        barScale.value = withTiming(1.08, {
+          duration: 120,
+          easing: Easing.out(Easing.cubic),
+        });
+        barDrop.value = withTiming(0, {
+          duration: 120,
+          easing: Easing.out(Easing.cubic),
+        });
+        barFloat.value = withTiming(1, {
+          duration: 120,
+          easing: Easing.out(Easing.cubic),
+        });
+        pillGrow.value = withSpring(1.16, { damping: 20, stiffness: 220 });
       },
       onPanResponderMove: (_, gesture) => {
         const w = tabWidthRef.current;
@@ -385,15 +420,24 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         if (next < innerPadding) next = innerPadding;
         if (next > max) next = max;
         pillX.value = next;
+        const nextIndex = Math.max(
+          0,
+          Math.min(routesRef.current.length - 1, Math.round((next - innerPadding) / (w || 1))),
+        );
+        updatePreviewIndex(nextIndex);
+        pillWobble.value = withSpring(Math.max(-1, Math.min(1, gesture.vx / 1.8)), {
+          damping: 13,
+          stiffness: 180,
+          mass: 0.5,
+        });
       },
       onPanResponderRelease: () => {
         const w = tabWidthRef.current || 1;
         const idx = Math.round((pillX.value - innerPadding) / w);
         const clamped = Math.max(0, Math.min(routesRef.current.length - 1, idx));
         isDraggingRef.current = false;
-        // Bubble settles once the finger lifts.
-        grow.value = withSpring(0, { damping: 16, stiffness: 200 });
-        wobble.value = withTiming(0.5, { duration: 300 });
+        updatePreviewIndex(null);
+        pillWobble.value = withSpring(0, { damping: 12, stiffness: 170 });
         pillX.value = withSpring(innerPadding + clamped * w, {
           damping: 18,
           stiffness: 200,
@@ -404,30 +448,29 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
       },
       onPanResponderTerminate: () => {
         isDraggingRef.current = false;
-        grow.value = withSpring(0, { damping: 16, stiffness: 200 });
-        wobble.value = withTiming(0.5, { duration: 300 });
+        updatePreviewIndex(null);
+        pillWobble.value = withSpring(0, { damping: 12, stiffness: 170 });
+        wakeBar();
       },
     }),
   ).current;
 
   const pillStyle = useAnimatedStyle(() => ({
-    width: tabWidth,
+    width: tabWidth + 10 * pillGrow.value + 8 * barFloat.value - 22 * pillCompact.value,
     transform: [
-      { translateX: pillX.value },
-      // Swell while held, with a tiny bubble jiggle.
-      { scale: 1 + grow.value * 0.16 + grow.value * (wobble.value - 0.5) * 0.05 },
+      { translateX: pillX.value - 5 * pillGrow.value - 4 * barFloat.value + 11 * pillCompact.value },
+      { scaleX: 1 + 0.035 * Math.abs(pillWobble.value) },
+      { scaleY: 0.96 + 0.04 * pillGrow.value + 0.08 * barFloat.value - 0.2 * pillCompact.value - 0.025 * Math.abs(pillWobble.value) },
+      { skewX: `${pillWobble.value * 2.2}deg` },
     ],
   }));
 
-  // Iridescent sheen that sweeps across the bubble's edges while it's held.
-  const bubbleEdgeStyle = useAnimatedStyle(() => ({
-    opacity: grow.value * (0.25 + wobble.value * 0.55),
-    transform: [{ translateX: (wobble.value - 0.5) * (tabWidth || 0) * 0.7 }],
-  }));
-
   const barStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: barScale.value }],
-    opacity: 0.7 + (barScale.value - 0.9) * 3,
+    transform: [
+      { translateY: barDrop.value },
+      { scale: barScale.value },
+    ],
+    opacity: 0.62 + (barScale.value - 0.82) * 2.65,
   }));
 
   const hasLiquidGlass = isLiquidGlassAvailable();
@@ -463,38 +506,34 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         {/* gliding / draggable selection bubble */}
         {tabWidth > 0 ? (
           <Animated.View style={[styles.glassPill, pillStyle]}>
-            {/* greyish translucent glass fill */}
             <LinearGradient
-              colors={['rgba(255,255,255,0.24)', 'rgba(176,182,196,0.10)']}
+              colors={['rgba(255,255,255,0.28)', 'rgba(176,182,196,0.12)']}
               start={{ x: 0.5, y: 0 }}
               end={{ x: 0.5, y: 1 }}
               style={StyleSheet.absoluteFill}
             />
-            {/* soap-bubble iridescent edge that flows while held */}
-            <Animated.View
+            <LinearGradient
               pointerEvents="none"
-              style={[StyleSheet.absoluteFill, bubbleEdgeStyle]}>
-              <LinearGradient
-                colors={[
-                  'rgba(255,255,255,0)',
-                  'rgba(150,210,255,0.55)',
-                  'rgba(255,190,235,0.5)',
-                  'rgba(190,255,220,0.45)',
-                  'rgba(255,255,255,0)',
-                ]}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={StyleSheet.absoluteFill}
-              />
-            </Animated.View>
-            {/* top specular highlight */}
-            <View pointerEvents="none" style={styles.pillSpecular} />
+              colors={[
+                'rgba(255,255,255,0)',
+                'rgba(178,224,255,0.28)',
+                'rgba(255,232,202,0.3)',
+                'rgba(205,238,224,0.2)',
+                'rgba(255,255,255,0)',
+              ]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={styles.pillWaterReflection}
+            />
+            <View pointerEvents="none" style={styles.pillEdgeReflection} />
           </Animated.View>
         ) : null}
 
         <View style={[styles.glassTabRow, { paddingHorizontal: innerPadding }]}>
           {visibleRoutes.map((route, index) => {
             const isFocused = route.key === focusedKey;
+            const isPreviewed = previewIndex === index;
+            const iconFocused = isFocused || isPreviewed;
             const options = descriptors[route.key].options;
             return (
               <Pressable
@@ -504,23 +543,24 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 accessibilityLabel={getTabLabel(options, route.name)}
                 onPress={() => {
                   wakeBar();
-                  pulseBubble();
                   selectIndex(index);
                 }}
                 style={styles.glassTabButton}>
-                {options.tabBarIcon?.({
-                  color: isFocused ? accentColor : inactiveColor,
-                  focused: isFocused,
-                  size: 22,
-                }) ?? (
-                  <Text
-                    style={[
-                      styles.tabFallbackIcon,
-                      { color: isFocused ? accentColor : inactiveColor },
-                    ]}>
-                    {getTabLabel(options, route.name).slice(0, 1)}
-                  </Text>
-                )}
+                <GlassTabIconWrap>
+                  {options.tabBarIcon?.({
+                    color: iconFocused ? accentColor : inactiveColor,
+                    focused: iconFocused,
+                    size: 22,
+                  }) ?? (
+                    <Text
+                      style={[
+                        styles.tabFallbackIcon,
+                        { color: iconFocused ? accentColor : inactiveColor },
+                      ]}>
+                      {getTabLabel(options, route.name).slice(0, 1)}
+                    </Text>
+                  )}
+                </GlassTabIconWrap>
               </Pressable>
             );
           })}
@@ -547,8 +587,6 @@ export default function TabsLayout() {
         freezeOnBlur: false,
         sceneStyle: { backgroundColor: premiumColors.background },
         headerBackground: () => null,
-        headerRight: () => <ProfileHeaderButton />,
-        headerRightContainerStyle: { paddingRight: 18, paddingTop: 16 },
         headerShadowVisible: false,
         headerShown: true,
         headerTitle: () => null,
@@ -572,7 +610,7 @@ export default function TabsLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ focused }) => (
-            <TabIcon activeIcon="house.fill" fallback="H" focused={focused} icon="house" />
+            <TabIcon activeIcon="house" fallback="H" focused={focused} icon="house" />
           ),
         }}
       />
@@ -604,6 +642,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ focused }) => <ProfileTabIcon focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
         name="help"
         options={{ href: null, title: 'Help' }}
       />
@@ -621,8 +666,8 @@ const styles = StyleSheet.create({
     height: 0,
   },
   tabFallbackIcon: {
-    fontSize: 17,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '900',
   },
 
   // iOS liquid-glass pill tab bar
@@ -635,10 +680,10 @@ const styles = StyleSheet.create({
   },
   glassBar: {
     flexDirection: 'row',
-    width: '86%',
-    maxWidth: 460,
-    height: 62,
-    borderRadius: 31,
+    width: '78%',
+    maxWidth: 390,
+    height: 54,
+    borderRadius: 27,
     overflow: 'hidden',
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.22)',
@@ -657,21 +702,31 @@ const styles = StyleSheet.create({
   },
   glassPill: {
     position: 'absolute',
-    top: 6,
-    bottom: 6,
+    top: 4,
+    bottom: 4,
     borderRadius: 24,
     overflow: 'hidden',
     borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.5)',
+    borderColor: 'rgba(255,255,255,0.52)',
   },
-  pillSpecular: {
+  pillWaterReflection: {
     position: 'absolute',
-    top: 2,
-    left: 6,
-    right: 6,
-    height: '42%',
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    top: 0,
+    left: -8,
+    right: -8,
+    bottom: 0,
+    opacity: 0.82,
+  },
+  pillEdgeReflection: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 24,
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,255,255,0.42)',
+    backgroundColor: 'transparent',
   },
   glassTabRow: {
     flex: 1,
@@ -681,6 +736,12 @@ const styles = StyleSheet.create({
   glassTabButton: {
     flex: 1,
     height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  glassTabIconWrap: {
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -763,25 +824,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Profile button
-  profileButton: {
-    width: 92,
-    height: 92,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'visible',
-    backgroundColor: 'transparent',
-    opacity: 0.82,
-    transform: [{ translateY: 10 }],
-  },
-  profileButtonPressed: {
-    opacity: 0.68,
-    // Keep the same translateY as the resting state so the icon scales in
-    // place instead of jumping upward on the first tap.
-    transform: [{ translateY: 10 }, { scale: 0.95 }],
-  },
-  profileButtonImage: {
-    width: 86,
-    height: 86,
-  },
 });

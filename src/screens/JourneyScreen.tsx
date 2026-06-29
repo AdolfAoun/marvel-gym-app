@@ -11,7 +11,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
+
   View,
 } from 'react-native';
 
@@ -103,13 +103,13 @@ async function getStoredTimerState() {
 export default function JourneyScreen() {
   const [member, setMember] = useState<Member>();
   const [profile, setProfile] = useState<JourneyProfile>();
-  const [biographyDraft, setBiographyDraft] = useState('');
+
   const [attendanceDays, setAttendanceDays] = useState<AttendanceDay[]>([]);
   const [workoutSessions, setWorkoutSessions] = useState<WorkoutSession[]>([]);
   const [historyRecords, setHistoryRecords] = useState<JourneyHistoryRecord[]>([]);
   const [stats, setStats] = useState<JourneyStats>();
   const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [isEditingBio, setIsEditingBio] = useState(false);
+
   const [isCalendarEditorOpen, setIsCalendarEditorOpen] = useState(false);
   const [selectedMonthIndex, setSelectedMonthIndex] = useState(new Date().getMonth());
   const [timerState, setTimerState] = useState<TimerState>('idle');
@@ -154,7 +154,7 @@ export default function JourneyScreen() {
 
       setMember(currentMember);
       setProfile(journeyProfile);
-      setBiographyDraft(journeyProfile.biography);
+
       setAttendanceDays(attendance);
       setWorkoutSessions(sessions);
       setHistoryRecords(history);
@@ -275,15 +275,6 @@ export default function JourneyScreen() {
   const refreshJourneyHistory = async () => {
     const nextHistory = await journeyService.getJourneyHistory();
     setHistoryRecords(nextHistory);
-  };
-
-  const handleSaveBiography = async () => {
-    const nextProfile = await journeyService.updateJourneyProfile({
-      biography: biographyDraft.trim(),
-    });
-    setProfile(nextProfile);
-    setBiographyDraft(nextProfile.biography);
-    setIsEditingBio(false);
   };
 
   const confirmToggleVisit = async () => {
@@ -819,52 +810,6 @@ export default function JourneyScreen() {
           ))}
         </ScrollView>
 
-        {/* AI Assistant */}
-        <View style={styles.aiCard}>
-          <View pointerEvents="none" style={styles.aiCardGlow} />
-          <Text style={styles.cardLabel}>AI Assistant</Text>
-          <Text style={styles.cardTitle}>Tailored training guidance</Text>
-          <Text style={styles.aiBody}>
-            Your About Me and Training Note help tailor AI guidance around your body type, goals, injuries, and preferences.
-          </Text>
-          <Pressable
-            onPress={() => undefined}
-            style={({ pressed }) => [styles.aiButton, pressed && styles.buttonPressed]}>
-            <Text style={styles.aiButtonText}>Start Chat</Text>
-          </Pressable>
-        </View>
-
-        {/* About Me / Training Note */}
-        <View style={styles.card}>
-          <View style={styles.cardHeaderRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.cardLabel}>About Me</Text>
-              <Text style={styles.cardTitle}>Training note</Text>
-              <Text style={styles.cardSubtitle}>
-                Edit to improve your tailored AI plan.
-              </Text>
-            </View>
-            <Pressable
-              onPress={() => (isEditingBio ? handleSaveBiography() : setIsEditingBio(true))}
-              style={({ pressed }) => [styles.editButton, pressed && styles.buttonPressed]}>
-              <Text style={styles.editButtonText}>{isEditingBio ? 'Save' : 'Edit'}</Text>
-            </Pressable>
-          </View>
-
-          {isEditingBio ? (
-            <TextInput
-              multiline
-              value={biographyDraft}
-              onChangeText={setBiographyDraft}
-              placeholder="Example: 28 years old, building lean strength, training 4 days weekly, protecting my lower back."
-              placeholderTextColor="#9AA3AF"
-              selectionColor={accentColor}
-              style={styles.planInput}
-            />
-          ) : (
-            <Text style={styles.bodyText}>{profile.biography}</Text>
-          )}
-        </View>
       </ScrollView>
 
       {/* Modals */}

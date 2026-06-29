@@ -1,9 +1,10 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { NativeScrollEvent, NativeSyntheticEvent, ViewStyle } from 'react-native';
 import {
   ActivityIndicator,
   Animated,
@@ -17,7 +18,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import type { NativeScrollEvent, NativeSyntheticEvent, ViewStyle } from 'react-native';
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import { premiumColors, premiumGlow, premiumShadow } from '@/constants/premiumTheme';
@@ -29,6 +29,7 @@ const DATE_NAV_BUTTON_W = 34;
 const DATE_PAGE_W = SCREEN_WIDTH - 128;
 const DATE_CELL_GAP = 6;
 const DATE_CELL_W = Math.floor((DATE_PAGE_W - DATE_CELL_GAP * 4) / 5);
+const CELL_STEP = DATE_CELL_W + (DATE_PAGE_W - 5 * DATE_CELL_W) / 4;
 const accentColor = premiumColors.red;
 const mutedColor = premiumColors.textMuted;
 
@@ -149,6 +150,8 @@ const SCHEDULE_FILTERS: { key: ScheduleFilter; label: string }[] = [
   { key: 'Gymnastics', label: 'GYMNASTICS' },
   { key: 'Extra Classes', label: 'EXTRA' },
 ];
+
+type ChipLayout = { x: number; width: number };
 
 const WEEKDAY_SHORTS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const WEEKDAY_FULLS = [
@@ -363,6 +366,74 @@ const hStyles = StyleSheet.create({
 });
 // ─────────────────────────────────────────────────────────────────────────────
 
+function WeekPageStrip({
+  week,
+  weekIdx,
+  selectedOffset,
+  onSelect,
+}: {
+  week: ReturnType<typeof getWeekDays>;
+  weekIdx: number;
+  selectedOffset: number;
+  onSelect: (iso: string) => void;
+}) {
+  const weekStartOffset = (weekIdx - 1) * 5;
+  const indexInWeek = selectedOffset - weekStartOffset;
+  const isInThisWeek = indexInWeek >= 0 && indexInWeek <= 4;
+
+  const pillX = useRef(new Animated.Value(isInThisWeek ? indexInWeek * CELL_STEP : 0)).current;
+  const pillOpacity = useRef(new Animated.Value(isInThisWeek ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (isInThisWeek) {
+      Animated.parallel([
+        Animated.spring(pillX, {
+          toValue: indexInWeek * CELL_STEP,
+          useNativeDriver: true,
+          tension: 220,
+          friction: 18,
+        }),
+        Animated.timing(pillOpacity, { toValue: 1, duration: 120, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.timing(pillOpacity, { toValue: 0, duration: 80, useNativeDriver: true }).start();
+    }
+  // pillX and pillOpacity are stable refs; intentionally omitted
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [indexInWeek, isInThisWeek]);
+
+  return (
+    <View style={styles.weekPage}>
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.dayPill, { transform: [{ translateX: pillX }], opacity: pillOpacity }]}
+      />
+      {week.map((day) => {
+        const selected = day.offset === selectedOffset;
+        return (
+          <Pressable
+            key={day.iso}
+            onPress={() => {
+              void Haptics.selectionAsync().catch(() => undefined);
+              onSelect(day.iso);
+            }}
+            style={styles.dayCell}>
+            <Text style={[styles.dayCellShort, selected && styles.dayCellTextActive]}>
+              {day.short}
+            </Text>
+            <Text style={[styles.dayCellNum, selected && styles.dayCellTextActive]}>
+              {day.num}
+            </Text>
+            {day.isToday ? (
+              <View style={[styles.todayDot, selected && styles.todayDotActive]} />
+            ) : null}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function ClassesScreen() {
   const [classes, setClasses] = useState<GymClass[]>([]);
   const [classVouchers, setClassVouchers] = useState<Voucher[]>([]);
@@ -387,18 +458,51 @@ export default function ClassesScreen() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [ptBookPending, setPtBookPending] = useState<string | undefined>(undefined);
+  const [ptSearchOpen, setPtSearchOpen] = useState(false);
+  const [ptSearch, setPtSearch] = useState('');
+  const [ptShowFavoritesOnly, setPtShowFavoritesOnly] = useState(false);
+  const [chipLayouts, setChipLayouts] = useState<Partial<Record<ScheduleFilter, ChipLayout>>>({});
+  const chipPillX = useRef(new Animated.Value(0)).current;
+  const chipPillW = useRef(new Animated.Value(0)).current;
 
   const allWeeksData = useMemo(() => [-1, 0, 1].map(getWeekDays), []);
 
   const selectedOffset = offsetFromToday(selectedIso);
   const selectedDay = getWeekdayName(selectedIso);
   const normalizedSearch = search.trim().toLowerCase();
+  const normalizedPtSearch = ptSearch.trim().toLowerCase();
+
+  const filteredTrainers = PT_TRAINERS.filter((t) => {
+    if (ptShowFavoritesOnly && !favorites.has(t.id)) return false;
+    if (normalizedPtSearch && !`${t.name} ${t.specialty}`.toLowerCase().includes(normalizedPtSearch)) return false;
+    return true;
+  });
 
   // Sync weekOffset changes from arrow presses → animated scroll
   useEffect(() => {
     const pageIdx = weekOffset + 1;
     weekScrollRef.current?.scrollTo({ x: pageIdx * DATE_PAGE_W, animated: true });
   }, [weekOffset]);
+
+  useEffect(() => {
+    const layout = chipLayouts[scheduleFilter];
+    if (!layout) return;
+
+    Animated.parallel([
+      Animated.spring(chipPillX, {
+        toValue: layout.x,
+        useNativeDriver: false,
+        tension: 220,
+        friction: 20,
+      }),
+      Animated.spring(chipPillW, {
+        toValue: layout.width,
+        useNativeDriver: false,
+        tension: 220,
+        friction: 20,
+      }),
+    ]).start();
+  }, [chipLayouts, scheduleFilter, chipPillW, chipPillX]);
 
   const toggleFavorite = (id: string) =>
     setFavorites((current) => {
@@ -452,6 +556,24 @@ export default function ClassesScreen() {
         ),
     [classes, selectedDay, scheduleFilter, showFavoritesOnly, favorites, normalizedSearch],
   );
+
+  const selectedDayCategoryCounts = useMemo(() => {
+    const counts: Record<ScheduleFilter, number> = {
+      ALL: 0,
+      'Fitness Classes': 0,
+      'Martial Arts': 0,
+      Gymnastics: 0,
+      'Extra Classes': 0,
+    };
+
+    classes.forEach((gymClass) => {
+      if (getWeekdayName(gymClass.startTime) !== selectedDay) return;
+      counts.ALL += 1;
+      counts[gymClass.category] += 1;
+    });
+
+    return counts;
+  }, [classes, selectedDay]);
 
   const pendingVouchers = classVouchers.filter((v) => v.status === 'Pending');
   const historyVouchers = classVouchers.filter((v) => v.status !== 'Pending');
@@ -735,10 +857,6 @@ export default function ClassesScreen() {
                   <Text style={styles.specialTitle}>{session.title}</Text>
                   <Text style={styles.specialDesc}>{session.description}</Text>
                 </View>
-                {/* Slide counter */}
-                <Text style={styles.specialCounter}>
-                  {String(idx + 1).padStart(2, '0')} / {String(SPECIAL_SESSIONS.length).padStart(2, '0')}
-                </Text>
                 {/* CTA */}
                 <Pressable
                   style={({ pressed }) => [styles.specialBookBtn, pressed && styles.btnPressed]}>
@@ -836,40 +954,13 @@ export default function ClassesScreen() {
             style={styles.weekStripScroll}
             contentContainerStyle={styles.weekStripContainer}>
             {allWeeksData.map((week, wIdx) => (
-              <View key={wIdx} style={styles.weekPage}>
-                {week.map((day) => {
-                  const selected = day.offset === selectedOffset;
-                  return (
-                    <Pressable
-                      key={day.iso}
-                      onPress={() => setSelectedIso(day.iso)}
-                      style={[styles.dayCell, selected && styles.dayCellActive]}>
-                      <Text
-                        style={[
-                          styles.dayCellShort,
-                          selected && styles.dayCellTextActive,
-                        ]}>
-                        {day.short}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.dayCellNum,
-                          selected && styles.dayCellTextActive,
-                        ]}>
-                        {day.num}
-                      </Text>
-                      {day.isToday ? (
-                        <View
-                          style={[
-                            styles.todayDot,
-                            selected && styles.todayDotActive,
-                          ]}
-                        />
-                      ) : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
+              <WeekPageStrip
+                key={wIdx}
+                week={week}
+                weekIdx={wIdx}
+                selectedOffset={selectedOffset}
+                onSelect={setSelectedIso}
+              />
             ))}
           </ScrollView>
 
@@ -968,20 +1059,58 @@ export default function ClassesScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipRail}>
-          {SCHEDULE_FILTERS.map((f) => (
-            <Pressable
-              key={f.key}
-              onPress={() => setScheduleFilter(f.key)}
-              style={[styles.chip, scheduleFilter === f.key && styles.chipActive]}>
-              <Text
-                style={[
-                  styles.chipText,
-                  scheduleFilter === f.key && styles.chipTextActive,
-                ]}>
-                {f.label}
-              </Text>
-            </Pressable>
-          ))}
+          <View style={styles.chipRailInner}>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.chipActivePill,
+                {
+                  opacity: chipPillW.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 1],
+                    extrapolate: 'clamp',
+                  }),
+                  transform: [{ translateX: chipPillX }],
+                  width: chipPillW,
+                },
+              ]}
+            />
+            {SCHEDULE_FILTERS.map((f) => (
+              <Pressable
+                key={f.key}
+                onLayout={(event) => {
+                  const { x, width } = event.nativeEvent.layout;
+                  setChipLayouts((current) => {
+                    const existing = current[f.key];
+                    if (existing?.x === x && existing.width === width) return current;
+                    return { ...current, [f.key]: { x, width } };
+                  });
+                }}
+                onPress={() => setScheduleFilter(f.key)}
+                style={[styles.chip, scheduleFilter === f.key && styles.chipSelected]}>
+                <Text
+                  style={[
+                    styles.chipText,
+                    scheduleFilter === f.key && styles.chipTextActive,
+                  ]}>
+                  {f.label}
+                </Text>
+                <View
+                  style={[
+                    styles.chipCountBadge,
+                    scheduleFilter === f.key && styles.chipCountBadgeActive,
+                  ]}>
+                  <Text
+                    style={[
+                      styles.chipCountText,
+                      scheduleFilter === f.key && styles.chipCountTextActive,
+                    ]}>
+                    {selectedDayCategoryCounts[f.key]}
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
         </ScrollView>
 
         {todayClasses.length === 0 ? (
@@ -1112,19 +1241,64 @@ export default function ClassesScreen() {
           <View style={styles.ptSectionHeading}>
             <View style={styles.accentBar} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.ptEyebrow}>1-on-1 Coaching</Text>
-              <Text style={styles.ptHeadingTitle}>Reserve Your PT</Text>
+              <Text style={styles.ptHeadingTitle}>Personal Trainers</Text>
+              <Text style={styles.ptReserveNow}>Reserve Now</Text>
+            </View>
+            <View style={styles.sectionIcons}>
+              <HeartButton
+                isFav={ptShowFavoritesOnly}
+                onToggle={() => setPtShowFavoritesOnly((v) => !v)}
+                btnSize={40}
+                iconSize={18}
+              />
+              {ptSearchOpen ? (
+                <View style={styles.searchExpanded}>
+                  <SymbolView
+                    name="magnifyingglass"
+                    size={15}
+                    tintColor={premiumColors.textFaint}
+                    fallback={<Text style={styles.searchGlyphSmall}>⌕</Text>}
+                  />
+                  <TextInput
+                    autoFocus
+                    value={ptSearch}
+                    onChangeText={setPtSearch}
+                    placeholder="Search"
+                    placeholderTextColor={premiumColors.textFaint}
+                    style={styles.searchExpandedInput}
+                    returnKeyType="search"
+                    autoCorrect={false}
+                    onBlur={() => { if (!ptSearch) setPtSearchOpen(false); }}
+                  />
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => { setPtSearch(''); setPtSearchOpen(false); }}>
+                    <SymbolView
+                      name="xmark"
+                      size={13}
+                      tintColor={premiumColors.textMuted}
+                      fallback={<Text style={styles.searchGlyphSmall}>×</Text>}
+                    />
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable onPress={() => setPtSearchOpen(true)} style={styles.iconBtnSmall}>
+                  <SymbolView
+                    name="magnifyingglass"
+                    size={18}
+                    tintColor="#FFFFFF"
+                    fallback={<Text style={styles.iconGlyph}>⌕</Text>}
+                  />
+                </Pressable>
+              )}
             </View>
           </View>
-          <Text style={styles.ptSubText}>
-            Train smarter with a personal coach. Sessions are tailored entirely to your goals.
-          </Text>
 
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.ptRail}>
-            {PT_TRAINERS.map((trainer) => (
+            {filteredTrainers.map((trainer) => (
               <Pressable
                 key={trainer.id}
                 onPress={() => setPtBookPending(trainer.id)}
@@ -1135,12 +1309,20 @@ export default function ClassesScreen() {
                   end={{ x: 0.9, y: 1 }}
                   style={StyleSheet.absoluteFillObject}
                 />
-                {/* Available badge */}
-                <View style={[styles.ptAvailBadge, trainer.available && styles.ptAvailBadgeOn]}>
-                  <View style={[styles.ptAvailDot, trainer.available && styles.ptAvailDotOn]} />
-                  <Text style={[styles.ptAvailText, trainer.available && styles.ptAvailTextOn]}>
-                    {trainer.available ? 'Available' : 'Busy'}
-                  </Text>
+                {/* Top row: badge + heart */}
+                <View style={styles.ptCardTopRow}>
+                  <View style={[styles.ptAvailBadge, trainer.available && styles.ptAvailBadgeOn]}>
+                    <View style={[styles.ptAvailDot, trainer.available && styles.ptAvailDotOn]} />
+                    <Text style={[styles.ptAvailText, trainer.available && styles.ptAvailTextOn]}>
+                      {trainer.available ? 'Available' : 'Busy'}
+                    </Text>
+                  </View>
+                  <HeartButton
+                    isFav={favorites.has(trainer.id)}
+                    onToggle={() => toggleFavorite(trainer.id)}
+                    btnSize={32}
+                    iconSize={14}
+                  />
                 </View>
                 {/* Avatar */}
                 <View style={styles.ptAvatar}>
@@ -1646,10 +1828,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
-    borderRadius: 14,
+    marginTop: 8,
+    borderRadius: 10,
     backgroundColor: premiumColors.red,
-    paddingVertical: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
     ...premiumGlow,
   },
   featuredBookBtnDisabled: {
@@ -1657,8 +1840,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     elevation: 0,
   },
-  featuredBookBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', letterSpacing: 0.6 },
-  featuredBookBtnArrow: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
+  featuredBookBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
+  featuredBookBtnArrow: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
   btnPressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
 
   specialDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: 'rgba(255,255,255,0.22)' },
@@ -1679,7 +1862,7 @@ const styles = StyleSheet.create({
   timeline: { paddingHorizontal: 20, marginBottom: 20, position: 'relative' },
   timelineBarGlow: {
     position: 'absolute',
-    left: 48,
+    left: 47,
     top: 7,
     bottom: 12,
     width: 4,
@@ -1709,11 +1892,11 @@ const styles = StyleSheet.create({
   timelineRow: { flexDirection: 'row', alignItems: 'stretch', marginBottom: 14 },
   timelineTimCol: {
     width: 60,
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingVertical: 14,
   },
-  timelineTimTop: { alignItems: 'center' },
+  timelineTimTop: { alignItems: 'center', width: 58 },
   timelineDot: {
     width: 14,
     height: 14,
@@ -1729,8 +1912,8 @@ const styles = StyleSheet.create({
     shadowRadius: 9,
     elevation: 8,
   },
-  timelineStartTime: { color: premiumColors.red, fontSize: 15, fontWeight: '900', textAlign: 'center' },
-  timelineEndTime: { color: mutedColor, fontSize: 15, fontWeight: '800', textAlign: 'center' },
+  timelineStartTime: { color: premiumColors.red, fontSize: 15, fontWeight: '900', textAlign: 'center', width: 58 },
+  timelineEndTime: { color: mutedColor, fontSize: 15, fontWeight: '800', textAlign: 'center', width: 58 },
   timelineCard: {
     flex: 1,
     flexDirection: 'row',
@@ -1776,7 +1959,7 @@ const styles = StyleSheet.create({
   },
   timelineHeart: {
     marginTop: 6,
-    right: 8,
+    right: 2,
     zIndex: 2,
   },
   timelineBookNow: {
@@ -1835,18 +2018,64 @@ const styles = StyleSheet.create({
   timelineBtnTextMuted: { color: mutedColor },
 
   // Category chips
-  chipRail: { paddingHorizontal: 20, gap: 8, paddingBottom: 4, marginBottom: 22 },
+  chipRail: { paddingHorizontal: 20, paddingBottom: 4, marginBottom: 22 },
+  chipRailInner: {
+    position: 'relative',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  chipActivePill: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: 999,
+    backgroundColor: premiumColors.red,
+    borderWidth: 1,
+    borderColor: premiumColors.redBright,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.42,
+    shadowRadius: 10,
+    elevation: 4,
+  },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.16)',
     backgroundColor: 'rgba(255,255,255,0.06)',
-    paddingHorizontal: 18,
+    paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  chipActive: { backgroundColor: 'rgba(255,255,255,0.9)', borderColor: '#FFFFFF' },
+  chipSelected: {
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+  },
   chipText: { color: mutedColor, fontSize: 12, fontWeight: '900', letterSpacing: 0.5 },
-  chipTextActive: { color: '#0A0B0F' },
+  chipTextActive: { color: '#FFFFFF' },
+  chipCountBadge: {
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 9,
+    backgroundColor: 'rgba(255,255,255,0.11)',
+    paddingHorizontal: 5,
+  },
+  chipCountBadgeActive: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  chipCountText: {
+    color: 'rgba(255,255,255,0.62)',
+    fontSize: 9,
+    fontWeight: '900',
+    lineHeight: 10,
+  },
+  chipCountTextActive: { color: '#FFFFFF' },
 
   // Day picker — smaller cells
   dayCell: {
@@ -1858,13 +2087,19 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.08)',
     backgroundColor: 'rgba(255,255,255,0.04)',
   },
-  dayCellActive: {
-    backgroundColor: premiumColors.red,
-    borderColor: premiumColors.redBright,
+  dayCellActive: {},
+  dayPill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: DATE_CELL_W,
+    borderRadius: 12,
+    backgroundColor: premiumColors.redBright,
     shadowColor: premiumColors.redBright,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
     elevation: 4,
   },
   dayCellShort: { color: mutedColor, fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
@@ -2268,7 +2503,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 20,
-    marginBottom: 8,
+    marginBottom: 16,
   },
   ptEyebrow: {
     color: premiumColors.redBright,
@@ -2282,6 +2517,13 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 21,
     fontWeight: '900',
+  },
+  ptReserveNow: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 2,
+    opacity: 0.72,
   },
   ptSubText: {
     color: mutedColor,
@@ -2311,18 +2553,22 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     elevation: 6,
   },
+  ptCardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
   ptAvailBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    alignSelf: 'flex-start',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
     borderRadius: 999,
     backgroundColor: 'rgba(255,255,255,0.05)',
     paddingHorizontal: 9,
     paddingVertical: 4,
-    marginBottom: 16,
   },
   ptAvailBadgeOn: {
     borderColor: 'rgba(34,197,94,0.4)',
