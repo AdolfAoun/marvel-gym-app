@@ -258,7 +258,22 @@ export type Achievement = {
 export type MachineGuide = {
   id: string;
   name: string;
-  muscleGroup: 'Chest' | 'Back' | 'Shoulders' | 'Arms' | 'Legs' | 'Core';
+  muscleGroup:
+    | 'Chest'
+    | 'Upper Back'
+    | 'Lower Back'
+    | 'Traps'
+    | 'Shoulders'
+    | 'Biceps'
+    | 'Triceps'
+    | 'Forearms'
+    | 'Quads'
+    | 'Hamstrings'
+    | 'Calves'
+    | 'Glutes'
+    | 'Adductors'
+    | 'Abs'
+    | 'Obliques';
   target: string;
   description: string;
   imageUri?: string;

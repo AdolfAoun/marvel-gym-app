@@ -1,9 +1,11 @@
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -11,59 +13,149 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
+import Body, { type ExtendedBodyPart, type Slug } from 'react-native-body-highlighter';
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
-import { premiumColors, premiumShadow, premiumGlow } from '@/constants/premiumTheme';
+import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
 import { machineGuideService } from '@/services';
 import type { MachineGuide } from '@/types';
 
-// ─── Neon palette per muscle group ──────────────────────────────────────────
-const MUSCLE_COLORS: Record<string, string> = {
-  Chest: '#00D4FF',
-  Back: '#9B59FF',
-  Shoulders: '#FF8C00',
-  Arms: '#00FF88',
-  Legs: '#FFD700',
-  Core: '#FF2D78',
+// ─── Per-muscle neon colors ──────────────────────────────────────────────────
+type MuscleGroupKey = MachineGuide['muscleGroup'];
+
+const MUSCLE_COLORS: Record<MuscleGroupKey, string> = {
+  'Chest':      '#38BDF8',
+  'Upper Back': '#A78BFA',
+  'Lower Back': '#7C3AED',
+  'Traps':      '#C4B5FD',
+  'Shoulders':  '#FB923C',
+  'Biceps':     '#34D399',
+  'Triceps':    '#10B981',
+  'Forearms':   '#6EE7B7',
+  'Quads':      '#FCD34D',
+  'Hamstrings': '#FBBF24',
+  'Calves':     '#F59E0B',
+  'Glutes':     '#F97316',
+  'Adductors':  '#EF4444',
+  'Abs':        '#F472B6',
+  'Obliques':   '#EC4899',
 };
 
-const MUSCLE_TINTS: Record<string, string> = {
-  Chest: 'rgba(0,212,255,0.10)',
-  Back: 'rgba(155,89,255,0.10)',
-  Shoulders: 'rgba(255,140,0,0.10)',
-  Arms: 'rgba(0,255,136,0.10)',
-  Legs: 'rgba(255,215,0,0.10)',
-  Core: 'rgba(255,45,120,0.10)',
+const MUSCLE_TINTS: Record<MuscleGroupKey, string> = {
+  'Chest':      'rgba(56,189,248,0.10)',
+  'Upper Back': 'rgba(167,139,250,0.10)',
+  'Lower Back': 'rgba(124,58,237,0.10)',
+  'Traps':      'rgba(196,181,253,0.10)',
+  'Shoulders':  'rgba(251,146,60,0.10)',
+  'Biceps':     'rgba(52,211,153,0.10)',
+  'Triceps':    'rgba(16,185,129,0.10)',
+  'Forearms':   'rgba(110,231,183,0.10)',
+  'Quads':      'rgba(252,211,77,0.10)',
+  'Hamstrings': 'rgba(251,191,36,0.10)',
+  'Calves':     'rgba(245,158,11,0.10)',
+  'Glutes':     'rgba(249,115,22,0.10)',
+  'Adductors':  'rgba(239,68,68,0.10)',
+  'Abs':        'rgba(244,114,182,0.10)',
+  'Obliques':   'rgba(236,72,153,0.10)',
 };
 
-const MUSCLE_GLOW: Record<string, string> = {
-  Chest: 'rgba(0,212,255,0.32)',
-  Back: 'rgba(155,89,255,0.32)',
-  Shoulders: 'rgba(255,140,0,0.32)',
-  Arms: 'rgba(0,255,136,0.32)',
-  Legs: 'rgba(255,215,0,0.32)',
-  Core: 'rgba(255,45,120,0.32)',
+const MUSCLE_GLOW: Record<MuscleGroupKey, string> = {
+  'Chest':      'rgba(56,189,248,0.32)',
+  'Upper Back': 'rgba(167,139,250,0.32)',
+  'Lower Back': 'rgba(124,58,237,0.32)',
+  'Traps':      'rgba(196,181,253,0.32)',
+  'Shoulders':  'rgba(251,146,60,0.32)',
+  'Biceps':     'rgba(52,211,153,0.32)',
+  'Triceps':    'rgba(16,185,129,0.32)',
+  'Forearms':   'rgba(110,231,183,0.32)',
+  'Quads':      'rgba(252,211,77,0.32)',
+  'Hamstrings': 'rgba(251,191,36,0.32)',
+  'Calves':     'rgba(245,158,11,0.32)',
+  'Glutes':     'rgba(249,115,22,0.32)',
+  'Adductors':  'rgba(239,68,68,0.32)',
+  'Abs':        'rgba(244,114,182,0.32)',
+  'Obliques':   'rgba(236,72,153,0.32)',
 };
 
-// ─── Unsplash image lookup ───────────────────────────────────────────────────
+// ─── Slug ↔ muscle-group mappings (react-native-body-highlighter) ────────────
+const SLUG_TO_GROUP: Partial<Record<Slug, MuscleGroupKey>> = {
+  'chest':      'Chest',
+  'abs':        'Abs',
+  'obliques':   'Obliques',
+  'lower-back': 'Lower Back',
+  'upper-back': 'Upper Back',
+  'trapezius':  'Traps',
+  'deltoids':   'Shoulders',
+  'biceps':     'Biceps',
+  'triceps':    'Triceps',
+  'forearm':    'Forearms',
+  'quadriceps': 'Quads',
+  'tibialis':   'Quads',
+  'adductors':  'Adductors',
+  'hamstring':  'Hamstrings',
+  'calves':     'Calves',
+  'gluteal':    'Glutes',
+};
+
+const GROUP_TO_SLUGS: Record<MuscleGroupKey, Slug[]> = {
+  'Chest':      ['chest'],
+  'Abs':        ['abs'],
+  'Obliques':   ['obliques'],
+  'Lower Back': ['lower-back'],
+  'Upper Back': ['upper-back'],
+  'Traps':      ['trapezius'],
+  'Shoulders':  ['deltoids'],
+  'Biceps':     ['biceps'],
+  'Triceps':    ['triceps'],
+  'Forearms':   ['forearm'],
+  'Quads':      ['quadriceps', 'tibialis'],
+  'Adductors':  ['adductors'],
+  'Hamstrings': ['hamstring'],
+  'Calves':     ['calves'],
+  'Glutes':     ['gluteal'],
+};
+
+// Which side each muscle is visible on (drives the auto front/back switch)
+const GROUP_SLUGS_BY_SIDE: Record<MuscleGroupKey, { front: Slug[]; back: Slug[] }> = {
+  'Chest':      { front: ['chest'],                    back: [] },
+  'Abs':        { front: ['abs'],                      back: [] },
+  'Obliques':   { front: ['obliques'],                 back: [] },
+  'Lower Back': { front: [],                           back: ['lower-back'] },
+  'Upper Back': { front: [],                           back: ['upper-back'] },
+  'Traps':      { front: [],                           back: ['trapezius'] },
+  'Shoulders':  { front: ['deltoids'],                 back: ['deltoids'] },
+  'Biceps':     { front: ['biceps'],                   back: [] },
+  'Triceps':    { front: [],                           back: ['triceps'] },
+  'Forearms':   { front: ['forearm'],                  back: ['forearm'] },
+  'Quads':      { front: ['quadriceps', 'tibialis'],   back: [] },
+  'Adductors':  { front: ['adductors'],                back: [] },
+  'Hamstrings': { front: [],                           back: ['hamstring'] },
+  'Calves':     { front: ['calves'],                   back: ['calves'] },
+  'Glutes':     { front: [],                           back: ['gluteal'] },
+};
+
+const muscleOrder: MuscleGroupKey[] = [
+  'Chest', 'Upper Back', 'Lower Back', 'Traps', 'Shoulders',
+  'Biceps', 'Triceps', 'Forearms',
+  'Quads', 'Hamstrings', 'Calves', 'Glutes', 'Adductors',
+  'Abs', 'Obliques',
+];
+
+// ─── Machine image lookup ────────────────────────────────────────────────────
 const MACHINE_IMAGES: Record<string, string> = {
-  'Leg Extension Machine':
-    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&q=80',
-  'Leg Press Machine':
+  'Leg Press':
     'https://images.unsplash.com/photo-1571731956672-f2b94d7dd0cb?w=600&q=80',
-  'Seated Leg Curl':
+  'Leg Curl':
     'https://images.unsplash.com/photo-1517963879433-6ad2b056d712?w=600&q=80',
-  'Smith Machine':
+  'Smith Machine Shrug':
     'https://images.unsplash.com/photo-1540497077202-7c8a3999166f?w=600&q=80',
-  'Cable Crossover':
-    'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600&q=80',
-  'Chest Press Machine':
-    'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=600&q=80',
   'Lat Pulldown':
     'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=600&q=80',
-  'Seated Row Machine':
+  'Seated Row':
     'https://images.unsplash.com/photo-1485395578879-6ba080fdddaa?w=600&q=80',
+  'Chest Press':
+    'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=600&q=80',
 };
 
 const FALLBACK_IMAGE =
@@ -74,58 +166,89 @@ function getMachineImage(name: string, imageUri?: string): string {
   return MACHINE_IMAGES[name] ?? FALLBACK_IMAGE;
 }
 
-// ─── Order ───────────────────────────────────────────────────────────────────
-const muscleOrder: MachineGuide['muscleGroup'][] = [
-  'Chest',
-  'Back',
-  'Shoulders',
-  'Arms',
-  'Legs',
-  'Core',
-];
-
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function MachineGuideScreen() {
-  const [guides, setGuides] = useState<MachineGuide[]>([]);
-  const [selectedGroup, setSelectedGroup] =
-    useState<MachineGuide['muscleGroup']>('Chest');
+  const [guides, setGuides]               = useState<MachineGuide[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<MuscleGroupKey>('Chest');
   const [selectedGuide, setSelectedGuide] = useState<MachineGuide | undefined>();
-  const [isLoading, setIsLoading] = useState(true);
+  const [bodySide, setBodySide]           = useState<'front' | 'back'>('front');
+  const [isLoading, setIsLoading]         = useState(true);
 
+  const scrollRef        = useRef<ScrollView>(null);
+  const machinesSectionY = useRef(0);
+
+  // ── Data loading ──────────────────────────────────────────────────────────
   useEffect(() => {
-    const loadGuides = async () => {
+    const load = async () => {
       const nextGuides = await machineGuideService.getMachineGuides();
-      const firstAvailableGroup =
-        muscleOrder.find((group) =>
-          nextGuides.some((guide) => guide.muscleGroup === group),
-        ) ?? 'Chest';
-
+      const first =
+        muscleOrder.find((g) => nextGuides.some((m) => m.muscleGroup === g)) ?? 'Chest';
       setGuides(nextGuides);
-      setSelectedGroup(firstAvailableGroup);
+      setSelectedGroup(first);
       setIsLoading(false);
     };
-
-    loadGuides();
+    load();
   }, []);
 
-  const availableGroups = useMemo(() => {
-    return muscleOrder.filter((group) =>
-      guides.some((guide) => guide.muscleGroup === group),
-    );
-  }, [guides]);
+  const availableGroups = useMemo(
+    () => muscleOrder.filter((g) => guides.some((m) => m.muscleGroup === g)),
+    [guides],
+  );
 
-  const selectedGuides = useMemo(() => {
-    return guides.filter((guide) => guide.muscleGroup === selectedGroup);
-  }, [guides, selectedGroup]);
+  const selectedGuides = useMemo(
+    () => guides.filter((m) => m.muscleGroup === selectedGroup),
+    [guides, selectedGroup],
+  );
+
+  // Build the highlighter data: selected muscle = bright neon, the rest faded.
+  // Every muscle is its own group, so only the tapped one lights up.
+  const bodyData = useMemo((): ExtendedBodyPart[] => {
+    const parts: ExtendedBodyPart[] = [];
+    for (const group of availableGroups) {
+      const color = group === selectedGroup
+        ? MUSCLE_COLORS[group]
+        : 'rgba(255,255,255,0.10)';
+      for (const slug of GROUP_TO_SLUGS[group] ?? []) {
+        parts.push({ slug, color });
+      }
+    }
+    return parts;
+  }, [availableGroups, selectedGroup]);
+
+  // Auto-switch to the side where a muscle is actually visible
+  const showMuscleSide = (group: MuscleGroupKey) => {
+    const frontSlugs = GROUP_SLUGS_BY_SIDE[group].front;
+    const backSlugs  = GROUP_SLUGS_BY_SIDE[group].back;
+    if (frontSlugs.length === 0 && backSlugs.length > 0) setBodySide('back');
+    if (backSlugs.length === 0 && frontSlugs.length > 0) setBodySide('front');
+  };
+
+  // Tap a muscle on the body
+  const handleBodyPartPress = (part: ExtendedBodyPart) => {
+    if (!part.slug) return;
+    const group = SLUG_TO_GROUP[part.slug];
+    if (!group || !availableGroups.includes(group)) return;
+    setSelectedGroup(group);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    showMuscleSide(group);
+  };
+
+  // Tap a muscle chip
+  const handleChipPress = (group: MuscleGroupKey) => {
+    setSelectedGroup(group);
+    Haptics.selectionAsync();
+    showMuscleSide(group);
+  };
 
   const activeColor = MUSCLE_COLORS[selectedGroup] ?? premiumColors.redBright;
-  const activeTint = MUSCLE_TINTS[selectedGroup] ?? 'rgba(177,18,38,0.10)';
-  const activeGlow = MUSCLE_GLOW[selectedGroup] ?? premiumColors.redBright;
+  const activeTint  = MUSCLE_TINTS[selectedGroup]  ?? 'rgba(177,18,38,0.10)';
 
-  const selectedMuscleColor =
-    selectedGuide ? (MUSCLE_COLORS[selectedGuide.muscleGroup] ?? premiumColors.redBright) : premiumColors.redBright;
-  const selectedMuscleTint =
-    selectedGuide ? (MUSCLE_TINTS[selectedGuide.muscleGroup] ?? 'rgba(177,18,38,0.10)') : 'rgba(177,18,38,0.10)';
+  const selectedMuscleColor = selectedGuide
+    ? (MUSCLE_COLORS[selectedGuide.muscleGroup] ?? premiumColors.redBright)
+    : premiumColors.redBright;
+  const selectedMuscleTint = selectedGuide
+    ? (MUSCLE_TINTS[selectedGuide.muscleGroup] ?? 'rgba(177,18,38,0.10)')
+    : 'rgba(177,18,38,0.10)';
 
   if (isLoading) {
     return (
@@ -144,6 +267,7 @@ export default function MachineGuideScreen() {
       <StatusBar style="light" />
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
 
@@ -152,14 +276,86 @@ export default function MachineGuideScreen() {
           <Text style={styles.pageEyebrow}>MARVEL GYM</Text>
           <Text style={styles.pageTitle}>MACHINE{'\n'}GUIDE</Text>
           <Text style={styles.pageSubtitle}>
-            Select a muscle group and tap any machine for setup cues and form tips.
+            Tap a muscle on the body to see the machines that train it.
           </Text>
           <View style={styles.headerDivider} />
         </View>
 
-        {/* ── Muscle Group Chips ───────────────────────────────────────── */}
+        {/* ── Interactive Body Map ─────────────────────────────────────── */}
+        <View style={styles.bodyMapSection}>
+
+          {/* Front / Back toggle */}
+          <View style={styles.viewToggle}>
+            {(['front', 'back'] as const).map((side) => {
+              const isActive = bodySide === side;
+              return (
+                <Pressable
+                  key={side}
+                  onPress={() => { setBodySide(side); Haptics.selectionAsync(); }}
+                  style={({ pressed }) => [
+                    styles.viewToggleBtn,
+                    isActive && styles.viewToggleBtnActive,
+                    pressed && { opacity: 0.75 },
+                  ]}>
+                  <Text style={[styles.viewToggleText, isActive && styles.viewToggleTextActive]}>
+                    {side === 'front' ? 'Front' : 'Back'}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Anatomical SVG body — each muscle is individually selectable */}
+          <Body
+            data={bodyData}
+            side={bodySide}
+            gender="male"
+            scale={1.7}
+            border="none"
+            defaultFill="rgba(255,255,255,0.06)"
+            defaultStroke="rgba(255,255,255,0.12)"
+            defaultStrokeWidth={0.8}
+            onBodyPartPress={handleBodyPartPress}
+          />
+
+          {/* Selected muscle info pill */}
+          <View style={[styles.bodySelectedPill, {
+            backgroundColor: activeTint,
+            borderColor: activeColor,
+          }]}>
+            <View style={[styles.bodySelectedDot, { backgroundColor: activeColor }]} />
+            <Text style={[styles.bodySelectedText, { color: activeColor }]}>
+              {selectedGroup} · {selectedGuides.length} machine{selectedGuides.length === 1 ? '' : 's'}
+            </Text>
+          </View>
+
+          {/* Legend */}
+          <View style={styles.legend}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: activeColor }]} />
+              <Text style={styles.legendText}>Selected</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: 'rgba(255,255,255,0.35)' }]} />
+              <Text style={styles.legendText}>Other groups</Text>
+            </View>
+          </View>
+
+          {/* Attribution */}
+          <Pressable
+            onPress={() => Linking.openURL('https://musclewiki.com')}
+            accessibilityRole="link"
+            style={({ pressed }) => [styles.creditRow, pressed && { opacity: 0.55 }]}>
+            <Text style={styles.creditText}>
+              Body map concept inspired by{' '}
+              <Text style={styles.creditLink}>MuscleWiki</Text>
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* ── Muscle Chips ─────────────────────────────────────────────── */}
         <View style={styles.chipSectionLabel}>
-          <Text style={styles.chipSectionTitle}>Target Muscle Group</Text>
+          <Text style={styles.chipSectionTitle}>Or browse by muscle</Text>
         </View>
 
         <ScrollView
@@ -169,15 +365,14 @@ export default function MachineGuideScreen() {
           style={styles.chipsScroller}>
           {availableGroups.map((group) => {
             const isSelected = selectedGroup === group;
-            const color = MUSCLE_COLORS[group] ?? premiumColors.redBright;
-            const tint = MUSCLE_TINTS[group] ?? 'rgba(177,18,38,0.10)';
-            const glow = MUSCLE_GLOW[group] ?? 'rgba(177,18,38,0.28)';
-            const count = guides.filter((g) => g.muscleGroup === group).length;
-
+            const color = MUSCLE_COLORS[group];
+            const tint  = MUSCLE_TINTS[group];
+            const glow  = MUSCLE_GLOW[group];
+            const count = guides.filter((m) => m.muscleGroup === group).length;
             return (
               <Pressable
                 key={group}
-                onPress={() => setSelectedGroup(group)}
+                onPress={() => handleChipPress(group)}
                 style={({ pressed }) => [
                   styles.chip,
                   isSelected && {
@@ -192,19 +387,17 @@ export default function MachineGuideScreen() {
                   !isSelected && styles.chipInactive,
                   pressed && { opacity: 0.72 },
                 ]}>
-                <Text
-                  style={[
-                    styles.chipLabel,
-                    { color: isSelected ? color : premiumColors.textMuted },
-                    isSelected && { fontWeight: '900' },
-                  ]}>
+                <Text style={[
+                  styles.chipLabel,
+                  { color: isSelected ? color : premiumColors.textMuted },
+                  isSelected && { fontWeight: '900' },
+                ]}>
                   {group}
                 </Text>
-                <Text
-                  style={[
-                    styles.chipCount,
-                    { color: isSelected ? color : premiumColors.textFaint },
-                  ]}>
+                <Text style={[
+                  styles.chipCount,
+                  { color: isSelected ? color : premiumColors.textFaint },
+                ]}>
                   {count}
                 </Text>
               </Pressable>
@@ -213,7 +406,9 @@ export default function MachineGuideScreen() {
         </ScrollView>
 
         {/* ── Machines Section Header ──────────────────────────────────── */}
-        <View style={styles.machinesSectionHeader}>
+        <View
+          style={styles.machinesSectionHeader}
+          onLayout={(e) => { machinesSectionY.current = e.nativeEvent.layout.y; }}>
           <View style={[styles.accentBar, { backgroundColor: activeColor }]} />
           <View style={styles.machinesSectionText}>
             <Text style={[styles.machinesSectionEyebrow, { color: activeColor }]}>
@@ -228,14 +423,13 @@ export default function MachineGuideScreen() {
           </View>
         </View>
 
-        {/* ── Machines Grid (2 columns) ────────────────────────────────── */}
+        {/* ── Machines Grid ────────────────────────────────────────────── */}
         <View style={styles.machineGrid}>
           {selectedGuides.map((guide) => {
             const imageUri = getMachineImage(guide.name, guide.imageUri);
             const color = MUSCLE_COLORS[guide.muscleGroup] ?? premiumColors.redBright;
-            const tint = MUSCLE_TINTS[guide.muscleGroup] ?? 'rgba(177,18,38,0.10)';
-            const glow = MUSCLE_GLOW[guide.muscleGroup] ?? 'rgba(177,18,38,0.28)';
-
+            const tint  = MUSCLE_TINTS[guide.muscleGroup]  ?? 'rgba(177,18,38,0.10)';
+            const glow  = MUSCLE_GLOW[guide.muscleGroup]   ?? 'rgba(177,18,38,0.28)';
             return (
               <Pressable
                 key={guide.id}
@@ -252,37 +446,26 @@ export default function MachineGuideScreen() {
                     opacity: pressed ? 0.88 : 1,
                   },
                 ]}>
-                {/* Colored left accent bar */}
                 <View style={[styles.cardAccentBar, { backgroundColor: color }]} />
-
-                {/* Machine image */}
                 <View style={styles.machineImageContainer}>
                   <Image
                     source={{ uri: imageUri }}
                     style={styles.machinePhoto}
                     resizeMode="cover"
                   />
-                  {/* Gradient overlay */}
                   <LinearGradient
                     colors={['transparent', 'rgba(10,11,15,0.72)']}
                     style={StyleSheet.absoluteFillObject}
                   />
-                  {/* Muscle tag */}
                   <View style={[styles.muscleTag, { backgroundColor: tint, borderColor: color }]}>
                     <Text style={[styles.muscleTagText, { color }]}>
                       {guide.muscleGroup}
                     </Text>
                   </View>
                 </View>
-
-                {/* Card info */}
                 <View style={styles.machineCardBody}>
-                  <Text style={styles.machineName} numberOfLines={2}>
-                    {guide.name}
-                  </Text>
-                  <Text style={styles.machineTarget} numberOfLines={1}>
-                    {guide.target}
-                  </Text>
+                  <Text style={styles.machineName} numberOfLines={2}>{guide.name}</Text>
+                  <Text style={styles.machineTarget} numberOfLines={2}>{guide.target}</Text>
                   <View style={styles.tapHint}>
                     <View style={[styles.tapDot, { backgroundColor: color }]} />
                     <Text style={[styles.tapHintText, { color }]}>View guide</Text>
@@ -306,24 +489,14 @@ export default function MachineGuideScreen() {
             style={StyleSheet.absoluteFillObject}
             onPress={() => setSelectedGuide(undefined)}
           />
-
           <View style={styles.detailSheet}>
-            {/* Close handle */}
             <View style={styles.sheetHandle} />
-
-            {/* Close button */}
             <Pressable
               onPress={() => setSelectedGuide(undefined)}
-              style={({ pressed }) => [
-                styles.closeButton,
-                pressed && { opacity: 0.7 },
-              ]}
-              accessibilityLabel="Close machine details">
+              style={({ pressed }) => [styles.closeButton, pressed && { opacity: 0.7 }]}>
               <Text style={styles.closeButtonText}>✕</Text>
             </Pressable>
-
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Hero image */}
               {selectedGuide && (
                 <>
                   <View style={styles.modalImageContainer}>
@@ -336,72 +509,45 @@ export default function MachineGuideScreen() {
                       colors={['transparent', 'rgba(10,11,15,0.92)']}
                       style={StyleSheet.absoluteFillObject}
                     />
-                    {/* Neon tint overlay */}
-                    <View
-                      style={[
-                        StyleSheet.absoluteFillObject,
-                        { backgroundColor: selectedMuscleTint },
-                      ]}
-                    />
+                    <View style={[StyleSheet.absoluteFillObject, { backgroundColor: selectedMuscleTint }]} />
                   </View>
 
-                  {/* Machine info header */}
                   <View style={styles.modalInfoHeader}>
-                    <View
-                      style={[
-                        styles.modalGroupPill,
-                        {
-                          backgroundColor: selectedMuscleTint,
-                          borderColor: selectedMuscleColor,
-                        },
-                      ]}>
-                      <Text
-                        style={[styles.modalGroupPillText, { color: selectedMuscleColor }]}>
+                    <View style={[styles.modalGroupPill, {
+                      backgroundColor: selectedMuscleTint,
+                      borderColor: selectedMuscleColor,
+                    }]}>
+                      <Text style={[styles.modalGroupPillText, { color: selectedMuscleColor }]}>
                         {selectedGuide.muscleGroup}
                       </Text>
                     </View>
-
                     <Text style={styles.modalMachineName}>{selectedGuide.name}</Text>
-
                     <View style={styles.modalTargetRow}>
-                      <View
-                        style={[styles.targetDot, { backgroundColor: selectedMuscleColor }]}
-                      />
-                      <Text style={styles.modalTargetText}>
-                        Targets: {selectedGuide.target}
-                      </Text>
+                      <View style={[styles.targetDot, { backgroundColor: selectedMuscleColor }]} />
+                      <Text style={styles.modalTargetText}>Targets: {selectedGuide.target}</Text>
                     </View>
                   </View>
 
-                  {/* Divider */}
-                  <View
-                    style={[
-                      styles.modalDivider,
-                      { backgroundColor: selectedMuscleColor, opacity: 0.28 },
-                    ]}
-                  />
+                  <View style={[styles.modalDivider, {
+                    backgroundColor: selectedMuscleColor,
+                    opacity: 0.28,
+                  }]} />
 
-                  {/* Description */}
                   <View style={styles.modalSection}>
                     <Text style={styles.modalSectionLabel}>About</Text>
-                    <Text style={styles.modalDescription}>
-                      {selectedGuide.description}
-                    </Text>
+                    <Text style={styles.modalDescription}>{selectedGuide.description}</Text>
                   </View>
 
-                  {/* Instructions */}
                   <View style={styles.modalSection}>
                     <Text style={styles.modalSectionLabel}>Step-by-Step</Text>
                     <View style={styles.instructionList}>
                       {selectedGuide.instructions.map((step, idx) => (
                         <View key={`${idx}-${step.slice(0, 16)}`} style={styles.instructionRow}>
-                          <View
-                            style={[
-                              styles.stepNumber,
-                              { backgroundColor: selectedMuscleTint, borderColor: selectedMuscleColor },
-                            ]}>
-                            <Text
-                              style={[styles.stepNumberText, { color: selectedMuscleColor }]}>
+                          <View style={[styles.stepNumber, {
+                            backgroundColor: selectedMuscleTint,
+                            borderColor: selectedMuscleColor,
+                          }]}>
+                            <Text style={[styles.stepNumberText, { color: selectedMuscleColor }]}>
                               {idx + 1}
                             </Text>
                           </View>
@@ -411,7 +557,6 @@ export default function MachineGuideScreen() {
                     </View>
                   </View>
 
-                  {/* Bottom spacer */}
                   <View style={{ height: 32 }} />
                 </>
               )}
@@ -425,7 +570,6 @@ export default function MachineGuideScreen() {
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  // Loading
   loadingState: {
     flex: 1,
     alignItems: 'center',
@@ -438,14 +582,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.4,
   },
-
-  // Main scroll
   content: {
     paddingTop: 60,
     paddingBottom: 130,
   },
-
-  // ── Page Header
   pageHeader: {
     paddingHorizontal: 22,
     marginBottom: 28,
@@ -474,7 +614,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     lineHeight: 19,
     marginTop: 10,
-    maxWidth: 280,
+    maxWidth: 300,
   },
   headerDivider: {
     height: 1,
@@ -482,10 +622,98 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
 
+  // ── Body map
+  bodyMapSection: {
+    alignItems: 'center',
+    paddingHorizontal: 22,
+    marginBottom: 28,
+  },
+  viewToggle: {
+    flexDirection: 'row',
+    gap: 4,
+    padding: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    backgroundColor: premiumColors.surfaceSoft,
+    marginBottom: 16,
+  },
+  viewToggleBtn: {
+    paddingHorizontal: 26,
+    paddingVertical: 9,
+    borderRadius: 999,
+  },
+  viewToggleBtnActive: {
+    backgroundColor: premiumColors.redBright,
+  },
+  viewToggleText: {
+    color: premiumColors.textMuted,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  viewToggleTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+  },
+  bodySelectedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 999,
+    borderWidth: 1.5,
+  },
+  bodySelectedDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  bodySelectedText: {
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+  },
+  legend: {
+    flexDirection: 'row',
+    gap: 18,
+    marginTop: 10,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    color: premiumColors.textFaint,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  creditRow: {
+    marginTop: 10,
+  },
+  creditText: {
+    color: premiumColors.textFaint,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  creditLink: {
+    color: premiumColors.textMuted,
+    fontWeight: '800',
+    textDecorationLine: 'underline',
+  },
+
   // ── Chips
   chipSectionLabel: {
     paddingHorizontal: 22,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   chipSectionTitle: {
     color: premiumColors.textFaint,
@@ -507,8 +735,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     borderRadius: 999,
     borderWidth: 1.5,
   },
@@ -517,12 +745,12 @@ const styles = StyleSheet.create({
     borderColor: premiumColors.border,
   },
   chipLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
   chipCount: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     minWidth: 14,
     textAlign: 'center',
@@ -533,7 +761,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  // ── Machines section header
+  // ── Machines section
   machinesSectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -574,7 +802,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 
-  // ── Machine grid (2 columns)
+  // ── Machine grid
   machineGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -617,13 +845,13 @@ const styles = StyleSheet.create({
     right: 8,
     borderRadius: 999,
     borderWidth: 1,
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 3,
   },
   muscleTagText: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '900',
-    letterSpacing: 0.8,
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   machineCardBody: {
@@ -639,9 +867,9 @@ const styles = StyleSheet.create({
   },
   machineTarget: {
     color: premiumColors.textMuted,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
-    lineHeight: 15,
+    lineHeight: 14,
     marginBottom: 8,
   },
   tapHint: {
@@ -661,7 +889,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
 
-  // ── Modal / Detail sheet
+  // ── Modal
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
