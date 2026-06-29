@@ -1,3 +1,4 @@
+import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { Href } from 'expo-router';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -14,6 +15,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -61,6 +63,30 @@ const minRenewMonths = 1;
 const machineGuideSign = require('@/assets/images/marvel-logo-startup-sign-x.png');
 const aiHelpSign = require('@/assets/images/marvel-logo-startup-sign-divide.png');
 const homeHeroBackground = require('@/assets/images/headerhomeback.png');
+
+// Per-letter blend between near-black maroon and bright red, so the member
+// name reads like the Marvel wordmark on the loading screen — every shade of
+// black-into-red across the letters.
+const NAME_BLEND_STOPS: [number, number, number][] = [
+  [44, 6, 12],
+  [177, 18, 38],
+  [255, 56, 72],
+  [225, 29, 46],
+  [36, 5, 11],
+];
+
+function nameLetterColor(t: number) {
+  const clamped = Math.min(1, Math.max(0, t));
+  const seg = clamped * (NAME_BLEND_STOPS.length - 1);
+  const i = Math.min(NAME_BLEND_STOPS.length - 2, Math.floor(seg));
+  const f = seg - i;
+  const a = NAME_BLEND_STOPS[i];
+  const b = NAME_BLEND_STOPS[i + 1];
+  const r = Math.round(a[0] + (b[0] - a[0]) * f);
+  const g = Math.round(a[1] + (b[1] - a[1]) * f);
+  const bl = Math.round(a[2] + (b[2] - a[2]) * f);
+  return `rgb(${r}, ${g}, ${bl})`;
+}
 
 type MembershipModal = 'freeze' | 'renew';
 
@@ -215,6 +241,12 @@ function formatVoucherDate(value: string) {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { width: windowWidth } = useWindowDimensions();
+  // Big swipeable feature cards (Machine Guide / AI Gym Help) snap one-per-view
+  // like the "Most Popular" rail on the Classes tab.
+  const featureCardWidth = Math.round(Math.min(windowWidth, 460) * 0.62);
+  const featurePageW = featureCardWidth + 12;
+  const featureScrollX = useRef(new Animated.Value(0)).current;
   const [member, setMember] = useState<Member>();
   const [membership, setMembership] = useState<Membership>();
   const [status, setStatus] = useState<MembershipStatus>();
@@ -584,7 +616,25 @@ export default function HomeScreen() {
           <View style={styles.heroTopRow}>
             <View style={styles.heroTextBlock}>
               <Text style={styles.kicker}>Welcome back</Text>
-              <Text style={styles.title}>{member?.firstName ?? 'Member'}</Text>
+              {/* Gradient FILL inside each glyph (black↔red sweep) via a mask,
+                  so every letter itself contains a mix of black and red. */}
+              <MaskedView
+                style={styles.nameMaskWrap}
+                maskElement={
+                  <Text style={[styles.nameGlyph, styles.nameMaskInk]}>
+                    {member?.firstName ?? 'Member'}
+                  </Text>
+                }>
+                <LinearGradient
+                  colors={['#2A0408', '#B11226', '#FF3B4D', '#E11D2E', '#2A0408']}
+                  locations={[0, 0.28, 0.5, 0.72, 1]}
+                  start={{ x: 0.5, y: 0 }}
+                  end={{ x: 0.5, y: 1 }}>
+                  <Text style={[styles.nameGlyph, styles.nameGlyphHidden]}>
+                    {member?.firstName ?? 'Member'}
+                  </Text>
+                </LinearGradient>
+              </MaskedView>
               <Text style={styles.subtitle}>Ready to push your limits today?</Text>
             </View>
           </View>
@@ -598,76 +648,33 @@ export default function HomeScreen() {
             start={{ x: 0.05, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.heroMembershipPanel}>
-            <View style={styles.heroMembershipIconWrap}>
-              <Image
-                source={machineGuideSign}
-                style={styles.heroMembershipIcon}
-                resizeMode="contain"
-              />
-            </View>
-            <View style={styles.heroMembershipDetails}>
-              <Text style={styles.heroMembershipLabel}>Membership Status</Text>
-              <View style={styles.heroStatusLine}>
-                <View style={[styles.statusDot, { backgroundColor: statusTone }]} />
-                <Text style={styles.heroStatusText}>{(status ?? 'Pending').toUpperCase()}</Text>
+            <View style={styles.heroPanelTopRow}>
+              <View style={styles.heroMembershipDetails}>
+                <Text style={styles.heroMembershipLabel}>Membership Status</Text>
+                <View style={styles.heroStatusLine}>
+                  <View style={[styles.statusDot, { backgroundColor: statusTone }]} />
+                  <Text style={styles.heroStatusText}>{(status ?? 'Pending').toUpperCase()}</Text>
+                </View>
               </View>
-              <Text style={styles.heroPlanText}>{plan?.name ?? 'Current Membership'}</Text>
+              <View style={styles.heroExpiryBlock}>
+                <Text style={styles.heroExpiryLabel}>Expires</Text>
+                <Text style={styles.heroExpiryDate}>{expiryDate}</Text>
+              </View>
+              <View style={styles.heroCalendarBadge}>
+                <SymbolView
+                  name="calendar"
+                  size={20}
+                  tintColor="#FFFFFF"
+                  weight="semibold"
+                  fallback={<Text style={styles.heroCalendarFallback}>C</Text>}
+                />
+              </View>
             </View>
-            <View style={styles.heroExpiryBlock}>
-              <Text style={styles.heroExpiryLabel}>Expires</Text>
-              <Text style={styles.heroExpiryDate}>{expiryDate}</Text>
-            </View>
-            <View style={styles.heroCalendarBadge}>
-              <SymbolView
-                name="calendar"
-                size={20}
-                tintColor="#FFFFFF"
-                weight="semibold"
-                fallback={<Text style={styles.heroCalendarFallback}>C</Text>}
-              />
-            </View>
-          </LinearGradient>
-        </View>
 
-        <View style={styles.sectionHeading}>
-          <View style={styles.accentBar} />
-          <View style={styles.sectionHeadingText}>
-            <Text style={styles.sectionEyebrow}>Membership</Text>
-            <Text style={styles.sectionHeadingTitle}>Days Remaining</Text>
-          </View>
-          <View style={styles.expiryPill}>
-            <Text style={styles.expiryPillLabel}>Expires</Text>
-            <Text style={styles.expiryPillText}>{expiryDate}</Text>
-          </View>
-        </View>
-
-        <View style={styles.ringStage}>
-          <LinearGradient
-            colors={[
-              'rgba(8,5,5,0.82)',
-              'rgba(5,3,3,0.90)',
-              'rgba(12,4,6,0.78)',
-            ]}
-            start={{ x: 0.08, y: 0 }}
-            end={{ x: 0.92, y: 1 }}
-            style={styles.daysGlassCard}>
-            <View pointerEvents="none" style={styles.daysGlassHighlight} />
-            <View style={styles.daysTopRow}>
-              <View>
-                <Text style={[styles.daysNumber, { color: countdownColor }]}>
-                  {daysRemaining}
-                </Text>
-                <Text style={styles.daysLabel}>Days Remaining</Text>
-              </View>
-              <View style={styles.daysStatusPill}>
-                <View style={[styles.statusDot, { backgroundColor: statusTone }]} />
-                <Text style={styles.daysStatusText}>{status ?? 'Pending'}</Text>
-              </View>
-            </View>
-            <View style={styles.membershipTrack}>
+            <View style={styles.heroProgressTrack}>
               <View
                 style={[
-                  styles.membershipTrackFill,
+                  styles.heroProgressFill,
                   {
                     backgroundColor: countdownColor,
                     width: `${Math.round(membershipProgress * 100)}%`,
@@ -675,16 +682,16 @@ export default function HomeScreen() {
                 ]}
               />
             </View>
-            <View style={styles.daysMetaRow}>
-              <Text style={styles.daysMetaText}>
-                {Math.round(membershipProgress * 100)}% of plan remaining
+
+            <View style={styles.heroMetaRow}>
+              <Text style={[styles.heroMetaStrong, { color: countdownColor }]}>
+                {daysRemaining} days left
               </Text>
-              <Text style={styles.daysMetaText}>{expiryDate}</Text>
             </View>
           </LinearGradient>
         </View>
 
-        <View style={styles.sectionHeading}>
+        <View style={[styles.sectionHeading, styles.featureSectionHeading]}>
           <View style={styles.accentBar} />
           <View style={styles.sectionHeadingText}>
             <Text style={styles.sectionEyebrow}>Quick actions</Text>
@@ -771,81 +778,129 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
-        <View style={styles.featureRow}>
-          <Pressable
-            onPress={() => router.push('/machine-guide')}
-            style={({ pressed }) => [
-              styles.featureCard,
-              pressed && styles.featurePressed,
-            ]}>
-            <LinearGradient
-              pointerEvents="none"
-              colors={['#7E0F1E', '#3A0B14', '#160609']}
-              start={{ x: 0.1, y: 0 }}
-              end={{ x: 0.9, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <Image
-              source={machineGuideSign}
-              style={styles.featureWatermark}
-              resizeMode="contain"
-            />
-            <View style={styles.featureTopRow}>
-              <View style={styles.featureIconBadge}>
-                <SymbolView
-                  name="dumbbell.fill"
-                  size={23}
-                  tintColor="#FFFFFF"
-                  weight="semibold"
-                  fallback={<Text style={styles.featureBadgeText}>D</Text>}
-                />
-              </View>
-            </View>
-            <Text style={styles.featureKicker}>Machine Guide</Text>
-            <Text style={styles.featureTitle}>Find the right equipment</Text>
-            <Text style={styles.featureBody}>
-              Pick a muscle group and get setup cues.
-            </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => router.push('/how-to-use' as Href)}
-            style={({ pressed }) => [
-              styles.featureCard,
-              pressed && styles.featurePressed,
-            ]}>
-            <LinearGradient
-              pointerEvents="none"
-              colors={['#1C1F29', '#14161D', '#0C0D12']}
-              start={{ x: 0.1, y: 0 }}
-              end={{ x: 0.9, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <Image
-              source={aiHelpSign}
-              style={[styles.featureWatermark, styles.featureWatermarkAi]}
-              resizeMode="contain"
-            />
-            <View style={styles.featureTopRow}>
-              <View style={[styles.featureIconBadge, styles.featureIconBadgeAi]}>
-                <SymbolView
-                  name="book.fill"
-                  size={22}
-                  tintColor="#FFFFFF"
-                  weight="semibold"
-                  fallback={<Text style={styles.featureBadgeText}>B</Text>}
-                />
-              </View>
-            </View>
-            <Text style={[styles.featureKicker, styles.featureKickerAi]}>
-              AI Gym Help
-            </Text>
-            <Text style={styles.featureTitle}>How to use the app</Text>
-            <Text style={styles.featureBody}>
-              Instructions, AI assistant, and contact.
-            </Text>
-          </Pressable>
+        <View style={[styles.sectionHeading, styles.featureSectionHeading]}>
+          <View style={styles.accentBar} />
+          <View style={styles.sectionHeadingText}>
+            <Text style={styles.sectionEyebrow}>Train smarter</Text>
+            <Text style={styles.sectionHeadingTitle}>Guides &amp; help</Text>
+          </View>
         </View>
+
+        <Animated.ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          decelerationRate="fast"
+          snapToInterval={featurePageW}
+          snapToAlignment="start"
+          scrollEventThrottle={16}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { x: featureScrollX } } }],
+            { useNativeDriver: true },
+          )}
+          style={styles.featureRailScroll}
+          contentContainerStyle={styles.featureRail}>
+          <Animated.View
+            style={{
+              width: featureCardWidth,
+              transform: [
+                {
+                  scale: featureScrollX.interpolate({
+                    inputRange: [-featurePageW, 0, featurePageW],
+                    outputRange: [0.84, 1, 0.84],
+                    extrapolate: 'clamp',
+                  }),
+                },
+              ],
+            }}>
+            <Pressable
+              onPress={() => router.push('/machine-guide')}
+              style={({ pressed }) => [
+                styles.featureCard,
+                pressed && styles.featurePressed,
+              ]}>
+              <LinearGradient
+                pointerEvents="none"
+                colors={['#7E0F1E', '#3A0B14', '#160609']}
+                start={{ x: 0.1, y: 0 }}
+                end={{ x: 0.9, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <Image
+                source={machineGuideSign}
+                style={styles.featureWatermark}
+                resizeMode="contain"
+              />
+              <View style={styles.featureTopRow}>
+                <View style={styles.featureIconBadge}>
+                  <SymbolView
+                    name="dumbbell.fill"
+                    size={23}
+                    tintColor="#FFFFFF"
+                    weight="semibold"
+                    fallback={<Text style={styles.featureBadgeText}>D</Text>}
+                  />
+                </View>
+              </View>
+              <Text style={styles.featureKicker}>Machine Guide</Text>
+              <Text style={styles.featureTitle}>Find the right equipment</Text>
+              <Text style={styles.featureBody}>
+                Pick a muscle group and get setup cues.
+              </Text>
+            </Pressable>
+          </Animated.View>
+
+          <Animated.View
+            style={{
+              width: featureCardWidth,
+              transform: [
+                {
+                  scale: featureScrollX.interpolate({
+                    inputRange: [0, featurePageW, featurePageW * 2],
+                    outputRange: [0.84, 1, 0.84],
+                    extrapolate: 'clamp',
+                  }),
+                },
+              ],
+            }}>
+            <Pressable
+              onPress={() => router.push('/how-to-use' as Href)}
+              style={({ pressed }) => [
+                styles.featureCard,
+                pressed && styles.featurePressed,
+              ]}>
+              <LinearGradient
+                pointerEvents="none"
+                colors={['#1C1F29', '#14161D', '#0C0D12']}
+                start={{ x: 0.1, y: 0 }}
+                end={{ x: 0.9, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <Image
+                source={aiHelpSign}
+                style={[styles.featureWatermark, styles.featureWatermarkAi]}
+                resizeMode="contain"
+              />
+              <View style={styles.featureTopRow}>
+                <View style={[styles.featureIconBadge, styles.featureIconBadgeAi]}>
+                  <SymbolView
+                    name="book.fill"
+                    size={22}
+                    tintColor="#FFFFFF"
+                    weight="semibold"
+                    fallback={<Text style={styles.featureBadgeText}>B</Text>}
+                  />
+                </View>
+              </View>
+              <Text style={[styles.featureKicker, styles.featureKickerAi]}>
+                AI Gym Help
+              </Text>
+              <Text style={styles.featureTitle}>How to use the app</Text>
+              <Text style={styles.featureBody}>
+                Instructions, AI assistant, and contact.
+              </Text>
+            </Pressable>
+          </Animated.View>
+        </Animated.ScrollView>
 
         <View style={styles.sectionHeading}>
           <View style={styles.accentBar} />
@@ -1288,7 +1343,7 @@ const styles = StyleSheet.create({
     marginHorizontal: -20,
     marginTop: -84,
     marginBottom: 0,
-    paddingTop: 122,
+    paddingTop: 100,
     paddingHorizontal: 20,
     paddingBottom: 0,
   },
@@ -1323,14 +1378,29 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   title: {
-    color: '#FFFFFF',
+    color: premiumColors.redBright,
     fontSize: 42,
     fontWeight: '900',
     letterSpacing: 0,
     marginTop: 4,
-    textShadowColor: 'rgba(0, 0, 0, 0.72)',
-    textShadowOffset: { width: 0, height: 3 },
-    textShadowRadius: 14,
+  },
+  nameMaskWrap: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  nameGlyph: {
+    fontSize: 42,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 50,
+  },
+  // Opaque ink → defines the glyph shape the gradient shows through.
+  nameMaskInk: {
+    color: '#000000',
+  },
+  // Sizes the gradient to the text without being visible itself.
+  nameGlyphHidden: {
+    opacity: 0,
   },
   subtitle: {
     color: 'rgba(255, 255, 255, 0.9)',
@@ -1348,22 +1418,66 @@ const styles = StyleSheet.create({
     borderRadius: 3.5,
   },
   heroMembershipPanel: {
-    minHeight: 62,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
     marginTop: 32,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     backgroundColor: 'rgba(5, 7, 12, 0.58)',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.34,
     shadowRadius: 20,
     elevation: 8,
+  },
+  heroPanelTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  heroProgressTrack: {
+    height: 8,
+    overflow: 'hidden',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.095)',
+    marginTop: 16,
+  },
+  heroProgressFill: {
+    height: '100%',
+    borderRadius: 999,
+  },
+  heroMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 9,
+  },
+  heroMetaStrong: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+  heroMetaText: {
+    color: 'rgba(255, 255, 255, 0.62)',
+    flexShrink: 1,
+    fontSize: 11,
+    fontWeight: '800',
+    textAlign: 'right',
+  },
+  featureSectionHeading: {
+    marginTop: 22,
+  },
+  featureRailScroll: {
+    marginHorizontal: -20,
+    marginBottom: 22,
+  },
+  featureRail: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
   },
   heroMembershipIconWrap: {
     width: 40,
@@ -1782,8 +1896,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   featureCard: {
-    flex: 1,
-    minHeight: 184,
+    minHeight: 150,
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,

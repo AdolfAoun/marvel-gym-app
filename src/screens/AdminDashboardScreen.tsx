@@ -242,8 +242,10 @@ export default function AdminDashboardScreen() {
 
   const handleLogout = async () => {
     setIsLogoutVisible(false);
+    // Clear the session and return to the default guest entry point, so the
+    // app behaves like a fresh guest after an admin signs out.
     await authService.logoutMember();
-    router.replace('/login');
+    router.replace('/welcome');
   };
 
   const renderSectionCard = (section: AdminSection) => {

@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
+  Easing,
   Image,
   Modal,
   Pressable,
@@ -278,10 +279,21 @@ export default function ShopScreen() {
   );
 
   const transitionToShopSlide = useCallback((newIndex: number) => {
-    Animated.timing(shopFadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+    // Slow, soft cross-fade (eased) so the auto-cycle feels gentle, not sharp.
+    Animated.timing(shopFadeAnim, {
+      toValue: 0,
+      duration: 480,
+      easing: Easing.in(Easing.ease),
+      useNativeDriver: true,
+    }).start(() => {
       setCarouselIndex(newIndex);
       shopIndexRef.current = newIndex;
-      Animated.timing(shopFadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+      Animated.timing(shopFadeAnim, {
+        toValue: 1,
+        duration: 720,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }).start();
     });
   }, [shopFadeAnim]);
 
@@ -419,8 +431,11 @@ export default function ShopScreen() {
           return (
             <View style={styles.featuredWidget}>
               <View style={styles.featuredCircleGlow} />
-              <Animated.View style={{ opacity: shopFadeAnim }}>
-                <View style={styles.featuredCard}>
+              <View style={styles.featuredCard}>
+                {/* Only the picture cross-fades on auto-next; the glass frame,
+                    text and button stay put so the widget feels coherent. */}
+                <Animated.View
+                  style={[StyleSheet.absoluteFillObject, { opacity: shopFadeAnim }]}>
                   {imageUri ? (
                     <Image
                       source={{ uri: imageUri }}
@@ -434,6 +449,7 @@ export default function ShopScreen() {
                       </Text>
                     </View>
                   )}
+                </Animated.View>
                   <LinearGradient
                     pointerEvents="none"
                     colors={[
@@ -500,7 +516,6 @@ export default function ShopScreen() {
                     </Pressable>
                   </View>
                 </View>
-              </Animated.View>
             </View>
           );
         })() : null}
@@ -540,7 +555,7 @@ export default function ShopScreen() {
                   ]}>
                   <SymbolView
                     name={meta.symbol as never}
-                    size={24}
+                    size={20}
                     tintColor={isSelected ? '#FFFFFF' : premiumColors.textMuted}
                     fallback={
                       <Text
@@ -1255,13 +1270,13 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
   categoryTile: {
-    width: 116,
+    width: 104,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: premiumColors.glassBorder,
-    borderRadius: 20,
+    borderRadius: 18,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingVertical: 16,
+    paddingVertical: 13,
     paddingHorizontal: 10,
   },
   categoryTileSelected: {
@@ -1277,20 +1292,20 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   categoryIconWrap: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
+    borderRadius: 13,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   categoryIconWrapSelected: {
     backgroundColor: premiumColors.red,
   },
   categoryFallback: {
     color: premiumColors.textMuted,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '900',
   },
   categoryFallbackSelected: {

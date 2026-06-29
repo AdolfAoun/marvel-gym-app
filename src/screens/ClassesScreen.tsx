@@ -380,14 +380,12 @@ export default function ClassesScreen() {
     gymClass: GymClass;
   }>();
   const [isLoading, setIsLoading] = useState(true);
-  const [carouselIndex, setCarouselIndex] = useState(0);
   const [expandedBox, setExpandedBox] = useState<'vouchers' | 'bookings' | null>(null);
   const [ordersTab, setOrdersTab] = useState<'Confirmed' | 'Canceled'>('Confirmed');
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [specialIndex, setSpecialIndex] = useState(0);
   const [ptBookPending, setPtBookPending] = useState<string | undefined>(undefined);
 
   const allWeeksData = useMemo(() => [-1, 0, 1].map(getWeekDays), []);
@@ -459,6 +457,10 @@ export default function ClassesScreen() {
   const historyVouchers = classVouchers.filter((v) => v.status !== 'Pending');
   const ordersFiltered = historyVouchers.filter((v) => v.status === ordersTab);
 
+  // Up to 5 featured items drive the "Most Popular" carousel.
+  const carouselItems =
+    featuredClasses.length > 0 ? featuredClasses : classes.slice(0, 5);
+
   const handleReserve = async (classId: string) => {
     await classService.registerForClass(classId);
     await loadData();
@@ -476,11 +478,17 @@ export default function ClassesScreen() {
     await loadData();
   };
 
-  const featuredScrollX = useRef(new Animated.Value(0)).current;
+  // The carousel renders [lastClone, ...items, firstClone] so it can loop
+  // seamlessly. Real item `i` lives at page index `i + 1`; `currentIndexRef`
+  // tracks that PAGE index (so it starts at 1, the first real item), and
+  // `featuredScrollX` starts one page in to match.
+  const featuredScrollX = useRef(new Animated.Value(FEAT_PAGE_W)).current;
   const featuredScrollRef = useRef<ScrollView>(null);
-  const autoplayIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const resumeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const currentIndexRef = useRef(0);
+  const specialScrollX = useRef(new Animated.Value(0)).current;
+  const specialScrollRef = useRef<ScrollView>(null);
+  const autoplayIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const resumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentIndexRef = useRef(1);
 
   useEffect(() => {
     if (!carouselItems || carouselItems.length <= 1) return;
@@ -488,7 +496,10 @@ export default function ClassesScreen() {
     const startAutoplay = () => {
       if (autoplayIntervalRef.current) clearInterval(autoplayIntervalRef.current);
       autoplayIntervalRef.current = setInterval(() => {
-        const next = (currentIndexRef.current + 1) % carouselItems.length;
+        // Always step forward by one page. When this lands on the trailing
+        // first-clone, onMomentumScrollEnd silently snaps back to the real
+        // first page, so it never scrolls backward through every item.
+        const next = currentIndexRef.current + 1;
         currentIndexRef.current = next;
         featuredScrollRef.current?.scrollTo({ x: next * FEAT_PAGE_W, animated: true });
       }, 3000);
@@ -513,11 +524,16 @@ export default function ClassesScreen() {
     );
   }
 
-  const carouselItems =
-    featuredClasses.length > 0 ? featuredClasses : classes.slice(0, 5);
-
   const canGoPrev = weekOffset > -1;
   const canGoNext = weekOffset < 1;
+
+  // Seamless loop: clone the last item before the first and the first after
+  // the last. Single-item carousels stay as-is.
+  const hasLoop = carouselItems.length > 1;
+  const loopItems = hasLoop
+    ? [carouselItems[carouselItems.length - 1], ...carouselItems, carouselItems[0]]
+    : carouselItems;
+  const featInitialOffset = hasLoop ? FEAT_PAGE_W : 0;
 
   return (
     <PremiumScreenBackground>
@@ -539,9 +555,7 @@ export default function ClassesScreen() {
 
         {/* ── FEATURED — fixed widget, swipe inside to change ──────── */}
         <View style={styles.featuredOuterLabel}>
-          <View style={styles.featuredOuterAccentBar} />
           <Text style={styles.featuredOuterLabelText}>MOST POPULAR</Text>
-          <View style={styles.featuredOuterDivider} />
         </View>
 
         <View style={styles.featuredWidget}>
@@ -553,6 +567,7 @@ export default function ClassesScreen() {
               showsHorizontalScrollIndicator={false}
               decelerationRate={0.95}
               scrollEventThrottle={16}
+              contentOffset={{ x: featInitialOffset, y: 0 }}
               style={{ flex: 1 }}
               onScrollBeginDrag={() => {
                 if (autoplayIntervalRef.current) clearInterval(autoplayIntervalRef.current);
@@ -563,20 +578,29 @@ export default function ClassesScreen() {
                 { useNativeDriver: true },
               )}
               onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
-                const idx = Math.round(e.nativeEvent.contentOffset.x / FEAT_PAGE_W);
-                currentIndexRef.current = idx;
-                setCarouselIndex(idx);
+                const n = carouselItems.length;
+                let page = Math.round(e.nativeEvent.contentOffset.x / FEAT_PAGE_W);
+                // Jumped onto a clone at either seam — snap (no animation) onto
+                // the matching real page so the loop is invisible.
+                if (hasLoop && page === n + 1) {
+                  page = 1;
+                  featuredScrollRef.current?.scrollTo({ x: FEAT_PAGE_W, animated: false });
+                } else if (hasLoop && page === 0) {
+                  page = n;
+                  featuredScrollRef.current?.scrollTo({ x: n * FEAT_PAGE_W, animated: false });
+                }
+                currentIndexRef.current = page;
                 if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
                 resumeTimeoutRef.current = setTimeout(() => {
                   if (autoplayIntervalRef.current) clearInterval(autoplayIntervalRef.current);
                   autoplayIntervalRef.current = setInterval(() => {
-                    const next = (currentIndexRef.current + 1) % carouselItems.length;
+                    const next = currentIndexRef.current + 1;
                     currentIndexRef.current = next;
                     featuredScrollRef.current?.scrollTo({ x: next * FEAT_PAGE_W, animated: true });
                   }, 3000);
                 }, 4000);
               }}>
-              {carouselItems.map((gymClass, i) => {
+              {loopItems.map((gymClass, i) => {
                 const isReserved = Boolean(gymClass.isRegistered);
                 const isFull = gymClass.status === 'Full' && !isReserved;
                 const isFav = favorites.has(gymClass.id);
@@ -587,7 +611,7 @@ export default function ClassesScreen() {
                   extrapolate: 'clamp',
                 });
                 return (
-                  <View key={gymClass.id} style={styles.featuredPage}>
+                  <View key={`feat-${i}`} style={styles.featuredPage}>
                     <Animated.View style={[StyleSheet.absoluteFillObject, styles.featuredPageInner, { transform: [{ scale: pageScale }] }]}>
                       <Image source={{ uri: imgUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
                       <LinearGradient
@@ -660,57 +684,6 @@ export default function ClassesScreen() {
             <View pointerEvents="none" style={styles.featuredGlassSpecular} />
           </View>
 
-          {carouselItems.length > 1 ? (() => {
-            const total = carouselItems.length;
-            // Window always starts at carouselIndex, capped so we don't go past total-3
-            const windowStart = Math.min(carouselIndex, Math.max(0, total - 3));
-            // Always render 3 slots; slot indices may exceed total-1 (handled via opacity)
-            const slots = [windowStart, windowStart + 1, windowStart + 2];
-            // 3rd dot fades out as scroll approaches the last page
-            const thirdDotOpacity = featuredScrollX.interpolate({
-              inputRange: [(total - 2) * FEAT_PAGE_W, (total - 1) * FEAT_PAGE_W],
-              outputRange: [1, 0],
-              extrapolate: 'clamp',
-            });
-            return (
-              <View style={styles.pagination}>
-                {slots.map((i, slotPos) => {
-                  const dotScale = featuredScrollX.interpolate({
-                    inputRange: [(i - 1) * FEAT_PAGE_W, i * FEAT_PAGE_W, (i + 1) * FEAT_PAGE_W],
-                    outputRange: [1, 1.5, 1],
-                    extrapolate: 'clamp',
-                  });
-                  const dotColor = featuredScrollX.interpolate({
-                    inputRange: [(i - 1) * FEAT_PAGE_W, i * FEAT_PAGE_W, (i + 1) * FEAT_PAGE_W],
-                    outputRange: ['rgba(255,255,255,0.22)', premiumColors.redBright, 'rgba(255,255,255,0.22)'],
-                    extrapolate: 'clamp',
-                  });
-                  const dotGlow = featuredScrollX.interpolate({
-                    inputRange: [(i - 1) * FEAT_PAGE_W, i * FEAT_PAGE_W, (i + 1) * FEAT_PAGE_W],
-                    outputRange: [0, 0.8, 0],
-                    extrapolate: 'clamp',
-                  });
-                  return (
-                    <Animated.View
-                      key={slotPos}
-                      style={[
-                        styles.dot,
-                        {
-                          transform: [{ scale: dotScale }],
-                          backgroundColor: dotColor,
-                          shadowColor: premiumColors.redBright,
-                          shadowOffset: { width: 0, height: 0 },
-                          shadowOpacity: dotGlow,
-                          shadowRadius: 6,
-                          opacity: slotPos === 2 ? thirdDotOpacity : 1,
-                        },
-                      ]}
-                    />
-                  );
-                })}
-              </View>
-            );
-          })() : null}
         </View>
 
         {/* ── WELLNESS & SPA SESSIONS ───────────────────────────── */}
@@ -725,16 +698,19 @@ export default function ClassesScreen() {
           </View>
         </View>
 
-        <ScrollView
+        <Animated.ScrollView
+          ref={specialScrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           decelerationRate="fast"
           snapToInterval={SPA_CARD_W + SPA_CARD_GAP}
           snapToAlignment="start"
+          scrollEventThrottle={16}
           contentContainerStyle={{ paddingLeft: 20, paddingRight: 8 }}
-          onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
-            setSpecialIndex(Math.round(e.nativeEvent.contentOffset.x / (SPA_CARD_W + SPA_CARD_GAP)));
-          }}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { x: specialScrollX } } }],
+            { useNativeDriver: false },
+          )}
           style={styles.specialCarousel}>
           {SPECIAL_SESSIONS.map((session, idx) => (
             <View key={session.id} style={styles.specialSlide}>
@@ -772,13 +748,47 @@ export default function ClassesScreen() {
               </LinearGradient>
             </View>
           ))}
-        </ScrollView>
+        </Animated.ScrollView>
 
         {/* Dots for special sessions */}
         <View style={styles.specialDots}>
-          {SPECIAL_SESSIONS.map((_, i) => (
-            <View key={i} style={[styles.dot, i === specialIndex && styles.dotActive]} />
-          ))}
+          {SPECIAL_SESSIONS.map((_, i) => {
+            const pageOffset = i * (SPA_CARD_W + SPA_CARD_GAP);
+            const dotColor = specialScrollX.interpolate({
+              inputRange: [
+                pageOffset - (SPA_CARD_W + SPA_CARD_GAP),
+                pageOffset,
+                pageOffset + (SPA_CARD_W + SPA_CARD_GAP),
+              ],
+              outputRange: [
+                'rgba(255,255,255,0.22)',
+                premiumColors.redBright,
+                'rgba(255,255,255,0.22)',
+              ],
+              extrapolate: 'clamp',
+            });
+
+            return (
+              <Pressable
+                key={i}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={`Go to featured ${i + 1}`}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  specialScrollRef.current?.scrollTo({ x: pageOffset, animated: true });
+                }}>
+                <Animated.View
+                  style={[
+                    styles.specialDot,
+                    {
+                      backgroundColor: dotColor,
+                    },
+                  ]}
+                />
+              </Pressable>
+            );
+          })}
         </View>
 
         {/* ── DATES — paging strip with edge arrows ─────────────── */}
@@ -790,8 +800,16 @@ export default function ClassesScreen() {
         <View style={styles.weekWrapper}>
           {/* Left arrow — only when not on first page */}
           <Pressable
-            onPress={() => setWeekOffset((w) => Math.max(-1, w - 1))}
-            style={[styles.weekEdgeBtn, styles.weekEdgeBtnLeft, !canGoPrev && styles.weekEdgeBtnHidden]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setWeekOffset((w) => Math.max(-1, w - 1));
+            }}
+            style={({ pressed }) => [
+              styles.weekEdgeBtn,
+              styles.weekEdgeBtnLeft,
+              !canGoPrev && styles.weekEdgeBtnHidden,
+              pressed && { transform: [{ scale: 0.86 }], opacity: 0.7 },
+            ]}
             disabled={!canGoPrev}
             hitSlop={6}>
             <SymbolView
@@ -857,8 +875,16 @@ export default function ClassesScreen() {
 
           {/* Right arrow — only when not on last page */}
           <Pressable
-            onPress={() => setWeekOffset((w) => Math.min(1, w + 1))}
-            style={[styles.weekEdgeBtn, styles.weekEdgeBtnRight, !canGoNext && styles.weekEdgeBtnHidden]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setWeekOffset((w) => Math.min(1, w + 1));
+            }}
+            style={({ pressed }) => [
+              styles.weekEdgeBtn,
+              styles.weekEdgeBtnRight,
+              !canGoNext && styles.weekEdgeBtnHidden,
+              pressed && { transform: [{ scale: 0.86 }], opacity: 0.7 },
+            ]}
             disabled={!canGoNext}
             hitSlop={6}>
             <SymbolView
@@ -1485,7 +1511,7 @@ const styles = StyleSheet.create({
   weekEdgeGlyph: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
   featuredWidget: {
     paddingHorizontal: 20,
-    marginBottom: 8,
+    marginBottom: 24,
   },
   featuredPage: {
     width: FEAT_PAGE_W,
@@ -1501,28 +1527,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     marginBottom: 10,
-    gap: 10,
-  },
-  featuredOuterAccentBar: {
-    width: 3,
-    height: 18,
-    borderRadius: 2,
-    backgroundColor: premiumColors.redBright,
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.75,
-    shadowRadius: 8,
   },
   featuredOuterLabelText: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 2.5,
-  },
-  featuredOuterDivider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   featuredOuterCounter: {
     color: '#FFFFFF',
@@ -1651,27 +1661,7 @@ const styles = StyleSheet.create({
   featuredBookBtnArrow: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
   btnPressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
 
-  // Pagination
-  pagination: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 16,
-    marginBottom: 18,
-  },
-  dot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: 'rgba(255,255,255,0.22)' },
-  dotActive: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: premiumColors.redBright,
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 8,
-    elevation: 4,
-  },
+  specialDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: 'rgba(255,255,255,0.22)' },
 
   // Today header
   todayRow: {
@@ -2115,7 +2105,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 20,
     marginBottom: 12,
-    marginTop: 4,
+    marginTop: 8,
   },
   spaEyebrow: {
     color: premiumColors.redBright,

@@ -5,6 +5,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Modal,
   Pressable,
   ScrollView,
@@ -41,6 +42,9 @@ const textColor = premiumColors.text;
 const mutedColor = premiumColors.textMuted;
 
 type TimerState = 'idle' | 'running' | 'paused';
+
+// Metric widget = 236 wide + 12 gap; one "page" for the scale carousel.
+const METRIC_PAGE_W = 248;
 
 const journeyTimerStorageKey = 'marvel-gym:journey-workout-timer';
 
@@ -106,6 +110,7 @@ export default function JourneyScreen() {
   const [stats, setStats] = useState<JourneyStats>();
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [isEditingBio, setIsEditingBio] = useState(false);
+  const [isCalendarEditorOpen, setIsCalendarEditorOpen] = useState(false);
   const [selectedMonthIndex, setSelectedMonthIndex] = useState(new Date().getMonth());
   const [timerState, setTimerState] = useState<TimerState>('idle');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -117,6 +122,7 @@ export default function JourneyScreen() {
   const [undoableMetricKeys, setUndoableMetricKeys] = useState<JourneyMetricKey[]>([]);
   const [isAllMetricResetUndoable, setIsAllMetricResetUndoable] = useState(false);
   const [pendingTimerSeconds, setPendingTimerSeconds] = useState(0);
+  const metricsScrollX = useRef(new Animated.Value(0)).current;
   const [isHistoryVisible, setIsHistoryVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const timerStartedAtRef = useRef<number | undefined>(undefined);
@@ -252,6 +258,9 @@ export default function JourneyScreen() {
             selectedMonthSessions.length,
         )
       : 0;
+  const selectedMonthCompletionRate = selectedMonth
+    ? Math.round((selectedMonthVisitCount / Math.max(1, selectedMonth.days.length)) * 100)
+    : 0;
 
   const refreshMetrics = async () => {
     const nextMetrics = await journeyService.getJourneyMetrics();
@@ -430,43 +439,68 @@ export default function JourneyScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
 
-        {/* Hero Card */}
+        {/* Journey cockpit */}
         <LinearGradient
           colors={premiumGradients.redPanel}
           start={{ x: 0.1, y: 0 }}
           end={{ x: 0.9, y: 1 }}
           style={styles.heroCard}>
           <View pointerEvents="none" style={styles.heroGloss} />
+          <View pointerEvents="none" style={styles.heroOrbitOne} />
+          <View pointerEvents="none" style={styles.heroOrbitTwo} />
           <MarvelMarks variant="corner" color="#FFFFFF" />
-          <Text style={styles.kicker}>Journey</Text>
-          <Text style={styles.heroTitle}>
-            {member?.firstName ?? 'Member'}&apos;s Dashboard
-          </Text>
-          <Text style={styles.heroBody}>
-            Track your consistency. Own your progress. Push your limits.
-          </Text>
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroIdentity}>
+              <Text style={styles.kicker}>Journey</Text>
+              <Text style={styles.heroTitle}>
+                {member?.firstName ?? 'Member'}'s Command Center
+              </Text>
+              <Text style={styles.heroBody}>
+                Live consistency, session energy, and long-term momentum in one place.
+              </Text>
+            </View>
+            <View style={styles.heroSignal}>
+              <Text style={styles.heroSignalValue}>{selectedMonthCompletionRate}%</Text>
+              <Text style={styles.heroSignalLabel}>this month</Text>
+            </View>
+          </View>
           <View style={styles.heroStatsRow}>
             <View style={styles.heroStatPill}>
               <Text style={styles.heroStatValue}>{selectedMonthVisitCount}</Text>
-              <Text style={styles.heroStatLabel}>this month</Text>
-            </View>
-            <View style={styles.heroStatPill}>
-              <Text style={styles.heroStatValue}>{selectedMonthAverageCalories}</Text>
-              <Text style={styles.heroStatLabel}>cal / session</Text>
+              <Text style={styles.heroStatLabel}>visits</Text>
             </View>
             <View style={styles.heroStatPill}>
               <Text style={styles.heroStatValue}>{stats.consecutiveStreak}</Text>
-              <Text style={styles.heroStatLabel}>day streak</Text>
+              <Text style={styles.heroStatLabel}>streak</Text>
+            </View>
+            <View style={styles.heroStatPill}>
+              <Text style={styles.heroStatValue}>{unlockedCount}</Text>
+              <Text style={styles.heroStatLabel}>badges</Text>
             </View>
           </View>
         </LinearGradient>
 
-        {/* Metrics Rail */}
+        <View style={styles.commandGrid}>
+          <View style={styles.commandTile}>
+            <Text style={styles.commandValue}>{selectedMonthAverageCalories}</Text>
+            <Text style={styles.commandLabel}>Avg kcal</Text>
+          </View>
+          <View style={styles.commandTile}>
+            <Text style={styles.commandValue}>{selectedMonthSessions.length}</Text>
+            <Text style={styles.commandLabel}>Sessions</Text>
+          </View>
+          <View style={styles.commandTile}>
+            <Text style={styles.commandValue}>{formatDuration(elapsedSeconds)}</Text>
+            <Text style={styles.commandLabel}>Live clock</Text>
+          </View>
+        </View>
+
+        {/* Swipeable Metrics Widgets */}
         <View style={styles.sectionHeader}>
           <View style={styles.accentBar} />
           <View style={styles.sectionHeaderText}>
             <Text style={styles.sectionEyebrow}>All-time</Text>
-            <Text style={styles.sectionTitle}>Performance Metrics</Text>
+            <Text style={styles.sectionTitle}>Performance</Text>
           </View>
           <View style={styles.metricHeaderActions}>
             {isAllMetricResetUndoable ? (
@@ -497,16 +531,33 @@ export default function JourneyScreen() {
           </View>
         </View>
 
-        <ScrollView
+        <Animated.ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          decelerationRate="fast"
+          snapToInterval={METRIC_PAGE_W}
+          snapToAlignment="start"
+          scrollEventThrottle={16}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { x: metricsScrollX } } }],
+            { useNativeDriver: true },
+          )}
           contentContainerStyle={styles.metricsRail}>
-          {metricCards.map((metric) => {
+          {metricCards.map((metric, i) => {
             const canUndo = undoableMetricKeys.includes(metric.key);
+            const scale = metricsScrollX.interpolate({
+              inputRange: [(i - 1) * METRIC_PAGE_W, i * METRIC_PAGE_W, (i + 1) * METRIC_PAGE_W],
+              outputRange: [0.92, 1, 0.92],
+              extrapolate: 'clamp',
+            });
             return (
-              <View key={metric.key} style={styles.metricCard}>
+              <Animated.View
+                key={metric.key}
+                style={[styles.metricCard, { transform: [{ scale }] }]}>
                 <View pointerEvents="none" style={styles.metricCardGloss} />
+                <View pointerEvents="none" style={styles.metricPulse} />
                 <View style={styles.metricAccent} />
+                <Text style={styles.metricWidgetEyebrow}>All-time</Text>
                 <Text style={styles.metricValue}>{metric.value}</Text>
                 <Text style={styles.metricLabel}>{metric.label}</Text>
                 <View style={styles.metricActions}>
@@ -533,23 +584,68 @@ export default function JourneyScreen() {
                     </Pressable>
                   ) : null}
                 </View>
-              </View>
+              </Animated.View>
             );
           })}
-        </ScrollView>
+        </Animated.ScrollView>
 
-        {/* Attendance Calendar */}
-        <View style={styles.card}>
+        {/* Attendance Calendar Launcher */}
+        <View style={styles.calendarCommandCard}>
+          <View pointerEvents="none" style={styles.calendarGlow} />
           <View style={styles.cardHeaderRow}>
             <View>
               <Text style={styles.cardLabel}>Attendance Calendar</Text>
-              <Text style={styles.cardTitle}>2026 visits</Text>
+              <Text style={styles.cardTitle}>
+                {selectedMonth ? `${selectedMonth.month} editor` : '2026 visits'}
+              </Text>
             </View>
-            <Text style={styles.cardHint}>Tap day to toggle</Text>
+            <Pressable
+              onPress={() => setIsCalendarEditorOpen((value) => !value)}
+              style={({ pressed }) => [styles.calendarToggleButton, pressed && styles.buttonPressed]}>
+              <Text style={styles.calendarToggleText}>
+                {isCalendarEditorOpen ? 'Close days' : 'Edit days'}
+              </Text>
+            </Pressable>
           </View>
 
           {selectedMonth ? (
             <View>
+              <Pressable
+                onPress={() => setIsCalendarEditorOpen((value) => !value)}
+                style={({ pressed }) => [styles.calendarLaunchButton, pressed && styles.buttonPressed]}>
+                <View style={styles.calendarLaunchTop}>
+                  <View style={styles.calendarLaunchBadge}>
+                    <Text style={styles.calendarLaunchMonth}>{selectedMonth.month.slice(0, 3)}</Text>
+                    <Text style={styles.calendarLaunchDay}>{selectedMonthVisitCount}</Text>
+                  </View>
+                  <View style={styles.calendarLaunchCopy}>
+                    <Text style={styles.calendarLaunchTitle}>Open monthly day editor</Text>
+                    <Text style={styles.calendarLaunchBody}>
+                      Tap to reveal the day grid, then select a date to update attendance.
+                    </Text>
+                  </View>
+                  <Text style={styles.calendarLaunchArrow}>
+                    {isCalendarEditorOpen ? '^' : 'v'}
+                  </Text>
+                </View>
+                <View style={styles.calendarStatsRow}>
+                  <View style={styles.calendarStatChip}>
+                    <Text style={styles.calendarStatValue}>{selectedMonthVisitCount}</Text>
+                    <Text style={styles.calendarStatLabel}>visits</Text>
+                  </View>
+                  <View style={styles.calendarStatChip}>
+                    <Text style={styles.calendarStatValue}>{selectedMonthAverageCalories}</Text>
+                    <Text style={styles.calendarStatLabel}>avg kcal</Text>
+                  </View>
+                  <View style={styles.calendarStatChip}>
+                    <Text style={styles.calendarStatValue}>{selectedMonthSessions.length}</Text>
+                    <Text style={styles.calendarStatLabel}>sessions</Text>
+                  </View>
+                </View>
+              </Pressable>
+
+              {isCalendarEditorOpen ? (
+                <View style={styles.calendarEditorPanel}>
               <View style={styles.monthSwitcher}>
                 <Pressable
                   disabled={activeMonthIndex === 0}
@@ -602,20 +698,8 @@ export default function JourneyScreen() {
                   </Pressable>
                 ))}
               </View>
-              <View style={styles.calendarStatsRow}>
-                <View style={styles.calendarStatChip}>
-                  <Text style={styles.calendarStatValue}>{selectedMonthVisitCount}</Text>
-                  <Text style={styles.calendarStatLabel}>visits</Text>
                 </View>
-                <View style={styles.calendarStatChip}>
-                  <Text style={styles.calendarStatValue}>{selectedMonthAverageCalories}</Text>
-                  <Text style={styles.calendarStatLabel}>avg kcal</Text>
-                </View>
-                <View style={styles.calendarStatChip}>
-                  <Text style={styles.calendarStatValue}>{selectedMonthSessions.length}</Text>
-                  <Text style={styles.calendarStatLabel}>sessions</Text>
-                </View>
-              </View>
+              ) : null}
             </View>
           ) : null}
         </View>
@@ -945,9 +1029,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.16)',
-    borderRadius: 26,
+    borderRadius: 30,
     padding: 22,
-    marginBottom: 20,
+    marginBottom: 12,
     shadowColor: premiumColors.red,
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.4,
@@ -961,6 +1045,56 @@ const styles = StyleSheet.create({
     right: 0,
     height: '50%',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  heroOrbitOne: {
+    position: 'absolute',
+    right: -70,
+    top: -44,
+    width: 178,
+    height: 178,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderRadius: 89,
+  },
+  heroOrbitTwo: {
+    position: 'absolute',
+    right: -28,
+    top: 18,
+    width: 104,
+    height: 104,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 52,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+  },
+  heroIdentity: {
+    flex: 1,
+  },
+  heroSignal: {
+    width: 86,
+    minHeight: 86,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.24)',
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.13)',
+  },
+  heroSignalValue: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  heroSignalLabel: {
+    color: 'rgba(255, 255, 255, 0.78)',
+    fontSize: 9,
+    fontWeight: '900',
+    marginTop: 2,
+    textTransform: 'uppercase',
   },
   kicker: {
     color: 'rgba(255, 255, 255, 0.78)',
@@ -986,13 +1120,13 @@ const styles = StyleSheet.create({
   heroStatsRow: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 18,
+    marginTop: 20,
   },
   heroStatPill: {
     flex: 1,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 16,
+    borderRadius: 18,
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
     padding: 12,
   },
@@ -1008,6 +1142,34 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textTransform: 'uppercase',
   },
+  commandGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 22,
+  },
+  commandTile: {
+    flex: 1,
+    minHeight: 74,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.065)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  commandValue: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  commandLabel: {
+    color: mutedColor,
+    fontSize: 10,
+    fontWeight: '900',
+    marginTop: 4,
+    textTransform: 'uppercase',
+  },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1018,8 +1180,12 @@ const styles = StyleSheet.create({
   accentBar: {
     width: 4,
     height: 36,
-    borderRadius: 3,
+    borderRadius: 999,
     backgroundColor: wineColor,
+    shadowColor: wineColor,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.36,
+    shadowRadius: 8,
   },
   sectionHeaderText: {
     flex: 1,
@@ -1122,11 +1288,11 @@ const styles = StyleSheet.create({
   metricCard: {
     position: 'relative',
     overflow: 'hidden',
-    width: 158,
-    minHeight: 160,
+    width: 236,
+    minHeight: 174,
     borderWidth: 1,
     borderColor: premiumColors.glassBorder,
-    borderRadius: 22,
+    borderRadius: 26,
     backgroundColor: premiumColors.surface,
     padding: 16,
     justifyContent: 'flex-start',
@@ -1140,16 +1306,32 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.18)',
   },
+  metricPulse: {
+    position: 'absolute',
+    right: -42,
+    top: -38,
+    width: 126,
+    height: 126,
+    borderRadius: 63,
+    backgroundColor: 'rgba(225, 29, 46, 0.08)',
+  },
   metricAccent: {
-    width: 26,
+    width: 34,
     height: 4,
     borderRadius: 2,
     backgroundColor: premiumColors.redBright,
-    marginBottom: 14,
+    marginBottom: 12,
+  },
+  metricWidgetEyebrow: {
+    color: 'rgba(255, 255, 255, 0.46)',
+    fontSize: 10,
+    fontWeight: '900',
+    marginBottom: 6,
+    textTransform: 'uppercase',
   },
   metricValue: {
     color: '#FFFFFF',
-    fontSize: 30,
+    fontSize: 36,
     fontWeight: '900',
     letterSpacing: 0,
   },
@@ -1245,6 +1427,106 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     flexShrink: 1,
     textAlign: 'right',
+  },
+  calendarCommandCard: {
+    position: 'relative',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(225, 29, 46, 0.18)',
+    borderRadius: 28,
+    backgroundColor: 'rgba(18, 20, 28, 0.86)',
+    padding: 18,
+    marginBottom: 16,
+    ...premiumShadow,
+  },
+  calendarGlow: {
+    position: 'absolute',
+    right: -50,
+    top: -54,
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    backgroundColor: 'rgba(225, 29, 46, 0.08)',
+  },
+  calendarToggleButton: {
+    minHeight: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(225, 29, 46, 0.32)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(225, 29, 46, 0.12)',
+    paddingHorizontal: 14,
+  },
+  calendarToggleText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  calendarLaunchButton: {
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.13)',
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.065)',
+    padding: 14,
+  },
+  calendarLaunchTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  calendarLaunchBadge: {
+    width: 58,
+    height: 66,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 18,
+    backgroundColor: premiumColors.red,
+    ...premiumGlow,
+  },
+  calendarLaunchMonth: {
+    color: 'rgba(255, 255, 255, 0.72)',
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  calendarLaunchDay: {
+    color: '#FFFFFF',
+    fontSize: 25,
+    fontWeight: '900',
+    marginTop: 1,
+  },
+  calendarLaunchCopy: {
+    flex: 1,
+  },
+  calendarLaunchTitle: {
+    color: textColor,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  calendarLaunchBody: {
+    color: mutedColor,
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  calendarLaunchArrow: {
+    color: 'rgba(255, 255, 255, 0.72)',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  calendarEditorPanel: {
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.18)',
+    marginTop: 12,
+    padding: 12,
   },
   monthSwitcher: {
     minHeight: 42,
