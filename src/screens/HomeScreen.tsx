@@ -59,7 +59,28 @@ const minRenewMonths = 1;
 
 const machineGuideSign = require('@/assets/images/marvel-logo-startup-sign-x.png');
 const aiHelpSign = require('@/assets/images/marvel-logo-startup-sign-divide.png');
+const obliqueSign = require('@/assets/images/marvel-logo-startup-sign-slash.png');
 const homeHeroBackground = require('@/assets/images/headerhomeback.png');
+
+// "What's New" carousel — latest gym updates (display only, no booking).
+const whatsNewUpdates = [
+  {
+    id: 'pilates',
+    tag: 'NEW CLASS',
+    title: 'PILATES',
+    desc: 'Reformer & mat flows are now on the timetable.',
+    image:
+      'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=900&q=80',
+  },
+  {
+    id: 'spa',
+    tag: 'NOW OPEN',
+    title: 'SPA & RECOVERY',
+    desc: 'Sauna, steam room and a new recovery lounge.',
+    image:
+      'https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=900&q=80',
+  },
+];
 
 type MembershipModal = 'freeze' | 'renew';
 
@@ -208,6 +229,32 @@ export default function HomeScreen() {
   const featureCardWidth = Math.round(Math.min(windowWidth, 460) * 0.62);
   const featurePageW = featureCardWidth + 12;
   const featureScrollX = useRef(new Animated.Value(0)).current;
+
+  // "What's New" looping autoplay carousel — mirrors the Classes "Most Popular"
+  // widget (seamless loop + scaling pages + 3s autoplay), but display-only.
+  const whatsNewPageW = windowWidth - 40; // matches the hero/days cards (content has 20px padding)
+  const whatsNewScrollX = useRef(new Animated.Value(whatsNewPageW)).current;
+  const whatsNewScrollRef = useRef<ScrollView>(null);
+  const whatsNewIndexRef = useRef(1);
+  const whatsNewAutoplayRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const whatsNewResumeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (whatsNewUpdates.length <= 1) return;
+    const start = () => {
+      if (whatsNewAutoplayRef.current) clearInterval(whatsNewAutoplayRef.current);
+      whatsNewAutoplayRef.current = setInterval(() => {
+        const next = whatsNewIndexRef.current + 1;
+        whatsNewIndexRef.current = next;
+        whatsNewScrollRef.current?.scrollTo({ x: next * whatsNewPageW, animated: true });
+      }, 3000);
+    };
+    start();
+    return () => {
+      if (whatsNewAutoplayRef.current) clearInterval(whatsNewAutoplayRef.current);
+      if (whatsNewResumeRef.current) clearTimeout(whatsNewResumeRef.current);
+    };
+  }, [whatsNewPageW]);
   const [member, setMember] = useState<Member>();
   const [membership, setMembership] = useState<Membership>();
   const [status, setStatus] = useState<MembershipStatus>();
@@ -337,6 +384,12 @@ export default function HomeScreen() {
     };
 
     loadDashboard();
+
+    const unsubscribe = memberService.subscribeToMemberUpdates((updatedMember) => {
+      setMember(updatedMember);
+    });
+
+    return unsubscribe;
   }, []);
 
   useFocusEffect(
@@ -563,7 +616,7 @@ export default function HomeScreen() {
     outputRange: [22, 0],
   });
   const isFreezeSheet = membershipModal === 'freeze';
-  const sheetAccent = isFreezeSheet ? '#60A5FA' : '#C084FC';
+  const sheetAccent = isFreezeSheet ? '#60A5FA' : '#9B7FF0';
   const sheetAccentSoft = isFreezeSheet ? 'rgba(96, 165, 250, 0.16)' : 'rgba(192, 132, 252, 0.16)';
   const sheetAccentBorder =
     isFreezeSheet ? 'rgba(96, 165, 250, 0.34)' : 'rgba(192, 132, 252, 0.34)';
@@ -585,7 +638,6 @@ export default function HomeScreen() {
   const sheetPrimaryLabel = isCreatingVoucher ? 'Creating...' : 'Create voucher';
   const sheetSymbolName = isFreezeSheet ? 'snowflake' : 'sparkles';
   const sheetSymbolFallback = isFreezeSheet ? '❄' : '✦';
-
   return (
     <PremiumScreenBackground>
       <StatusBar style="light" />
@@ -593,12 +645,59 @@ export default function HomeScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
-          <View pointerEvents="none" style={styles.heroGloss} />
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(8,9,13,0.34)', 'rgba(3,4,7,0.82)', 'rgba(5,6,10,0.6)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={[
+              'rgba(30,64,175,0.24)',
+              'rgba(37,99,235,0.08)',
+              'rgba(168,85,247,0.14)',
+              'rgba(255,255,255,0)',
+            ]}
+            locations={[0, 0.32, 0.66, 1]}
+            start={{ x: 0.1, y: 0 }}
+            end={{ x: 0.95, y: 0.85 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(99,102,241,0)', 'rgba(139,92,246,0.12)', 'rgba(99,102,241,0)']}
+            start={{ x: 1, y: 0.1 }}
+            end={{ x: 0.2, y: 0.9 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.42)']}
+            start={{ x: 0, y: 0.4 }}
+            end={{ x: 0, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.14)', 'rgba(255,255,255,0)']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={[styles.daysCrystalFacet, styles.daysCrystalFacetTop]}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.07)', 'rgba(255,255,255,0)']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={[styles.daysCrystalFacet, styles.daysCrystalFacetBottom]}
+          />
+          <View style={styles.daysLeftEdge} />
           <View style={styles.heroTopRow}>
             <View style={styles.heroTextBlock}>
-              <Text style={styles.kicker}>Welcome back</Text>
-              <Text style={styles.title}>{member?.firstName ?? 'Member'}</Text>
-              <Text style={styles.subtitle}>Consistency is key.</Text>
+              <Text style={styles.kicker}>Welcome Back</Text>
+              <Text style={styles.title}>{member?.firstName ?? 'Athlete'}</Text>
             </View>
             <View style={styles.avatarBadge}>
               {member?.profileImageUri ? (
@@ -617,13 +716,111 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.heroMetaRow}>
-            <View style={styles.statusBadgeOnRed}>
-              <View style={[styles.statusDot, { backgroundColor: statusTone }]} />
-              <Text style={styles.statusTextOnRed}>{status ?? 'Pending'}</Text>
-            </View>
+            <Text style={styles.heroTagline}>Consistency is key.</Text>
             <Text style={styles.heroExpiryText}>
               Member since {formatDate(membership?.startDate)}
             </Text>
+          </View>
+        </View>
+
+        {/* ── WHAT'S NEW — looping autoplay carousel (display only) ──────── */}
+        <View style={styles.whatsNewLabel}>
+          <Text style={styles.whatsNewLabelText}>WHAT&apos;S NEW</Text>
+        </View>
+
+        <View style={styles.whatsNewWidget}>
+          <View style={styles.whatsNewCard}>
+            <Animated.ScrollView
+              ref={whatsNewScrollRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              decelerationRate={0.95}
+              scrollEventThrottle={16}
+              contentOffset={{ x: whatsNewPageW, y: 0 }}
+              style={{ flex: 1 }}
+              onScrollBeginDrag={() => {
+                if (whatsNewAutoplayRef.current) clearInterval(whatsNewAutoplayRef.current);
+                if (whatsNewResumeRef.current) clearTimeout(whatsNewResumeRef.current);
+              }}
+              onScroll={Animated.event(
+                [{ nativeEvent: { contentOffset: { x: whatsNewScrollX } } }],
+                { useNativeDriver: true },
+              )}
+              onMomentumScrollEnd={(e) => {
+                const n = whatsNewUpdates.length;
+                let page = Math.round(e.nativeEvent.contentOffset.x / whatsNewPageW);
+                if (page === n + 1) {
+                  page = 1;
+                  whatsNewScrollRef.current?.scrollTo({ x: whatsNewPageW, animated: false });
+                } else if (page === 0) {
+                  page = n;
+                  whatsNewScrollRef.current?.scrollTo({ x: n * whatsNewPageW, animated: false });
+                }
+                whatsNewIndexRef.current = page;
+                if (whatsNewResumeRef.current) clearTimeout(whatsNewResumeRef.current);
+                whatsNewResumeRef.current = setTimeout(() => {
+                  if (whatsNewAutoplayRef.current) clearInterval(whatsNewAutoplayRef.current);
+                  whatsNewAutoplayRef.current = setInterval(() => {
+                    const next = whatsNewIndexRef.current + 1;
+                    whatsNewIndexRef.current = next;
+                    whatsNewScrollRef.current?.scrollTo({ x: next * whatsNewPageW, animated: true });
+                  }, 3000);
+                }, 4000);
+              }}>
+              {[
+                whatsNewUpdates[whatsNewUpdates.length - 1],
+                ...whatsNewUpdates,
+                whatsNewUpdates[0],
+              ].map((item, i) => {
+                const pageScale = whatsNewScrollX.interpolate({
+                  inputRange: [(i - 1) * whatsNewPageW, i * whatsNewPageW, (i + 1) * whatsNewPageW],
+                  outputRange: [0.7, 1, 0.7],
+                  extrapolate: 'clamp',
+                });
+                return (
+                  <View key={`wn-${i}`} style={[styles.whatsNewPage, { width: whatsNewPageW }]}>
+                    <Animated.View
+                      style={[
+                        StyleSheet.absoluteFillObject,
+                        styles.whatsNewPageInner,
+                        { transform: [{ scale: pageScale }] },
+                      ]}>
+                      <Image
+                        source={{ uri: item.image }}
+                        style={StyleSheet.absoluteFillObject}
+                        resizeMode="cover"
+                      />
+                      <LinearGradient
+                        pointerEvents="none"
+                        colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.03)', 'rgba(8,3,8,0.88)']}
+                        locations={[0, 0.32, 1]}
+                        style={StyleSheet.absoluteFillObject}
+                      />
+                      <LinearGradient
+                        pointerEvents="none"
+                        colors={['rgba(255,255,255,0.10)', 'transparent', 'rgba(255,255,255,0.05)']}
+                        start={{ x: 0, y: 0.5 }}
+                        end={{ x: 1, y: 0.5 }}
+                        style={StyleSheet.absoluteFillObject}
+                      />
+                      <View style={styles.whatsNewTopRow}>
+                        <View style={styles.whatsNewBadge}>
+                          <Text style={styles.whatsNewBadgeText}>{item.tag}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.whatsNewBottom}>
+                        <Text style={styles.whatsNewTitle}>{item.title}</Text>
+                        <Text style={styles.whatsNewDesc} numberOfLines={2}>
+                          {item.desc}
+                        </Text>
+                      </View>
+                    </Animated.View>
+                  </View>
+                );
+              })}
+            </Animated.ScrollView>
+            <View pointerEvents="none" style={styles.whatsNewSpecular} />
           </View>
         </View>
 
@@ -640,48 +837,15 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.ringStage}>
-          <LinearGradient
-            colors={[
-              'rgba(5, 7, 12, 0.92)',
-              'rgba(17, 7, 32, 0.9)',
-              'rgba(138,43,226,0.18)',
-            ]}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={styles.daysGlassCard}>
+          <View style={styles.daysGlassCard}>
             <LinearGradient
               pointerEvents="none"
-              colors={[
-                'rgba(0, 0, 0, 0)',
-                'rgba(192,132,252,0.08)',
-                'rgba(192,132,252,0.16)',
-              ]}
+              colors={['rgba(20, 10, 36, 0.94)', 'rgba(38, 16, 66, 0.82)', 'rgba(10, 11, 15, 0.2)']}
               start={{ x: 0, y: 0.5 }}
               end={{ x: 1, y: 0.5 }}
-              style={styles.daysAuroraBand}
+              style={StyleSheet.absoluteFill}
             />
-            <LinearGradient
-              pointerEvents="none"
-              colors={[
-                'rgba(255, 255, 255, 0)',
-                'rgba(216, 180, 254, 0.16)',
-                'rgba(192,132,252,0.04)',
-              ]}
-              start={{ x: 0, y: 0.5 }}
-              end={{ x: 1, y: 0.5 }}
-              style={[styles.daysCrystalFacet, styles.daysCrystalFacetTop]}
-            />
-            <LinearGradient
-              pointerEvents="none"
-              colors={[
-                'rgba(192,132,252,0.02)',
-                'rgba(216, 180, 254, 0.12)',
-                'rgba(255, 255, 255, 0)',
-              ]}
-              start={{ x: 0, y: 0.5 }}
-              end={{ x: 1, y: 0.5 }}
-              style={[styles.daysCrystalFacet, styles.daysCrystalFacetBottom]}
-            />
+            <View pointerEvents="none" style={styles.heroGloss} />
             <View style={styles.daysTopRow}>
               <View>
                 <Text style={[styles.daysNumber, { color: countdownColor }]}>
@@ -711,7 +875,7 @@ export default function HomeScreen() {
               </Text>
               <Text style={styles.daysMetaText}>{expiryDate}</Text>
             </View>
-          </LinearGradient>
+          </View>
         </View>
 
         <View style={[styles.sectionHeading, styles.featureSectionHeading]}>
@@ -728,22 +892,6 @@ export default function HomeScreen() {
           style={styles.actionRailScroll}
           contentContainerStyle={styles.actionRail}>
           <View style={styles.actionGridInner}>
-            <Pressable
-              disabled={!canShowQr}
-              onPress={handleShowQr}
-              style={({ pressed }) => [
-                styles.actionChip,
-                styles.actionChipPrimary,
-                !canShowQr && styles.actionCardDisabled,
-                pressed && styles.buttonPressed,
-              ]}>
-              <View style={[styles.actionIconWrap, styles.actionIconWrapPrimary]}>
-                <Text style={styles.actionIcon}>⊞</Text>
-              </View>
-              <Text style={styles.actionTitle}>Open QR</Text>
-              <Text style={styles.actionCaption}>Entry scan</Text>
-            </Pressable>
-
             <Pressable
               onPress={() => {
                 setSelectedRenewMonths(1);
@@ -786,6 +934,27 @@ export default function HomeScreen() {
               </View>
               <Text style={styles.actionTitle}>Freeze</Text>
               <Text style={styles.actionCaption}>Pause plan</Text>
+            </Pressable>
+
+            <Pressable
+              disabled={!canShowQr}
+              onPress={handleShowQr}
+              style={({ pressed }) => [
+                styles.actionChip,
+                styles.actionChipRenew,
+                !canShowQr && styles.actionCardDisabled,
+                pressed && styles.buttonPressed,
+              ]}>
+              <LinearGradient
+                pointerEvents="none"
+                colors={['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0)']}
+                style={styles.actionChipGloss}
+              />
+              <View style={[styles.actionIconWrap, styles.actionIconWrapRenew]}>
+                <Text style={styles.actionIcon}>⊞</Text>
+              </View>
+              <Text style={styles.actionTitle}>Open QR</Text>
+              <Text style={styles.actionCaption}>Entry scan</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -886,58 +1055,6 @@ export default function HomeScreen() {
               ],
             }}>
             <Pressable
-              onPress={() => router.push('/how-to-use' as Href)}
-              style={({ pressed }) => [
-                styles.featureCard,
-                pressed && styles.featurePressed,
-              ]}>
-              <LinearGradient
-                pointerEvents="none"
-                colors={['#1C1F29', '#14161D', '#0C0D12']}
-                start={{ x: 0.1, y: 0 }}
-                end={{ x: 0.9, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
-              <Image
-                source={aiHelpSign}
-                style={[styles.featureWatermark, styles.featureWatermarkAi]}
-                resizeMode="contain"
-              />
-              <View style={styles.featureTopRow}>
-                <View style={[styles.featureIconBadge, styles.featureIconBadgeAi]}>
-                  <SymbolView
-                    name="book.fill"
-                    size={22}
-                    tintColor="#FFFFFF"
-                    weight="semibold"
-                    fallback={<Text style={styles.featureBadgeText}>B</Text>}
-                  />
-                </View>
-              </View>
-              <Text style={[styles.featureKicker, styles.featureKickerAi]}>
-                AI Gym Help
-              </Text>
-              <Text style={styles.featureTitle}>How to use the app</Text>
-              <Text style={styles.featureBody}>
-                Instructions, AI assistant, and contact.
-              </Text>
-            </Pressable>
-          </Animated.View>
-
-          <Animated.View
-            style={{
-              width: featureCardWidth,
-              transform: [
-                {
-                  scale: featureScrollX.interpolate({
-                    inputRange: [featurePageW, featurePageW * 2, featurePageW * 3],
-                    outputRange: [0.72, 1, 0.72],
-                    extrapolate: 'clamp',
-                  }),
-                },
-              ],
-            }}>
-            <Pressable
               onPress={() => router.push('/ai-plan' as Href)}
               style={({ pressed }) => [
                 styles.featureCard,
@@ -975,6 +1092,58 @@ export default function HomeScreen() {
               </Text>
             </Pressable>
           </Animated.View>
+
+          <Animated.View
+            style={{
+              width: featureCardWidth,
+              transform: [
+                {
+                  scale: featureScrollX.interpolate({
+                    inputRange: [featurePageW, featurePageW * 2, featurePageW * 3],
+                    outputRange: [0.72, 1, 0.72],
+                    extrapolate: 'clamp',
+                  }),
+                },
+              ],
+            }}>
+            <Pressable
+              onPress={() => router.push('/how-to-use' as Href)}
+              style={({ pressed }) => [
+                styles.featureCard,
+                pressed && styles.featurePressed,
+              ]}>
+              <LinearGradient
+                pointerEvents="none"
+                colors={['#1C1F29', '#14161D', '#0C0D12']}
+                start={{ x: 0.1, y: 0 }}
+                end={{ x: 0.9, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <Image
+                source={obliqueSign}
+                style={[styles.featureWatermark, styles.featureWatermarkAi]}
+                resizeMode="contain"
+              />
+              <View style={styles.featureTopRow}>
+                <View style={[styles.featureIconBadge, styles.featureIconBadgeAi]}>
+                  <SymbolView
+                    name="book.fill"
+                    size={22}
+                    tintColor="#FFFFFF"
+                    weight="semibold"
+                    fallback={<Text style={styles.featureBadgeText}>B</Text>}
+                  />
+                </View>
+              </View>
+              <Text style={[styles.featureKicker, styles.featureKickerAi]}>
+                AI Gym Help
+              </Text>
+              <Text style={styles.featureTitle}>How to use the app</Text>
+              <Text style={styles.featureBody}>
+                Instructions, AI assistant, and contact.
+              </Text>
+            </Pressable>
+          </Animated.View>
         </Animated.ScrollView>
 
         <View style={styles.sectionHeading}>
@@ -997,6 +1166,8 @@ export default function HomeScreen() {
               }))}
               selectedKey={selectedActivityDay?.id ?? ''}
               onSelect={setSelectedActivityDayId}
+              indicatorColor="#2E1065"
+              indicatorGlowColor="#4C2A9E"
             />
           </View>
 
@@ -1047,7 +1218,7 @@ export default function HomeScreen() {
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0)', 'rgba(0,0,0,0.08)']}
+                colors={['rgba(110,79,207,0.18)', 'rgba(76,42,158,0.06)', 'rgba(0,0,0,0.10)']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFillObject}
@@ -1407,16 +1578,18 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
     borderRadius: 28,
-    backgroundColor: 'rgba(15, 17, 23, 0.74)',
     padding: 18,
     marginBottom: 22,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.22,
-    shadowRadius: 28,
-    elevation: 8,
+    shadowOpacity: 0.60,
+    shadowRadius: 32,
+    elevation: 12,
+  },
+  guestHeroFade: {
+    ...StyleSheet.absoluteFillObject,
   },
   heroGloss: {
     position: 'absolute',
@@ -1447,7 +1620,7 @@ const styles = StyleSheet.create({
     fontSize: 34,
     fontWeight: '900',
     letterSpacing: 0,
-    marginTop: 4,
+    marginTop: 8,
     textShadowColor: 'rgba(0, 0, 0, 0.25)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
@@ -1460,14 +1633,15 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   avatarBadge: {
-    width: 54,
-    height: 54,
+    width: 64,
+    height: 64,
+    alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 0,
-    borderColor: 'transparent',
-    borderRadius: 27,
-    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.28)',
+    borderRadius: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     overflow: 'hidden',
   },
   avatarImage: {
@@ -1486,7 +1660,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 10,
     borderTopWidth: 0,
-    marginTop: 12,
+    marginTop: 8,
     paddingTop: 0,
   },
   statusBadgeOnRed: {
@@ -1509,6 +1683,91 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '900',
+  },
+  heroTagline: {
+    color: 'rgba(255, 255, 255, 0.88)',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  whatsNewLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    marginBottom: 10,
+  },
+  whatsNewLabelText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 2.5,
+  },
+  whatsNewWidget: {
+    marginBottom: 24,
+  },
+  whatsNewCard: {
+    height: 220,
+    borderRadius: 28,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+    ...premiumShadow,
+  },
+  whatsNewPage: {
+    height: 220,
+  },
+  whatsNewPageInner: {
+    justifyContent: 'space-between',
+    borderRadius: 26,
+    overflow: 'hidden',
+  },
+  whatsNewSpecular: {
+    position: 'absolute',
+    top: 0,
+    left: 18,
+    right: 18,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.55)',
+  },
+  whatsNewTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    padding: 16,
+  },
+  whatsNewBadge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(225,29,46,0.75)',
+    backgroundColor: 'rgba(225,29,46,0.10)',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  whatsNewBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+  },
+  whatsNewBottom: { padding: 16 },
+  whatsNewTitle: {
+    color: '#FFFFFF',
+    fontSize: 26,
+    fontWeight: '900',
+    fontStyle: 'italic',
+    letterSpacing: -0.5,
+    lineHeight: 29,
+  },
+  whatsNewDesc: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 4,
+    lineHeight: 17,
   },
   heroExpiryText: {
     flex: 1,
@@ -1589,46 +1848,46 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(192,132,252,0.34)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     borderRadius: 28,
+    backgroundColor: 'rgba(15, 17, 23, 0.74)',
     width: '100%',
-    padding: 20,
-    shadowColor: '#C084FC',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 22,
-    elevation: 5,
-  },
-  daysAuroraBand: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width: '72%',
-    opacity: 0.72,
+    padding: 18,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.22,
+    shadowRadius: 28,
+    elevation: 8,
   },
   daysCrystalFacet: {
     position: 'absolute',
     right: -18,
-    width: 230,
-    height: 1,
-    backgroundColor: 'rgba(216, 180, 254, 0.1)',
+    width: 280,
+    height: 1.5,
   },
   daysCrystalFacetTop: {
-    top: 36,
+    top: 38,
     transform: [{ rotate: '-17deg' }],
   },
   daysCrystalFacetBottom: {
-    bottom: 34,
+    bottom: 36,
     transform: [{ rotate: '14deg' }],
   },
-  daysGlassHighlight: {
+  daysTopEdge: {
     position: 'absolute',
     top: 0,
-    left: 20,
-    right: 20,
+    left: 16,
+    right: 16,
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.24)',
+    backgroundColor: 'rgba(255, 255, 255, 0.38)',
+  },
+  daysLeftEdge: {
+    position: 'absolute',
+    top: 16,
+    bottom: 16,
+    left: 0,
+    width: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
   },
   daysTopRow: {
     flexDirection: 'row',
@@ -1638,10 +1897,10 @@ const styles = StyleSheet.create({
   },
   daysNumber: {
     color: textColor,
-    fontSize: 72,
+    fontSize: 54,
     fontWeight: '900',
     letterSpacing: 0,
-    lineHeight: 76,
+    lineHeight: 58,
   },
   daysLabel: {
     color: 'rgba(255, 255, 255, 0.72)',
@@ -1672,7 +1931,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: 999,
     backgroundColor: 'rgba(255, 255, 255, 0.095)',
-    marginTop: 18,
+    marginTop: 12,
   },
   membershipTrackFill: {
     height: '100%',
@@ -1682,7 +1941,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
-    marginTop: 10,
+    marginTop: 8,
   },
   daysMetaText: {
     color: 'rgba(255, 255, 255, 0.62)',
@@ -1995,11 +2254,11 @@ const styles = StyleSheet.create({
     color: '#FF8088',
   },
   featureIconBadgeAiPlan: {
-    borderColor: 'rgba(192,132,252,0.5)',
-    backgroundColor: 'rgba(138,43,226,0.22)',
+    borderColor: 'rgba(192,132,252,0.55)',
+    backgroundColor: '#2E1065',
   },
   featureKickerAiPlan: {
-    color: '#C084FC',
+    color: '#9B7FF0',
   },
   featureTitle: {
     color: '#FFFFFF',
@@ -2076,7 +2335,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   activityTrack: {
-    width: 32,
+    width: 28,
     height: 120,
     justifyContent: 'flex-end',
     overflow: 'hidden',
@@ -2116,8 +2375,8 @@ const styles = StyleSheet.create({
     ...premiumShadow,
   },
   requestLinkCardPayments: {
-    borderColor: 'rgba(192, 132, 252, 0.24)',
-    backgroundColor: 'rgba(29, 18, 45, 0.72)',
+    borderColor: 'rgba(76, 42, 158, 0.55)',
+    backgroundColor: 'rgba(20, 10, 52, 0.90)',
   },
   requestLinkCardReservations: {
     borderColor: 'rgba(225, 29, 46, 0.2)',
@@ -2138,8 +2397,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   requestLinkIconWrapPayments: {
-    borderColor: 'rgba(192, 132, 252, 0.42)',
-    backgroundColor: 'rgba(192, 132, 252, 0.18)',
+    borderColor: 'rgba(110, 79, 207, 0.55)',
+    backgroundColor: 'rgba(60, 30, 140, 0.28)',
   },
   requestLinkIconWrapReservations: {
     borderColor: 'rgba(225, 29, 46, 0.38)',
@@ -2559,7 +2818,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   modalNote: {
-    color: '#C084FC',
+    color: '#9B7FF0',
     fontSize: 12,
     fontWeight: '900',
     lineHeight: 18,

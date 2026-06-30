@@ -39,6 +39,9 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // inner content width rather than the full screen width.
 const accentColor = premiumColors.red;
 const mutedColor = premiumColors.textMuted;
+const shopHeartPurple = '#3B1D7A';
+const shopHeartPurpleBg = 'rgba(46,16,101,0.30)';
+const shopHeartPurpleBorder = 'rgba(76,42,158,0.52)';
 
 // Faint Marvel logo signs used as glow-box watermarks.
 const ORDERS_SIGN = require('@/assets/images/marvel-logo-startup-sign-dot.png');
@@ -207,10 +210,11 @@ function HeartButton({
       <Animated.View style={{ transform: [{ scale: combined }] }}>
         <SymbolView
           name={isFav ? 'heart.fill' : 'heart'}
-          size={iconSize}
-          tintColor={premiumColors.redBright}
+          size={isFav ? iconSize : iconSize + 2}
+          tintColor={shopHeartPurple}
+          weight={isFav ? 'semibold' : 'bold'}
           fallback={
-            <Text style={[hStyles.glyph, { fontSize: iconSize }]}>
+            <Text style={[hStyles.glyph, { fontSize: isFav ? iconSize : iconSize + 2 }]}>
               {isFav ? '♥' : '♡'}
             </Text>
           }
@@ -229,15 +233,15 @@ const hStyles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.20)',
   },
   btnLiked: {
-    backgroundColor: 'rgba(177,18,38,0.28)',
-    borderColor: 'rgba(225,29,46,0.60)',
-    shadowColor: premiumColors.redBright,
+    backgroundColor: shopHeartPurpleBg,
+    borderColor: shopHeartPurpleBorder,
+    shadowColor: shopHeartPurple,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.65,
     shadowRadius: 12,
     elevation: 6,
   },
-  glyph: { color: premiumColors.redBright, fontWeight: '900' },
+  glyph: { color: shopHeartPurple, fontWeight: '900' },
 });
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -245,6 +249,11 @@ export default function ShopScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] =
     useState<ShopCategory>('Supplements');
+  const [categoryLayouts, setCategoryLayouts] = useState<
+    Partial<Record<ShopCategory, { x: number; width: number }>>
+  >({});
+  const categoryPillX = useRef(new Animated.Value(0)).current;
+  const categoryPillW = useRef(new Animated.Value(0)).current;
   const [search, setSearch] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
@@ -298,6 +307,26 @@ export default function ShopScreen() {
   }, [shopFadeAnim]);
 
   useEffect(() => { shopIndexRef.current = carouselIndex; }, [carouselIndex]);
+
+  // Glide the selection pill to the active category tile.
+  useEffect(() => {
+    const layout = categoryLayouts[selectedCategory];
+    if (!layout) return;
+    Animated.parallel([
+      Animated.spring(categoryPillX, {
+        toValue: layout.x,
+        useNativeDriver: false,
+        tension: 220,
+        friction: 20,
+      }),
+      Animated.spring(categoryPillW, {
+        toValue: layout.width,
+        useNativeDriver: false,
+        tension: 220,
+        friction: 20,
+      }),
+    ]).start();
+  }, [categoryLayouts, selectedCategory, categoryPillX, categoryPillW]);
 
   const normalizedSearch = search.trim().toLowerCase();
 
@@ -533,6 +562,22 @@ export default function ShopScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoryRail}>
+          <View style={styles.categoryRailInner}>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.categoryActivePill,
+                {
+                  opacity: categoryPillW.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 1],
+                    extrapolate: 'clamp',
+                  }),
+                  transform: [{ translateX: categoryPillX }],
+                  width: categoryPillW,
+                },
+              ]}
+            />
           {categoryMeta.map((meta) => {
             const isSelected = selectedCategory === meta.key;
             const count = categoryCounts.get(meta.key) ?? 0;
@@ -541,10 +586,18 @@ export default function ShopScreen() {
               <Pressable
                 key={meta.key}
                 disabled={!available}
+                onLayout={(event) => {
+                  const { x, width } = event.nativeEvent.layout;
+                  setCategoryLayouts((current) => {
+                    const existing = current[meta.key];
+                    if (existing?.x === x && existing.width === width) return current;
+                    return { ...current, [meta.key]: { x, width } };
+                  });
+                }}
                 onPress={() => setSelectedCategory(meta.key)}
                 style={({ pressed }) => [
                   styles.categoryTile,
-                  isSelected && styles.categoryTileSelected,
+                  isSelected && styles.categoryTileGliding,
                   !available && styles.categoryTileDisabled,
                   pressed && styles.buttonPressed,
                 ]}>
@@ -582,6 +635,7 @@ export default function ShopScreen() {
               </Pressable>
             );
           })}
+          </View>
         </ScrollView>
 
         {/* Products */}
@@ -1264,10 +1318,29 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   categoryRail: {
-    gap: 12,
     paddingRight: 4,
     paddingBottom: 4,
     marginBottom: 22,
+  },
+  categoryRailInner: {
+    flexDirection: 'row',
+    gap: 12,
+    position: 'relative',
+  },
+  categoryActivePill: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(225, 29, 46, 0.5)',
+    backgroundColor: 'rgba(177, 18, 38, 0.16)',
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 6,
   },
   categoryTile: {
     width: 104,
@@ -1279,14 +1352,9 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     paddingHorizontal: 10,
   },
-  categoryTileSelected: {
-    borderColor: 'rgba(225, 29, 46, 0.5)',
-    backgroundColor: 'rgba(177, 18, 38, 0.16)',
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 6,
+  categoryTileGliding: {
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
   },
   categoryTileDisabled: {
     opacity: 0.4,

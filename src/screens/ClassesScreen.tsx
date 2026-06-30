@@ -32,6 +32,9 @@ const DATE_CELL_W = Math.floor((DATE_PAGE_W - DATE_CELL_GAP * 4) / 5);
 const CELL_STEP = DATE_CELL_W + (DATE_PAGE_W - 5 * DATE_CELL_W) / 4;
 const accentColor = premiumColors.red;
 const mutedColor = premiumColors.textMuted;
+const classHeartPurple = '#3B1D7A';
+const classHeartPurpleBg = 'rgba(46,16,101,0.30)';
+const classHeartPurpleBorder = 'rgba(76,42,158,0.52)';
 
 const SPA_CARD_W = SCREEN_WIDTH - 88;
 const FEAT_CARD_W = SCREEN_WIDTH - 40;
@@ -332,10 +335,11 @@ function HeartButton({
       <Animated.View style={{ transform: [{ scale: combined }] }}>
         <SymbolView
           name={isFav ? 'heart.fill' : 'heart'}
-          size={iconSize}
-          tintColor={premiumColors.redBright}
+          size={isFav ? iconSize : iconSize + 2}
+          tintColor={classHeartPurple}
+          weight={isFav ? 'semibold' : 'bold'}
           fallback={
-            <Text style={[hStyles.glyph, { fontSize: iconSize }]}>
+            <Text style={[hStyles.glyph, { fontSize: isFav ? iconSize : iconSize + 2 }]}>
               {isFav ? '♥' : '♡'}
             </Text>
           }
@@ -354,15 +358,15 @@ const hStyles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.20)',
   },
   btnLiked: {
-    backgroundColor: 'rgba(177,18,38,0.28)',
-    borderColor: 'rgba(225,29,46,0.60)',
-    shadowColor: premiumColors.redBright,
+    backgroundColor: classHeartPurpleBg,
+    borderColor: classHeartPurpleBorder,
+    shadowColor: classHeartPurple,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.65,
     shadowRadius: 12,
     elevation: 6,
   },
-  glyph: { color: premiumColors.redBright, fontWeight: '900' },
+  glyph: { color: classHeartPurple, fontWeight: '900' },
 });
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2095,7 +2099,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: DATE_CELL_W,
     borderRadius: 12,
-    backgroundColor: premiumColors.redBright,
+    backgroundColor: premiumColors.red,
+    borderWidth: 1,
+    borderColor: premiumColors.redBright,
     shadowColor: premiumColors.redBright,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.45,

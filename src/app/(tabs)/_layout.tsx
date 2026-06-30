@@ -8,6 +8,7 @@ import type { SFSymbol } from 'expo-symbols';
 import { SymbolView } from 'expo-symbols';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Image,
   PanResponder,
   Platform,
   Pressable,
@@ -19,6 +20,7 @@ import Animated, {
   Easing,
   type SharedValue,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withSpring,
   withTiming,
@@ -26,6 +28,8 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { premiumColors } from '@/constants/premiumTheme';
+import { memberService } from '@/services';
+import type { Member } from '@/types';
 
 const accentColor = premiumColors.redBright;
 const inactiveColor = 'rgba(255,255,255,0.55)';
@@ -34,23 +38,27 @@ const FAB_W = 40;
 const FAB_H = 80;
 const FAN_RADIUS = 115;
 const ITEM_SIZE = 52;
+const TAB_ICON_SIZE = 22;
+const TAB_ICON_CELL_SIZE = 28;
 
 function TabIcon({
   fallback,
   focused,
   activeIcon,
   icon,
+  size = TAB_ICON_SIZE,
 }: {
   fallback: string;
   focused: boolean;
   activeIcon: SFSymbol;
   icon: SFSymbol;
+  size?: number;
 }) {
-  const color = focused ? accentColor : inactiveColor;
+  const color = focused ? '#FFFFFF' : inactiveColor;
   return (
     <SymbolView
       name={focused ? activeIcon : icon}
-      size={22}
+      size={size}
       tintColor={color}
       weight={focused ? 'semibold' : 'regular'}
       fallback={<Text style={[styles.tabFallbackIcon, { color }]}>{fallback}</Text>}
@@ -58,13 +66,42 @@ function TabIcon({
   );
 }
 
-function ProfileTabIcon({ focused }: { focused: boolean }) {
+function ProfileTabIcon({
+  focused,
+  imageUri,
+  size,
+}: {
+  focused: boolean;
+  imageUri?: string;
+  size?: number;
+}) {
+  const iconSize = size ?? TAB_ICON_SIZE;
+
+  if (imageUri) {
+    return (
+      <Image
+        source={{ uri: imageUri }}
+        style={[
+          styles.profileTabImage,
+          {
+            width: iconSize,
+            height: iconSize,
+            borderRadius: iconSize / 2,
+          },
+          focused && styles.profileTabImageFocused,
+        ]}
+        resizeMode="cover"
+      />
+    );
+  }
+
   return (
     <TabIcon
       activeIcon="person.crop.circle.fill"
       fallback="P"
       focused={focused}
       icon="person.crop.circle"
+      size={size}
     />
   );
 }
@@ -75,6 +112,83 @@ function GlassTabIconWrap({
   children: ReactNode;
 }) {
   return <Animated.View style={styles.glassTabIconWrap}>{children}</Animated.View>;
+}
+
+function BubbleClippedTabIcon({
+  barFloat,
+  fallback,
+  index,
+  innerPadding,
+  label,
+  pillCompact,
+  pillGrow,
+  pillX,
+  renderIcon,
+  tabWidth,
+}: {
+  barFloat: SharedValue<number>;
+  fallback: string;
+  index: number;
+  innerPadding: number;
+  label: string;
+  pillCompact: SharedValue<number>;
+  pillGrow: SharedValue<number>;
+  pillX: SharedValue<number>;
+  renderIcon?: BottomTabBarProps['descriptors'][string]['options']['tabBarIcon'];
+  tabWidth: number;
+}) {
+  const overlap = useDerivedValue(() => {
+    const iconLeft = innerPadding + index * tabWidth + (tabWidth - TAB_ICON_CELL_SIZE) / 2;
+    const bubbleLeft = pillX.value - 6 * pillGrow.value - 2 * barFloat.value + 6 * pillCompact.value;
+    const bubbleWidth = tabWidth + 12 * pillGrow.value + 4 * barFloat.value - 12 * pillCompact.value;
+    const left = Math.max(0, bubbleLeft - iconLeft);
+    const right = Math.min(TAB_ICON_CELL_SIZE, bubbleLeft + bubbleWidth - iconLeft);
+
+    return {
+      left,
+      width: Math.max(0, right - left),
+    };
+  });
+
+  const clipStyle = useAnimatedStyle(() => ({
+    left: overlap.value.left,
+    width: overlap.value.width,
+  }));
+
+  const loupeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: -overlap.value.left }],
+  }));
+
+  const baseIcon = renderIcon?.({
+    color: inactiveColor,
+    focused: false,
+    size: TAB_ICON_SIZE,
+  }) ?? (
+    <Text style={[styles.tabFallbackIcon, { color: inactiveColor }]}>
+      {fallback}
+    </Text>
+  );
+
+  const loupeIcon = renderIcon?.({
+    color: '#FFFFFF',
+    focused: true,
+    size: TAB_ICON_SIZE,
+  }) ?? (
+    <Text style={[styles.tabFallbackIcon, { color: '#FFFFFF' }]}>
+      {fallback}
+    </Text>
+  );
+
+  return (
+    <View accessibilityLabel={label} style={styles.bubbleClippedIcon}>
+      {baseIcon}
+      <Animated.View pointerEvents="none" style={[styles.bubbleClipWindow, clipStyle]}>
+        <Animated.View style={[styles.bubbleClipIcon, loupeStyle]}>
+          {loupeIcon}
+        </Animated.View>
+      </Animated.View>
+    </View>
+  );
 }
 
 function getTabLabel(options: BottomTabBarProps['descriptors'][string]['options'], routeName: string) {
@@ -121,7 +235,7 @@ function FanItem({
           <LinearGradient
             colors={
               isFocused
-                ? ['rgba(225,29,46,0.38)', 'rgba(225,29,46,0.14)']
+                ? ['rgba(255,255,255,0.24)', 'rgba(255,255,255,0.08)']
                 : ['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.05)']
             }
             style={StyleSheet.absoluteFillObject}
@@ -135,12 +249,12 @@ function FanItem({
             style={StyleSheet.absoluteFillObject}
           />
           {options.tabBarIcon?.({
-            color: isFocused ? accentColor : inactiveColor,
+            color: isFocused ? '#FFFFFF' : inactiveColor,
             focused: isFocused,
             size: 22,
-          }) ?? <Text style={[styles.tabFallbackIcon, { color: isFocused ? accentColor : inactiveColor }]}>{label.slice(0, 1)}</Text>}
+          }) ?? <Text style={[styles.tabFallbackIcon, { color: isFocused ? '#FFFFFF' : inactiveColor }]}>{label.slice(0, 1)}</Text>}
         </BlurView>
-        <Text style={[styles.fanItemLabel, isFocused && { color: accentColor }]} numberOfLines={1}>
+        <Text style={[styles.fanItemLabel, isFocused && { color: '#FFFFFF' }]} numberOfLines={1}>
           {label}
         </Text>
       </Pressable>
@@ -186,7 +300,7 @@ function HalfCircleFABBar({ state, descriptors, navigation }: BottomTabBarProps)
 
       <View
         pointerEvents="box-none"
-        style={[styles.fabHost, { bottom: Math.max(16, insets.bottom + 8) }]}>
+        style={[styles.fabHost, { bottom: Math.max(8, insets.bottom) }]}>
 
         {/* Fan items — rendered first so they're behind trigger */}
         {visibleRoutes.map((route, i) => (
@@ -239,15 +353,15 @@ function HalfCircleFABBar({ state, descriptors, navigation }: BottomTabBarProps)
               {/* active icon */}
               <View style={styles.fabTriggerIcon}>
                 {focusedOptions.tabBarIcon?.({
-                  color: accentColor,
+                  color: '#FFFFFF',
                   focused: true,
                   size: 22,
-                }) ?? <Text style={[styles.tabFallbackIcon, { color: accentColor }]}>•</Text>}
+                }) ?? <Text style={[styles.tabFallbackIcon, { color: '#FFFFFF' }]}>•</Text>}
               </View>
-              {/* red glow at bottom */}
+              {/* soft glow at bottom */}
               <LinearGradient
                 pointerEvents="none"
-                colors={['rgba(225,29,46,0)', 'rgba(225,29,46,0.28)']}
+                colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.16)']}
                 start={{ x: 0.5, y: 0.4 }}
                 end={{ x: 0.5, y: 1 }}
                 style={StyleSheet.absoluteFillObject}
@@ -267,7 +381,6 @@ function HalfCircleFABBar({ state, descriptors, navigation }: BottomTabBarProps)
 function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const [barWidth, setBarWidth] = useState(0);
-  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   const visibleRoutes = state.routes.filter(
     (route) =>
@@ -295,8 +408,8 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const barDrop = useSharedValue(0);
   const barFloat = useSharedValue(0);
   const isDraggingRef = useRef(false);
+  const isTouchHoldingRef = useRef(false);
   const dragStartRef = useRef(0);
-  const previewIndexRef = useRef<number | null>(null);
   const shrinkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Latest geometry/routes for the PanResponder closures (created once).
@@ -326,14 +439,15 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     [navigation],
   );
 
-  // Pop the bar back to full size and (re)arm the idle-shrink timer.
+  // Pop the bar back to full size and (re)arm the idle-shrink timer only
+  // when the user is no longer holding the selection bubble.
   const wakeBar = useCallback(() => {
     barScale.value = withSpring(1, { damping: 16, stiffness: 200 });
     barDrop.value = withSpring(0, { damping: 18, stiffness: 210 });
     barFloat.value = withSpring(0, { damping: 18, stiffness: 210 });
     pillCompact.value = withSpring(0, { damping: 18, stiffness: 210 });
     if (shrinkTimer.current) clearTimeout(shrinkTimer.current);
-    if (isDraggingRef.current) {
+    if (isDraggingRef.current || isTouchHoldingRef.current) {
       shrinkTimer.current = null;
       return;
     }
@@ -357,14 +471,17 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     }, 2600);
   }, [barScale, barDrop, barFloat, pillCompact]);
 
-  const updatePreviewIndex = useCallback(
-    (index: number | null) => {
-      if (previewIndexRef.current === index) return;
-      previewIndexRef.current = index;
-      setPreviewIndex(index);
-    },
-    [],
-  );
+  const beginBarHold = useCallback(() => {
+    isTouchHoldingRef.current = true;
+    wakeBar();
+  }, [wakeBar]);
+
+  const endBarHold = useCallback(() => {
+    isTouchHoldingRef.current = false;
+    if (!isDraggingRef.current) {
+      wakeBar();
+    }
+  }, [wakeBar]);
 
   useEffect(() => {
     wakeBar();
@@ -396,9 +513,9 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         Math.abs(gesture.dx) > 6 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
       onPanResponderGrant: () => {
         isDraggingRef.current = true;
+        isTouchHoldingRef.current = true;
         dragStartRef.current = pillX.value;
         wakeBar();
-        updatePreviewIndex(activeIndex);
         barScale.value = withTiming(1.08, {
           duration: 120,
           easing: Easing.out(Easing.cubic),
@@ -411,7 +528,7 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
           duration: 120,
           easing: Easing.out(Easing.cubic),
         });
-        pillGrow.value = withSpring(1.16, { damping: 20, stiffness: 220 });
+        pillGrow.value = withSpring(1.08, { damping: 20, stiffness: 220 });
       },
       onPanResponderMove: (_, gesture) => {
         const w = tabWidthRef.current;
@@ -420,11 +537,6 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         if (next < innerPadding) next = innerPadding;
         if (next > max) next = max;
         pillX.value = next;
-        const nextIndex = Math.max(
-          0,
-          Math.min(routesRef.current.length - 1, Math.round((next - innerPadding) / (w || 1))),
-        );
-        updatePreviewIndex(nextIndex);
         pillWobble.value = withSpring(Math.max(-1, Math.min(1, gesture.vx / 1.8)), {
           damping: 13,
           stiffness: 180,
@@ -436,7 +548,6 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         const idx = Math.round((pillX.value - innerPadding) / w);
         const clamped = Math.max(0, Math.min(routesRef.current.length - 1, idx));
         isDraggingRef.current = false;
-        updatePreviewIndex(null);
         pillWobble.value = withSpring(0, { damping: 12, stiffness: 170 });
         pillX.value = withSpring(innerPadding + clamped * w, {
           damping: 18,
@@ -448,7 +559,7 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
       },
       onPanResponderTerminate: () => {
         isDraggingRef.current = false;
-        updatePreviewIndex(null);
+        isTouchHoldingRef.current = false;
         pillWobble.value = withSpring(0, { damping: 12, stiffness: 170 });
         wakeBar();
       },
@@ -456,13 +567,19 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   ).current;
 
   const pillStyle = useAnimatedStyle(() => ({
-    width: tabWidth + 10 * pillGrow.value + 8 * barFloat.value - 22 * pillCompact.value,
+    width: tabWidth + 12 * pillGrow.value + 4 * barFloat.value - 12 * pillCompact.value,
     transform: [
-      { translateX: pillX.value - 5 * pillGrow.value - 4 * barFloat.value + 11 * pillCompact.value },
+      { translateX: pillX.value - 6 * pillGrow.value - 2 * barFloat.value + 6 * pillCompact.value },
       { scaleX: 1 + 0.035 * Math.abs(pillWobble.value) },
-      { scaleY: 0.96 + 0.04 * pillGrow.value + 0.08 * barFloat.value - 0.2 * pillCompact.value - 0.025 * Math.abs(pillWobble.value) },
+      { scaleY: 1 + 0.04 * pillGrow.value + 0.06 * barFloat.value - 0.17 * pillCompact.value - 0.025 * Math.abs(pillWobble.value) },
       { skewX: `${pillWobble.value * 2.2}deg` },
     ],
+  }));
+
+  // Fade only the pill's glass fill while dragging, leaving the white
+  // circular outline visible so the moving pill reads as a transparent ring.
+  const pillFillStyle = useAnimatedStyle(() => ({
+    opacity: 1 - 0.92 * barFloat.value,
   }));
 
   const barStyle = useAnimatedStyle(() => ({
@@ -478,9 +595,11 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   return (
     <View
       pointerEvents="box-none"
-      style={[styles.glassBarHost, { bottom: Math.max(14, insets.bottom + 6) }]}>
+      style={[styles.glassBarHost, { bottom: Math.max(6, insets.bottom - 2) }]}>
       <Animated.View
-        onTouchStart={wakeBar}
+        onTouchCancel={endBarHold}
+        onTouchEnd={endBarHold}
+        onTouchStart={beginBarHold}
         style={[styles.glassBar, barStyle]}
         onLayout={(event) => setBarWidth(event.nativeEvent.layout.width)}
         {...panResponder.panHandlers}>
@@ -505,61 +624,60 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
         {/* gliding / draggable selection bubble */}
         {tabWidth > 0 ? (
-          <Animated.View style={[styles.glassPill, pillStyle]}>
-            <LinearGradient
-              colors={['rgba(255,255,255,0.28)', 'rgba(176,182,196,0.12)']}
-              start={{ x: 0.5, y: 0 }}
-              end={{ x: 0.5, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <LinearGradient
-              pointerEvents="none"
-              colors={[
-                'rgba(255,255,255,0)',
-                'rgba(178,224,255,0.28)',
-                'rgba(255,232,202,0.3)',
-                'rgba(205,238,224,0.2)',
-                'rgba(255,255,255,0)',
-              ]}
-              start={{ x: 0, y: 0.5 }}
-              end={{ x: 1, y: 0.5 }}
-              style={styles.pillWaterReflection}
-            />
-            <View pointerEvents="none" style={styles.pillEdgeReflection} />
+          <Animated.View pointerEvents="none" style={[styles.glassPill, pillStyle]}>
+            <Animated.View style={[StyleSheet.absoluteFill, pillFillStyle]}>
+              <LinearGradient
+                colors={['rgba(255,255,255,0.28)', 'rgba(176,182,196,0.12)']}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <LinearGradient
+                pointerEvents="none"
+                colors={[
+                  'rgba(255,255,255,0)',
+                  'rgba(178,224,255,0.28)',
+                  'rgba(255,232,202,0.3)',
+                  'rgba(205,238,224,0.2)',
+                  'rgba(255,255,255,0)',
+                ]}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.pillWaterReflection}
+              />
+            </Animated.View>
           </Animated.View>
         ) : null}
 
         <View style={[styles.glassTabRow, { paddingHorizontal: innerPadding }]}>
           {visibleRoutes.map((route, index) => {
             const isFocused = route.key === focusedKey;
-            const isPreviewed = previewIndex === index;
-            const iconFocused = isFocused || isPreviewed;
             const options = descriptors[route.key].options;
+            const label = getTabLabel(options, route.name);
             return (
               <Pressable
                 key={route.key}
                 accessibilityRole="button"
                 accessibilityState={isFocused ? { selected: true } : {}}
-                accessibilityLabel={getTabLabel(options, route.name)}
+                accessibilityLabel={label}
                 onPress={() => {
                   wakeBar();
                   selectIndex(index);
                 }}
                 style={styles.glassTabButton}>
                 <GlassTabIconWrap>
-                  {options.tabBarIcon?.({
-                    color: iconFocused ? accentColor : inactiveColor,
-                    focused: iconFocused,
-                    size: 22,
-                  }) ?? (
-                    <Text
-                      style={[
-                        styles.tabFallbackIcon,
-                        { color: iconFocused ? accentColor : inactiveColor },
-                      ]}>
-                      {getTabLabel(options, route.name).slice(0, 1)}
-                    </Text>
-                  )}
+                  <BubbleClippedTabIcon
+                    barFloat={barFloat}
+                    fallback={label.slice(0, 1)}
+                    index={index}
+                    innerPadding={innerPadding}
+                    label={label}
+                    pillCompact={pillCompact}
+                    pillGrow={pillGrow}
+                    pillX={pillX}
+                    renderIcon={options.tabBarIcon}
+                    tabWidth={tabWidth}
+                  />
                 </GlassTabIconWrap>
               </Pressable>
             );
@@ -571,6 +689,27 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 }
 
 export default function TabsLayout() {
+  const [currentMember, setCurrentMember] = useState<Member>();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    memberService.getCurrentMember().then((member) => {
+      if (isMounted) {
+        setCurrentMember(member);
+      }
+    });
+
+    const unsubscribe = memberService.subscribeToMemberUpdates((member) => {
+      setCurrentMember(member);
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+
   return (
     <Tabs
       tabBar={(props) =>
@@ -609,8 +748,14 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon activeIcon="house" fallback="H" focused={focused} icon="house" />
+          tabBarIcon: ({ focused, size }) => (
+            <TabIcon
+              activeIcon="house.fill"
+              fallback="H"
+              focused={focused}
+              icon="house"
+              size={size}
+            />
           ),
         }}
       />
@@ -618,8 +763,14 @@ export default function TabsLayout() {
         name="classes"
         options={{
           title: 'Classes',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon activeIcon="calendar" fallback="C" focused={focused} icon="calendar" />
+          tabBarIcon: ({ focused, size }) => (
+            <TabIcon
+              activeIcon="calendar"
+              fallback="C"
+              focused={focused}
+              icon="calendar"
+              size={size}
+            />
           ),
         }}
       />
@@ -627,8 +778,14 @@ export default function TabsLayout() {
         name="shop"
         options={{
           title: 'Gym Shop',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon activeIcon="bag.fill" fallback="S" focused={focused} icon="bag" />
+          tabBarIcon: ({ focused, size }) => (
+            <TabIcon
+              activeIcon="bag.fill"
+              fallback="S"
+              focused={focused}
+              icon="bag"
+              size={size}
+            />
           ),
         }}
       />
@@ -636,8 +793,14 @@ export default function TabsLayout() {
         name="journey"
         options={{
           title: 'Journey',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon activeIcon="chart.bar.fill" fallback="J" focused={focused} icon="chart.bar" />
+          tabBarIcon: ({ focused, size }) => (
+            <TabIcon
+              activeIcon="chart.bar.fill"
+              fallback="J"
+              focused={focused}
+              icon="chart.bar"
+              size={size}
+            />
           ),
         }}
       />
@@ -645,7 +808,13 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ focused }) => <ProfileTabIcon focused={focused} />,
+          tabBarIcon: ({ focused, size }) => (
+            <ProfileTabIcon
+              focused={focused}
+              imageUri={currentMember?.profileImageUri}
+              size={size}
+            />
+          ),
         }}
       />
       <Tabs.Screen
@@ -702,12 +871,13 @@ const styles = StyleSheet.create({
   },
   glassPill: {
     position: 'absolute',
-    top: 4,
-    bottom: 4,
+    top: 2,
+    bottom: 2,
     borderRadius: 24,
     overflow: 'hidden',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.52)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.58)',
+    zIndex: 3,
   },
   pillWaterReflection: {
     position: 'absolute',
@@ -717,21 +887,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     opacity: 0.82,
   },
-  pillEdgeReflection: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 24,
-    borderWidth: 1.2,
-    borderColor: 'rgba(255,255,255,0.42)',
-    backgroundColor: 'transparent',
-  },
   glassTabRow: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    zIndex: 2,
   },
   glassTabButton: {
     flex: 1,
@@ -739,11 +899,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  glassTabIconWrap: {
-    width: 28,
-    height: 28,
+  bubbleClippedIcon: {
+    width: TAB_ICON_CELL_SIZE,
+    height: TAB_ICON_CELL_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bubbleClipWindow: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
+  bubbleClipIcon: {
+    width: TAB_ICON_CELL_SIZE,
+    height: TAB_ICON_CELL_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  glassTabIconWrap: {
+    width: TAB_ICON_CELL_SIZE,
+    height: TAB_ICON_CELL_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileTabImage: {
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  profileTabImageFocused: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.72)',
   },
 
   // Backdrop shown when menu is open

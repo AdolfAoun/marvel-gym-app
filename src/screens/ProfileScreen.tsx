@@ -1,8 +1,12 @@
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
-import { useEffect, useMemo, useState } from 'react';
+import * as Haptics from 'expo-haptics';
+import { SymbolView } from 'expo-symbols';
+import { useEffect, useState } from 'react';
 import {
+  Alert,
   ActivityIndicator,
   Image,
   Modal,
@@ -25,12 +29,16 @@ import {
 import type { Member, StudentVerificationRequest } from '@/types';
 
 const accentColor = premiumColors.red;
+const profileRingColor = '#7C5CE6';
 
 type ProfileForm = {
+  firstName: string;
   email: string;
   location: string;
   dateOfBirth: string;
 };
+
+type EditableField = keyof ProfileForm;
 
 function formatDateInput(value: string) {
   const digits = value.replace(/\D/g, '').slice(0, 8);
@@ -85,6 +93,7 @@ function parseDateOfBirth(value: string) {
 
 function createProfileForm(member: Member): ProfileForm {
   return {
+    firstName: member.firstName,
     email: member.email,
     location: member.location ?? '',
     dateOfBirth: toDisplayDate(member.dateOfBirth),
@@ -96,9 +105,8 @@ export default function ProfileScreen() {
   const [member, setMember] = useState<Member>();
   const [initialForm, setInitialForm] = useState<ProfileForm>();
   const [form, setForm] = useState<ProfileForm>();
-  const [isEditing, setIsEditing] = useState(false);
+  const [editingField, setEditingField] = useState<EditableField>();
   const [isSaving, setIsSaving] = useState(false);
-  const [isPhotoSheetVisible, setIsPhotoSheetVisible] = useState(false);
   const [isSignOutVisible, setIsSignOutVisible] = useState(false);
   const [initialProfileImageUri, setInitialProfileImageUri] = useState('');
   const [draftProfileImageUri, setDraftProfileImageUri] = useState('');
@@ -126,17 +134,6 @@ export default function ProfileScreen() {
     loadMember();
   }, []);
 
-  const hasChanges = useMemo(() => {
-    if (!form || !initialForm) {
-      return false;
-    }
-
-    return (
-      form.email.trim() !== initialForm.email.trim() ||
-      form.location.trim() !== initialForm.location.trim() ||
-      form.dateOfBirth.trim() !== initialForm.dateOfBirth.trim()
-    );
-  }, [form, initialForm]);
   const hasPhotoChange = draftProfileImageUri !== initialProfileImageUri;
 
   const updateForm = (updates: Partial<ProfileForm>) => {
@@ -144,20 +141,38 @@ export default function ProfileScreen() {
     setFormError('');
   };
 
-  const handleEditOrCancel = () => {
-    if (isEditing || hasPhotoChange) {
-      setForm(initialForm);
-      setDraftProfileImageUri(initialProfileImageUri);
-      setFormError('');
-      setIsEditing(false);
-      return;
-    }
+  const handleEditField = (field: EditableField) => {
+    setEditingField(field);
+    setFormError('');
+  };
 
-    setIsEditing(true);
+  const handleCancelField = (field: EditableField) => {
+    if (initialForm) {
+      setForm((current) =>
+        current ? { ...current, [field]: initialForm[field] } : current,
+      );
+    }
+    setFormError('');
+    setEditingField(undefined);
+  };
+
+  const applyProfilePhoto = async (profileImageUri: string) => {
+    setDraftProfileImageUri(profileImageUri);
+    setIsSaving(true);
+
+    try {
+      const updatedMember = await memberService.updateProfile({ profileImageUri });
+
+      setMember(updatedMember);
+      setInitialProfileImageUri(updatedMember.profileImageUri ?? '');
+      setDraftProfileImageUri(updatedMember.profileImageUri ?? '');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDone = async () => {
-    if (!form || (!hasChanges && !hasPhotoChange)) {
+    if (!form || (!editingField && !hasPhotoChange)) {
       return;
     }
 
@@ -165,12 +180,12 @@ export default function ProfileScreen() {
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const parsedDateOfBirth = parseDateOfBirth(form.dateOfBirth);
 
-    if (isEditing && cleanEmail && !emailPattern.test(cleanEmail)) {
+    if (editingField === 'email' && cleanEmail && !emailPattern.test(cleanEmail)) {
       setFormError('Enter a valid email address.');
       return;
     }
 
-    if (isEditing && form.dateOfBirth.trim() && !parsedDateOfBirth) {
+    if (editingField === 'dateOfBirth' && form.dateOfBirth.trim() && !parsedDateOfBirth) {
       setFormError('Enter date of birth as DD/MM/YYYY.');
       return;
     }
@@ -179,13 +194,10 @@ export default function ProfileScreen() {
 
     try {
       const updatedMember = await memberService.updateProfile({
-        ...(isEditing
-          ? {
-              email: cleanEmail,
-              location: form.location.trim(),
-              dateOfBirth: parsedDateOfBirth,
-            }
-          : {}),
+        ...(editingField === 'firstName' ? { firstName: form.firstName.trim() } : {}),
+        ...(editingField === 'email' ? { email: cleanEmail } : {}),
+        ...(editingField === 'location' ? { location: form.location.trim() } : {}),
+        ...(editingField === 'dateOfBirth' ? { dateOfBirth: parsedDateOfBirth } : {}),
         ...(hasPhotoChange ? { profileImageUri: draftProfileImageUri } : {}),
       });
       const nextForm = createProfileForm(updatedMember);
@@ -195,17 +207,17 @@ export default function ProfileScreen() {
       setForm(nextForm);
       setInitialProfileImageUri(updatedMember.profileImageUri ?? '');
       setDraftProfileImageUri(updatedMember.profileImageUri ?? '');
-      setIsEditing(false);
+      setEditingField(undefined);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleChooseProfilePhoto = async () => {
+    void Haptics.selectionAsync().catch(() => undefined);
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      setIsPhotoSheetVisible(false);
       return;
     }
 
@@ -217,17 +229,16 @@ export default function ProfileScreen() {
     });
 
     if (!result.canceled) {
-      setDraftProfileImageUri(result.assets[0].uri);
+      await applyProfilePhoto(result.assets[0].uri);
     }
 
-    setIsPhotoSheetVisible(false);
   };
 
   const handleTakeProfilePhoto = async () => {
+    void Haptics.selectionAsync().catch(() => undefined);
     const permission = await ImagePicker.requestCameraPermissionsAsync();
 
     if (!permission.granted) {
-      setIsPhotoSheetVisible(false);
       return;
     }
 
@@ -239,10 +250,9 @@ export default function ProfileScreen() {
     });
 
     if (!result.canceled) {
-      setDraftProfileImageUri(result.assets[0].uri);
+      await applyProfilePhoto(result.assets[0].uri);
     }
 
-    setIsPhotoSheetVisible(false);
   };
 
   const submitStudentIdProof = async (
@@ -301,6 +311,35 @@ export default function ProfileScreen() {
     await submitStudentIdProof(result.assets[0], 'Student ID picture');
   };
 
+  const handleStudentUploadPress = () => {
+    Alert.alert('Upload Student ID', 'Choose how to upload student ID.', [
+      {
+        text: 'Take Picture',
+        onPress: handleTakeStudentIdPicture,
+      },
+      {
+        text: 'Choose from Gallery',
+        onPress: handleUploadStudentId,
+      },
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+    ]);
+  };
+
+  const handleAddPhotoPress = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    Alert.alert('Profile Picture', 'Choose how to add a photo.', [
+      { text: 'Take Photo', onPress: handleTakeProfilePhoto },
+      { text: 'Choose from Gallery', onPress: handleChooseProfilePhoto },
+      ...(draftProfileImageUri
+        ? [{ text: 'Remove Photo', style: 'destructive' as const, onPress: () => { void applyProfilePhoto(''); } }]
+        : []),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
+  };
+
   const handleSignOut = async () => {
     await authService.logoutMember();
     setIsSignOutVisible(false);
@@ -319,12 +358,70 @@ export default function ProfileScreen() {
     );
   }
 
-  const doneDisabled = (!hasChanges && !hasPhotoChange) || isSaving;
+  const editingFieldHasChanges =
+    !!editingField &&
+    !!form &&
+    !!initialForm &&
+    form[editingField].trim() !== initialForm[editingField].trim();
+  const doneDisabled = (!editingFieldHasChanges && !hasPhotoChange) || isSaving;
   const avatar = avatarService.getMemberAvatarDisplay({
     ...member,
     profileImageUri: draftProfileImageUri,
   });
   const studentStatus = studentVerification?.status ?? 'Not Submitted';
+  const renderFieldActions = (field: EditableField) => {
+    const isFieldEditing = editingField === field;
+
+    if (isFieldEditing) {
+      return (
+        <View style={styles.fieldActionRow}>
+          <Pressable
+            accessibilityLabel={`Cancel ${field} change`}
+            onPress={() => handleCancelField(field)}
+            style={({ pressed }) => [
+              styles.fieldActionButton,
+              styles.fieldCancelButton,
+              pressed && styles.buttonPressed,
+            ]}>
+            <SymbolView name="xmark.circle.fill" size={18} tintColor="#C4C9D1" weight="regular" />
+          </Pressable>
+          <Pressable
+            accessibilityLabel={`Save ${field} change`}
+            disabled={doneDisabled}
+            onPress={handleDone}
+            style={({ pressed }) => [
+              styles.fieldActionButton,
+              doneDisabled && styles.fieldActionButtonDisabled,
+              pressed && !doneDisabled && styles.buttonPressed,
+            ]}>
+            {isSaving ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <SymbolView
+                name="checkmark"
+                size={16}
+                tintColor={doneDisabled ? premiumColors.textFaint : '#FFFFFF'}
+                weight="bold"
+              />
+            )}
+          </Pressable>
+        </View>
+      );
+    }
+
+    return (
+      <Pressable
+        accessibilityLabel={`Edit ${field}`}
+        onPress={() => handleEditField(field)}
+        style={({ pressed }) => [
+          styles.fieldActionButton,
+          styles.fieldEditButton,
+          pressed && styles.buttonPressed,
+        ]}>
+        <SymbolView name="pencil" size={15} tintColor="#E6E8ED" weight="regular" />
+      </Pressable>
+    );
+  };
 
   return (
     <PremiumScreenBackground>
@@ -335,20 +432,22 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}>
         <View style={styles.profileTop}>
           <Pressable
-            onPress={() => setIsPhotoSheetVisible(true)}
-            style={({ pressed }) => [styles.avatar, pressed && styles.buttonPressed]}>
-            {avatar.imageUri ? (
-              <Image
-                source={{ uri: avatar.imageUri }}
-                style={styles.avatarImage}
-                resizeMode="cover"
-              />
-            ) : (
-              <Text style={styles.avatarText}>{avatar.fallbackLabel}</Text>
-            )}
+            onPress={handleAddPhotoPress}
+            style={({ pressed }) => [styles.avatarRing, pressed && styles.buttonPressed]}>
+            <View style={styles.avatar}>
+              {avatar.imageUri ? (
+                <Image
+                  source={{ uri: avatar.imageUri }}
+                  style={styles.avatarImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text style={styles.avatarText}>{avatar.fallbackLabel}</Text>
+              )}
+            </View>
           </Pressable>
           <Pressable
-            onPress={() => setIsPhotoSheetVisible(true)}
+            onPress={handleAddPhotoPress}
             style={({ pressed }) => [
               styles.photoButton,
               pressed && styles.buttonPressed,
@@ -363,50 +462,24 @@ export default function ProfileScreen() {
           <Text style={styles.phoneText}>{member.phone || 'Member profile'}</Text>
         </View>
 
-        <View style={styles.actionRow}>
-          <Pressable
-            onPress={handleEditOrCancel}
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              (isEditing || hasPhotoChange) && styles.cancelButton,
-              pressed && styles.buttonPressed,
-            ]}>
-            <Text style={styles.secondaryButtonText}>
-              {isEditing || hasPhotoChange ? 'Cancel' : 'Edit Profile'}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            disabled={doneDisabled}
-            onPress={handleDone}
-            style={({ pressed }) => [
-              styles.doneButton,
-              doneDisabled && styles.doneButtonDisabled,
-              pressed && !doneDisabled && styles.buttonPressed,
-            ]}>
-            {isSaving ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text
-                style={[
-                  styles.doneButtonText,
-                  doneDisabled && styles.doneButtonTextDisabled,
-                ]}>
-                Done
-              </Text>
-            )}
-          </Pressable>
-        </View>
-
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Details</Text>
 
           <View style={styles.detailsGrid}>
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>First name</Text>
-              <View style={styles.disabledField}>
-                <Text style={styles.disabledValue}>{member.firstName}</Text>
+              <View style={styles.inputLabelRow}>
+                <Text style={[styles.label, styles.inputLabel]}>First name</Text>
+                {renderFieldActions('firstName')}
               </View>
+              <TextInput
+                value={form.firstName}
+                onChangeText={(firstName) => updateForm({ firstName })}
+                editable={editingField === 'firstName'}
+                placeholder="First name"
+                placeholderTextColor="#667282"
+                selectionColor={accentColor}
+                style={[styles.input, editingField !== 'firstName' && styles.inputReadOnly]}
+              />
             </View>
 
             <View style={styles.fieldGroup}>
@@ -425,47 +498,56 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Date of birth</Text>
+            <View style={styles.inputLabelRow}>
+              <Text style={[styles.label, styles.inputLabel]}>Date of birth</Text>
+              {renderFieldActions('dateOfBirth')}
+            </View>
             <TextInput
               value={form.dateOfBirth}
               onChangeText={(dateOfBirth) =>
                 updateForm({ dateOfBirth: formatDateInput(dateOfBirth) })
               }
-              editable={isEditing}
+              editable={editingField === 'dateOfBirth'}
               keyboardType="number-pad"
               placeholder="DD/MM/YYYY"
               placeholderTextColor="#667282"
               selectionColor={accentColor}
-              style={[styles.input, !isEditing && styles.inputReadOnly]}
+              style={[styles.input, editingField !== 'dateOfBirth' && styles.inputReadOnly]}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
+            <View style={styles.inputLabelRow}>
+              <Text style={[styles.label, styles.inputLabel]}>Email</Text>
+              {renderFieldActions('email')}
+            </View>
             <TextInput
               value={form.email}
               onChangeText={(email) => updateForm({ email })}
-              editable={isEditing}
+              editable={editingField === 'email'}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               placeholder="member@marvelgym.com"
               placeholderTextColor="#667282"
               selectionColor={accentColor}
-              style={[styles.input, !isEditing && styles.inputReadOnly]}
+              style={[styles.input, editingField !== 'email' && styles.inputReadOnly]}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Place of living</Text>
+            <View style={styles.inputLabelRow}>
+              <Text style={[styles.label, styles.inputLabel]}>Place of living</Text>
+              {renderFieldActions('location')}
+            </View>
             <TextInput
               value={form.location}
               onChangeText={(location) => updateForm({ location })}
-              editable={isEditing}
+              editable={editingField === 'location'}
               placeholder="City, country"
               placeholderTextColor="#667282"
               selectionColor={accentColor}
-              style={[styles.input, !isEditing && styles.inputReadOnly]}
+              style={[styles.input, editingField !== 'location' && styles.inputReadOnly]}
             />
           </View>
 
@@ -474,7 +556,9 @@ export default function ProfileScreen() {
 
         <View style={styles.card}>
           <View style={styles.sectionRow}>
-            <Text style={styles.sectionTitle}>Student Verification</Text>
+            <Text style={[styles.sectionTitle, styles.sectionTitleInRow]}>
+              Student Verification
+            </Text>
             <View
               style={[
                 styles.studentStatusChip,
@@ -493,7 +577,7 @@ export default function ProfileScreen() {
                 ? 'Your student ID is pending verification. Admin approval is required before student pricing applies.'
                 : studentStatus === 'Rejected'
                   ? 'Student ID could not be verified. Please upload a clearer proof.'
-                  : 'Upload your student ID to request student pricing.'}
+                  : 'Upload your student ID to benefit from our student discount.'}
           </Text>
           {studentVerification?.proofLabel ? (
             <Text style={styles.studentProofText}>
@@ -504,27 +588,22 @@ export default function ProfileScreen() {
             <Text style={styles.studentMessageText}>{studentVerificationMessage}</Text>
           ) : null}
           {studentStatus === 'Not Submitted' || studentStatus === 'Rejected' ? (
-            <View style={styles.studentUploadRow}>
-              <Pressable
-                onPress={handleUploadStudentId}
-                style={({ pressed }) => [
-                  styles.studentUploadButton,
-                  pressed && styles.buttonPressed,
-                ]}>
-                <Text style={styles.studentUploadText}>
-                  {studentStatus === 'Rejected' ? 'Choose Again' : 'Choose from Gallery'}
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={handleTakeStudentIdPicture}
-                style={({ pressed }) => [
-                  styles.studentUploadButton,
-                  styles.studentCameraButton,
-                  pressed && styles.buttonPressed,
-                ]}>
-                <Text style={styles.studentUploadText}>Take Picture</Text>
-              </Pressable>
-            </View>
+            <Pressable
+              onPress={handleStudentUploadPress}
+              style={({ pressed }) => [
+                styles.studentUploadButtonWrap,
+                pressed && styles.buttonPressed,
+              ]}>
+              <LinearGradient
+                colors={['#FF2638', '#B11226', '#2A0308']}
+                locations={[0, 0.58, 1]}
+                start={{ x: 0.08, y: 0 }}
+                end={{ x: 0.92, y: 1 }}
+                style={styles.studentUploadButton}>
+                <View pointerEvents="none" style={styles.studentUploadGloss} />
+                <Text style={styles.studentUploadText}>Upload</Text>
+              </LinearGradient>
+            </Pressable>
           ) : null}
         </View>
 
@@ -537,82 +616,6 @@ export default function ProfileScreen() {
           <Text style={styles.signOutText}>Sign Out</Text>
         </Pressable>
       </ScrollView>
-
-      <Modal transparent visible={isPhotoSheetVisible} animationType="fade">
-        <View style={styles.modalOverlay}>
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setIsPhotoSheetVisible(false)}
-          />
-          <View style={styles.photoSheet}>
-            <Text style={styles.sheetKicker}>Profile picture</Text>
-            <Text style={styles.sheetTitle}>Update photo</Text>
-            <View style={styles.photoPreviewWrap}>
-              <View style={styles.photoPreview}>
-                {draftProfileImageUri ? (
-                  <Image
-                    source={{ uri: draftProfileImageUri }}
-                    style={styles.photoPreviewImage}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <Text style={styles.photoPreviewText}>
-                    {avatar.fallbackLabel}
-                  </Text>
-                )}
-              </View>
-              <Text style={styles.photoPreviewHint}>
-                Use the native crop screen, then save with Done.
-              </Text>
-            </View>
-            <View style={styles.photoChoiceStack}>
-              <Pressable
-                onPress={handleChooseProfilePhoto}
-                style={({ pressed }) => [
-                  styles.photoChoiceButton,
-                  pressed && styles.buttonPressed,
-                ]}>
-                <Text style={styles.photoChoiceText}>Choose from Gallery</Text>
-              </Pressable>
-              <Pressable
-                onPress={handleTakeProfilePhoto}
-                style={({ pressed }) => [
-                  styles.photoChoiceButton,
-                  pressed && styles.buttonPressed,
-                ]}>
-                <Text style={styles.photoChoiceText}>Take Photo</Text>
-              </Pressable>
-              <Pressable
-                disabled={!draftProfileImageUri}
-                onPress={() => {
-                  setDraftProfileImageUri('');
-                  setIsPhotoSheetVisible(false);
-                }}
-                style={({ pressed }) => [
-                  styles.removePhotoButton,
-                  !draftProfileImageUri && styles.removePhotoButtonDisabled,
-                  pressed && draftProfileImageUri && styles.buttonPressed,
-                ]}>
-                <Text
-                  style={[
-                    styles.removePhotoText,
-                    !draftProfileImageUri && styles.removePhotoTextDisabled,
-                  ]}>
-                  Remove Profile Picture
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setIsPhotoSheetVisible(false)}
-                style={({ pressed }) => [
-                  styles.photoCancelButton,
-                  pressed && styles.buttonPressed,
-                ]}>
-                <Text style={styles.photoCancelText}>Cancel</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       <Modal transparent visible={isSignOutVisible} animationType="fade">
         <View style={styles.centerModalOverlay}>
@@ -671,20 +674,11 @@ const styles = StyleSheet.create({
   profileTop: {
     position: 'relative',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(225,29,46,0.28)',
-    borderRadius: 32,
     marginBottom: 14,
     marginHorizontal: 4,
     paddingHorizontal: 20,
-    paddingTop: 28,
-    paddingBottom: 24,
-    backgroundColor: 'rgba(8,4,5,0.72)',
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.32,
-    shadowRadius: 32,
-    elevation: 14,
+    paddingTop: 12,
+    paddingBottom: 16,
   },
   profileGloss: {
     position: 'absolute',
@@ -703,6 +697,21 @@ const styles = StyleSheet.create({
     borderRadius: 130,
     backgroundColor: 'rgba(255, 120, 130, 0.2)',
   },
+  avatarRing: {
+    width: 120,
+    height: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 60,
+    borderWidth: 3,
+    borderColor: profileRingColor,
+    backgroundColor: 'rgba(168, 85, 247, 0.12)',
+    shadowColor: profileRingColor,
+    shadowOpacity: 0.55,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
+  },
   avatar: {
     width: 108,
     height: 108,
@@ -710,12 +719,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
     borderRadius: 54,
-    backgroundColor: 'rgba(0, 0, 0, 0.22)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   avatarImage: {
     width: '100%',
@@ -772,11 +776,15 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginBottom: 14,
   },
+  sectionTitleInRow: {
+    flex: 1,
+    marginBottom: 0,
+  },
   sectionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 12,
     marginBottom: 10,
   },
   studentStatusChip: {
@@ -820,33 +828,73 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 9,
   },
-  studentUploadRow: {
-    flexDirection: 'row',
-    gap: 10,
+  studentUploadButtonWrap: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
     marginTop: 14,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
   },
   studentUploadButton: {
-    minHeight: 48,
-    flex: 1,
+    minHeight: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
-    backgroundColor: accentColor,
-    paddingHorizontal: 10,
+    overflow: 'hidden',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,91,106,0.72)',
+    borderRadius: 999,
+    paddingHorizontal: 16,
   },
-  studentCameraButton: {
-    borderWidth: 1,
-    borderColor: 'rgba(177, 18, 38, 0.32)',
-    backgroundColor: premiumColors.surfaceSoft,
+  studentUploadGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '42%',
+    backgroundColor: 'rgba(255,255,255,0.075)',
   },
   studentUploadText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
+    letterSpacing: 0.3,
   },
   detailsGrid: {
     gap: 12,
     marginBottom: 16,
+  },
+  inputLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 28,
+  },
+  inputLabel: {
+    marginBottom: 0,
+  },
+  fieldActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  fieldActionButton: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  fieldEditButton: {
+    backgroundColor: 'rgba(148, 154, 166, 0.34)',
+  },
+  fieldCancelButton: {
+    backgroundColor: 'transparent',
+  },
+  fieldActionButtonDisabled: {
+    opacity: 0.45,
   },
   fieldGroup: {
     gap: 8,
@@ -855,7 +903,6 @@ const styles = StyleSheet.create({
     color: premiumColors.textMuted,
     fontSize: 12,
     fontWeight: '900',
-    marginBottom: 8,
     textTransform: 'uppercase',
   },
   disabledField: {
@@ -873,6 +920,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   inputGroup: {
+    gap: 8,
     marginBottom: 16,
   },
   input: {
@@ -897,66 +945,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 17,
   },
-  actionRow: {
-    width: '100%',
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 14,
-  },
-  secondaryButton: {
-    minHeight: 52,
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.4,
-    borderColor: 'rgba(225,29,46,0.55)',
-    borderRadius: 999,
-    backgroundColor: 'rgba(7,2,5,0.45)',
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  cancelButton: {
-    borderColor: 'rgba(225,29,46,0.72)',
-    backgroundColor: 'rgba(177,18,38,0.12)',
-  },
-  secondaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  doneButton: {
-    minHeight: 52,
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    borderWidth: 1.2,
-    borderColor: 'rgba(255,91,106,0.72)',
-    borderRadius: 999,
-    backgroundColor: accentColor,
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.42,
-    shadowRadius: 22,
-    elevation: 8,
-  },
-  doneButtonDisabled: {
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  doneButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  doneButtonTextDisabled: {
-    color: premiumColors.textFaint,
-  },
   signOutButton: {
     minHeight: 52,
     alignSelf: 'center',
@@ -978,11 +966,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
   },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.58)',
-  },
   centerModalOverlay: {
     flex: 1,
     alignItems: 'center',
@@ -992,48 +975,6 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-  },
-  photoSheet: {
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    backgroundColor: premiumColors.surface,
-    paddingHorizontal: 22,
-    paddingTop: 18,
-    paddingBottom: 30,
-    ...premiumShadow,
-  },
-  photoPreviewWrap: {
-    alignItems: 'center',
-    marginTop: 18,
-  },
-  photoPreview: {
-    width: 96,
-    height: 96,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-    borderRadius: 48,
-    backgroundColor: premiumColors.surfaceSoft,
-  },
-  photoPreviewImage: {
-    width: '100%',
-    height: '100%',
-  },
-  photoPreviewText: {
-    color: accentColor,
-    fontSize: 28,
-    fontWeight: '900',
-  },
-  photoPreviewHint: {
-    color: premiumColors.textMuted,
-    fontSize: 12,
-    fontWeight: '800',
-    marginTop: 9,
-    textAlign: 'center',
   },
   confirmCard: {
     width: '100%',
@@ -1064,70 +1005,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 20,
     marginTop: 8,
-  },
-  photoChoiceStack: {
-    gap: 10,
-    marginTop: 18,
-  },
-  photoChoiceButton: {
-    minHeight: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.4,
-    borderColor: 'rgba(225,29,46,0.55)',
-    borderRadius: 999,
-    backgroundColor: 'rgba(7,2,5,0.45)',
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.16,
-    shadowRadius: 14,
-    elevation: 4,
-  },
-  photoChoiceText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  removePhotoButton: {
-    minHeight: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(225,29,46,0.28)',
-    borderRadius: 999,
-    backgroundColor: 'rgba(177,18,38,0.08)',
-  },
-  removePhotoButtonDisabled: {
-    borderColor: 'rgba(148,163,184,0.12)',
-    opacity: 0.40,
-  },
-  removePhotoText: {
-    color: premiumColors.redBright,
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  removePhotoTextDisabled: {
-    color: premiumColors.textFaint,
-  },
-  photoCancelButton: {
-    minHeight: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    borderWidth: 1.2,
-    borderColor: 'rgba(255,91,106,0.72)',
-    borderRadius: 999,
-    backgroundColor: accentColor,
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.40,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  photoCancelText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '900',
   },
   confirmRow: {
     flexDirection: 'row',

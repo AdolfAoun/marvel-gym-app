@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Easing,
   LayoutChangeEvent,
   PanResponder,
   Pressable,
@@ -42,6 +43,10 @@ type GlowingChipsProps = {
   chipStyle?: StyleProp<ViewStyle>;
   unselectedChipStyle?: StyleProp<ViewStyle>;
   labelStyle?: StyleProp<TextStyle>;
+  /** Fill color of the gliding selection pill. Defaults to the red accent. */
+  indicatorColor?: string;
+  /** Border/glow color of the selection pill. Defaults to the bright red accent. */
+  indicatorGlowColor?: string;
 };
 
 /**
@@ -59,6 +64,8 @@ export function GlowingChips({
   chipStyle,
   unselectedChipStyle,
   labelStyle,
+  indicatorColor = premiumColors.red,
+  indicatorGlowColor = premiumColors.redBright,
 }: GlowingChipsProps) {
   const [layouts, setLayouts] = useState<Record<string, ChipLayout>>({});
   const indicatorX = useRef(new Animated.Value(0)).current;
@@ -93,17 +100,17 @@ export function GlowingChips({
     }
 
     Animated.parallel([
-      Animated.spring(indicatorX, {
+      Animated.timing(indicatorX, {
         toValue: layout.x,
-        useNativeDriver: false,
-        friction: 9,
-        tension: 80,
+        duration: 140,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
       }),
-      Animated.spring(indicatorWidth, {
+      Animated.timing(indicatorWidth, {
         toValue: layout.width,
+        duration: 140,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: false,
-        friction: 9,
-        tension: 80,
       }),
     ]).start();
   }, [selectedKey, layouts, indicatorX, indicatorWidth]);
@@ -175,6 +182,9 @@ export function GlowingChips({
           {
             transform: [{ translateX: indicatorX }],
             width: indicatorWidth,
+            backgroundColor: indicatorColor,
+            borderColor: indicatorGlowColor,
+            shadowColor: indicatorGlowColor,
           },
         ]}
       />
@@ -267,10 +277,14 @@ const styles = StyleSheet.create({
     bottom: 3,
     overflow: 'hidden',
     borderRadius: 999,
-    backgroundColor: 'rgba(177, 18, 38, 0.92)',
+    backgroundColor: premiumColors.red,
     borderWidth: 1,
-    borderColor: 'rgba(255, 140, 150, 0.55)',
-    elevation: 0,
+    borderColor: premiumColors.redBright,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    elevation: 4,
   },
   chip: {
     minHeight: 38,

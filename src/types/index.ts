@@ -259,21 +259,53 @@ export type MachineGuide = {
   id: string;
   name: string;
   muscleGroup:
-    | 'Chest'
+    // Chest
+    | 'Upper Chest'
+    | 'Middle Chest'
+    | 'Lower Chest'
+    // Back
+    | 'Latissimus Dorsi'
     | 'Upper Back'
     | 'Lower Back'
-    | 'Traps'
-    | 'Shoulders'
-    | 'Biceps'
-    | 'Triceps'
-    | 'Forearms'
-    | 'Quads'
+    // Traps
+    | 'Upper Traps'
+    | 'Lower Traps'
+    // Shoulders
+    | 'Anterior Deltoid'
+    | 'Lateral Deltoid'
+    | 'Posterior Deltoid'
+    // Biceps
+    | 'Bicep Long Head'
+    | 'Bicep Short Head'
+    | 'Brachialis'
+    // Triceps
+    | 'Tricep Long Head'
+    | 'Tricep Lateral Head'
+    | 'Tricep Medial Head'
+    // Forearms
+    | 'Forearm Extensors'
+    | 'Forearm Flexors'
+    // Quads
+    | 'Rectus Femoris'
+    | 'Vastus Medialis'
+    | 'Vastus Lateralis'
+    // Hamstrings
     | 'Hamstrings'
-    | 'Calves'
-    | 'Glutes'
-    | 'Adductors'
-    | 'Abs'
-    | 'Obliques';
+    // Glutes
+    | 'Gluteus Maximus'
+    | 'Gluteus Medius'
+    | 'Gluteus Minimus'
+    // Calves & shin
+    | 'Gastrocnemius'
+    | 'Soleus'
+    | 'Tibialis Anterior'
+    // Core
+    | 'Upper Abs'
+    | 'Lower Abs'
+    | 'Transverse Abdominis'
+    | 'Obliques'
+    // Inner thigh
+    | 'Adductors';
   target: string;
   description: string;
   imageUri?: string;

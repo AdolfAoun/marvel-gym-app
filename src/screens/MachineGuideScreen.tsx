@@ -4,13 +4,16 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Image,
   Linking,
   Modal,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
@@ -21,126 +24,95 @@ import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
 import { machineGuideService } from '@/services';
 import type { MachineGuide } from '@/types';
 
-// ─── Per-muscle neon colors ──────────────────────────────────────────────────
+// ─── Muscle taxonomy ─────────────────────────────────────────────────────────
+// Each head is drawn as its own region on the custom <MuscleMap />. `slug` is the
+// broad anatomical area it belongs to (kept for grouping / future use); `label`
+// is the gym-conventional display name; `key` stays the data identity.
 type MuscleGroupKey = MachineGuide['muscleGroup'];
 
-const MUSCLE_COLORS: Record<MuscleGroupKey, string> = {
-  'Chest':      '#38BDF8',
-  'Upper Back': '#A78BFA',
-  'Lower Back': '#7C3AED',
-  'Traps':      '#C4B5FD',
-  'Shoulders':  '#FB923C',
-  'Biceps':     '#34D399',
-  'Triceps':    '#10B981',
-  'Forearms':   '#6EE7B7',
-  'Quads':      '#FCD34D',
-  'Hamstrings': '#FBBF24',
-  'Calves':     '#F59E0B',
-  'Glutes':     '#F97316',
-  'Adductors':  '#EF4444',
-  'Abs':        '#F472B6',
-  'Obliques':   '#EC4899',
+type MuscleDef = {
+  key: MuscleGroupKey;
+  label: string;
+  slug: string;
+  side: 'front' | 'back' | 'both';
+  color: string;
 };
 
-const MUSCLE_TINTS: Record<MuscleGroupKey, string> = {
-  'Chest':      'rgba(56,189,248,0.10)',
-  'Upper Back': 'rgba(167,139,250,0.10)',
-  'Lower Back': 'rgba(124,58,237,0.10)',
-  'Traps':      'rgba(196,181,253,0.10)',
-  'Shoulders':  'rgba(251,146,60,0.10)',
-  'Biceps':     'rgba(52,211,153,0.10)',
-  'Triceps':    'rgba(16,185,129,0.10)',
-  'Forearms':   'rgba(110,231,183,0.10)',
-  'Quads':      'rgba(252,211,77,0.10)',
-  'Hamstrings': 'rgba(251,191,36,0.10)',
-  'Calves':     'rgba(245,158,11,0.10)',
-  'Glutes':     'rgba(249,115,22,0.10)',
-  'Adductors':  'rgba(239,68,68,0.10)',
-  'Abs':        'rgba(244,114,182,0.10)',
-  'Obliques':   'rgba(236,72,153,0.10)',
-};
-
-const MUSCLE_GLOW: Record<MuscleGroupKey, string> = {
-  'Chest':      'rgba(56,189,248,0.32)',
-  'Upper Back': 'rgba(167,139,250,0.32)',
-  'Lower Back': 'rgba(124,58,237,0.32)',
-  'Traps':      'rgba(196,181,253,0.32)',
-  'Shoulders':  'rgba(251,146,60,0.32)',
-  'Biceps':     'rgba(52,211,153,0.32)',
-  'Triceps':    'rgba(16,185,129,0.32)',
-  'Forearms':   'rgba(110,231,183,0.32)',
-  'Quads':      'rgba(252,211,77,0.32)',
-  'Hamstrings': 'rgba(251,191,36,0.32)',
-  'Calves':     'rgba(245,158,11,0.32)',
-  'Glutes':     'rgba(249,115,22,0.32)',
-  'Adductors':  'rgba(239,68,68,0.32)',
-  'Abs':        'rgba(244,114,182,0.32)',
-  'Obliques':   'rgba(236,72,153,0.32)',
-};
-
-// ─── Slug ↔ muscle-group mappings (react-native-body-highlighter) ────────────
-const SLUG_TO_GROUP: Partial<Record<Slug, MuscleGroupKey>> = {
-  'chest':      'Chest',
-  'abs':        'Abs',
-  'obliques':   'Obliques',
-  'lower-back': 'Lower Back',
-  'upper-back': 'Upper Back',
-  'trapezius':  'Traps',
-  'deltoids':   'Shoulders',
-  'biceps':     'Biceps',
-  'triceps':    'Triceps',
-  'forearm':    'Forearms',
-  'quadriceps': 'Quads',
-  'tibialis':   'Quads',
-  'adductors':  'Adductors',
-  'hamstring':  'Hamstrings',
-  'calves':     'Calves',
-  'gluteal':    'Glutes',
-};
-
-const GROUP_TO_SLUGS: Record<MuscleGroupKey, Slug[]> = {
-  'Chest':      ['chest'],
-  'Abs':        ['abs'],
-  'Obliques':   ['obliques'],
-  'Lower Back': ['lower-back'],
-  'Upper Back': ['upper-back'],
-  'Traps':      ['trapezius'],
-  'Shoulders':  ['deltoids'],
-  'Biceps':     ['biceps'],
-  'Triceps':    ['triceps'],
-  'Forearms':   ['forearm'],
-  'Quads':      ['quadriceps', 'tibialis'],
-  'Adductors':  ['adductors'],
-  'Hamstrings': ['hamstring'],
-  'Calves':     ['calves'],
-  'Glutes':     ['gluteal'],
-};
-
-// Which side each muscle is visible on (drives the auto front/back switch)
-const GROUP_SLUGS_BY_SIDE: Record<MuscleGroupKey, { front: Slug[]; back: Slug[] }> = {
-  'Chest':      { front: ['chest'],                    back: [] },
-  'Abs':        { front: ['abs'],                      back: [] },
-  'Obliques':   { front: ['obliques'],                 back: [] },
-  'Lower Back': { front: [],                           back: ['lower-back'] },
-  'Upper Back': { front: [],                           back: ['upper-back'] },
-  'Traps':      { front: [],                           back: ['trapezius'] },
-  'Shoulders':  { front: ['deltoids'],                 back: ['deltoids'] },
-  'Biceps':     { front: ['biceps'],                   back: [] },
-  'Triceps':    { front: [],                           back: ['triceps'] },
-  'Forearms':   { front: ['forearm'],                  back: ['forearm'] },
-  'Quads':      { front: ['quadriceps', 'tibialis'],   back: [] },
-  'Adductors':  { front: ['adductors'],                back: [] },
-  'Hamstrings': { front: [],                           back: ['hamstring'] },
-  'Calves':     { front: ['calves'],                   back: ['calves'] },
-  'Glutes':     { front: [],                           back: ['gluteal'] },
-};
-
-const muscleOrder: MuscleGroupKey[] = [
-  'Chest', 'Upper Back', 'Lower Back', 'Traps', 'Shoulders',
-  'Biceps', 'Triceps', 'Forearms',
-  'Quads', 'Hamstrings', 'Calves', 'Glutes', 'Adductors',
-  'Abs', 'Obliques',
+const MUSCLES: MuscleDef[] = [
+  // Chest
+  { key: 'Upper Chest',          label: 'Upper Chest',              slug: 'chest',      side: 'front', color: '#38BDF8' },
+  { key: 'Middle Chest',         label: 'Middle Chest',             slug: 'chest',      side: 'front', color: '#0EA5E9' },
+  { key: 'Lower Chest',          label: 'Lower Chest',              slug: 'chest',      side: 'front', color: '#0284C7' },
+  // Back
+  { key: 'Latissimus Dorsi',     label: 'Lats',                     slug: 'upper-back', side: 'back',  color: '#9B7FF0' },
+  { key: 'Upper Back',           label: 'Upper Back',               slug: 'upper-back', side: 'back',  color: '#6E4FCF' },
+  { key: 'Lower Back',           label: 'Lower Back',               slug: 'lower-back', side: 'back',  color: '#4C2A9E' },
+  // Traps
+  { key: 'Upper Traps',          label: 'Upper Traps',              slug: 'trapezius',  side: 'back',  color: '#C4B5FD' },
+  { key: 'Lower Traps',          label: 'Lower Traps',              slug: 'trapezius',  side: 'back',  color: '#DDD6FE' },
+  // Shoulders
+  { key: 'Anterior Deltoid',     label: 'Front Delts',              slug: 'deltoids',   side: 'front', color: '#FB923C' },
+  { key: 'Lateral Deltoid',      label: 'Side Delts',               slug: 'deltoids',   side: 'both',  color: '#F97316' },
+  { key: 'Posterior Deltoid',    label: 'Rear Delts',               slug: 'deltoids',   side: 'back',  color: '#FDBA74' },
+  // Biceps
+  { key: 'Bicep Long Head',      label: 'Biceps (Long Head)',       slug: 'biceps',     side: 'front', color: '#34D399' },
+  { key: 'Bicep Short Head',     label: 'Biceps (Short Head)',      slug: 'biceps',     side: 'front', color: '#10B981' },
+  { key: 'Brachialis',           label: 'Brachialis',               slug: 'biceps',     side: 'front', color: '#6EE7B7' },
+  // Triceps
+  { key: 'Tricep Long Head',     label: 'Triceps (Long Head)',      slug: 'triceps',    side: 'back',  color: '#2DD4BF' },
+  { key: 'Tricep Lateral Head',  label: 'Triceps (Lateral Head)',   slug: 'triceps',    side: 'back',  color: '#14B8A6' },
+  { key: 'Tricep Medial Head',   label: 'Triceps (Medial Head)',    slug: 'triceps',    side: 'back',  color: '#5EEAD4' },
+  // Forearms
+  { key: 'Forearm Extensors',    label: 'Forearm Extensors',        slug: 'forearm',    side: 'both',  color: '#A3E635' },
+  { key: 'Forearm Flexors',      label: 'Forearm Flexors',          slug: 'forearm',    side: 'both',  color: '#84CC16' },
+  // Quads
+  { key: 'Rectus Femoris',       label: 'Mid Quad (Rectus Femoris)',slug: 'quadriceps', side: 'front', color: '#FDE047' },
+  { key: 'Vastus Medialis',      label: 'Inner Quad (Teardrop)',    slug: 'quadriceps', side: 'front', color: '#FBBF24' },
+  { key: 'Vastus Lateralis',     label: 'Outer Quad (Sweep)',       slug: 'quadriceps', side: 'front', color: '#FCD34D' },
+  // Hamstrings
+  { key: 'Hamstrings',           label: 'Hamstrings',               slug: 'hamstring',  side: 'back',  color: '#F59E0B' },
+  // Glutes
+  { key: 'Gluteus Maximus',      label: 'Glutes (Maximus)',         slug: 'gluteal',    side: 'back',  color: '#FB7185' },
+  { key: 'Gluteus Medius',       label: 'Glutes (Medius)',          slug: 'gluteal',    side: 'back',  color: '#F43F5E' },
+  { key: 'Gluteus Minimus',      label: 'Glutes (Minimus)',         slug: 'gluteal',    side: 'back',  color: '#FDA4AF' },
+  // Calves & shin
+  { key: 'Gastrocnemius',        label: 'Calves (Gastrocnemius)',   slug: 'calves',     side: 'both',  color: '#FCA5A5' },
+  { key: 'Soleus',               label: 'Calves (Soleus)',          slug: 'calves',     side: 'both',  color: '#F87171' },
+  { key: 'Tibialis Anterior',    label: 'Shins (Tibialis)',         slug: 'tibialis',   side: 'front', color: '#FECACA' },
+  // Core
+  { key: 'Upper Abs',            label: 'Upper Abs',                slug: 'abs',        side: 'front', color: '#F472B6' },
+  { key: 'Lower Abs',            label: 'Lower Abs',                slug: 'abs',        side: 'front', color: '#EC4899' },
+  { key: 'Transverse Abdominis', label: 'Deep Core (TVA)',          slug: 'abs',        side: 'front', color: '#F9A8D4' },
+  { key: 'Obliques',             label: 'Obliques',                 slug: 'obliques',   side: 'front', color: '#DB2777' },
+  // Inner thigh
+  { key: 'Adductors',            label: 'Inner Thighs (Adductors)', slug: 'adductors',  side: 'front', color: '#EF4444' },
 ];
+
+const MUSCLE_BY_KEY = Object.fromEntries(
+  MUSCLES.map((m) => [m.key, m]),
+) as Record<MuscleGroupKey, MuscleDef>;
+
+const muscleOrder: MuscleGroupKey[] = MUSCLES.map((m) => m.key);
+
+// Colour helpers — derive the tint / glow from each muscle's base colour.
+const hexToRgba = (hex: string, alpha: number): string => {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+};
+
+const labelOf = (key: MuscleGroupKey): string =>
+  MUSCLE_BY_KEY[key]?.label ?? key;
+const colorOf = (key: MuscleGroupKey): string =>
+  MUSCLE_BY_KEY[key]?.color ?? premiumColors.redBright;
+const tintOf = (key: MuscleGroupKey): string =>
+  hexToRgba(MUSCLE_BY_KEY[key]?.color ?? '#B11226', 0.1);
+const glowOf = (key: MuscleGroupKey): string =>
+  hexToRgba(MUSCLE_BY_KEY[key]?.color ?? '#B11226', 0.32);
+const slugOf = (key: MuscleGroupKey): Slug =>
+  (MUSCLE_BY_KEY[key]?.slug ?? 'chest') as Slug;
 
 // ─── Machine image lookup ────────────────────────────────────────────────────
 const MACHINE_IMAGES: Record<string, string> = {
@@ -160,6 +132,7 @@ const MACHINE_IMAGES: Record<string, string> = {
 
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&q=80';
+const VIEW_TOGGLE_BUTTON_W = 92;
 
 function getMachineImage(name: string, imageUri?: string): string {
   if (imageUri) return imageUri;
@@ -169,7 +142,7 @@ function getMachineImage(name: string, imageUri?: string): string {
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function MachineGuideScreen() {
   const [guides, setGuides]               = useState<MachineGuide[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState<MuscleGroupKey>('Chest');
+  const [selectedGroup, setSelectedGroup] = useState<MuscleGroupKey>('Upper Chest');
   const [selectedGuide, setSelectedGuide] = useState<MachineGuide | undefined>();
   const [bodySide, setBodySide]           = useState<'front' | 'back'>('front');
   const [isLoading, setIsLoading]         = useState(true);
@@ -177,12 +150,93 @@ export default function MachineGuideScreen() {
   const scrollRef        = useRef<ScrollView>(null);
   const machinesSectionY = useRef(0);
 
+  // Front/back body pager. It glides only from the segmented buttons; the
+  // mannequin itself stays tap-only for muscle selection.
+  const { width: windowW } = useWindowDimensions();
+  const bodyPageW          = windowW - 44; // section has 22px horizontal padding each side
+  const sideIndex          = bodySide === 'front' ? 0 : 1;
+
+  const translateX    = useRef(new Animated.Value(0)).current;
+  const togglePillX   = useRef(new Animated.Value(0)).current;
+  const committedX    = useRef(0); // current settled offset (0 or -bodyPageW)
+  const bodySideRef   = useRef(bodySide);
+  bodySideRef.current = bodySide;
+  const sideIndexRef  = useRef(sideIndex);
+  sideIndexRef.current = sideIndex;
+  const toggleDragStartX = useRef(0);
+
+  const animateToIndex = (index: number) => {
+    const to = -index * bodyPageW;
+    committedX.current = to;
+    Animated.spring(translateX, {
+      toValue: to,
+      useNativeDriver: true,
+      speed: 16,
+      bounciness: 4,
+    }).start();
+  };
+
+  // Keep the pager aligned with the active side when it changes via tap/toggle
+  useEffect(() => {
+    animateToIndex(sideIndex);
+    Animated.spring(togglePillX, {
+      toValue: sideIndex * VIEW_TOGGLE_BUTTON_W,
+      useNativeDriver: false,
+      speed: 18,
+      bounciness: 5,
+    }).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sideIndex, bodyPageW]);
+
+  const togglePanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_event, gesture) =>
+        Math.abs(gesture.dx) > 6 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+      onPanResponderGrant: () => {
+        toggleDragStartX.current = sideIndexRef.current * VIEW_TOGGLE_BUTTON_W;
+      },
+      onPanResponderMove: (_event, gesture) => {
+        const next = Math.max(
+          0,
+          Math.min(VIEW_TOGGLE_BUTTON_W, toggleDragStartX.current + gesture.dx),
+        );
+        togglePillX.setValue(next);
+      },
+      onPanResponderRelease: (_event, gesture) => {
+        const next = toggleDragStartX.current + gesture.dx;
+        const targetIndex = next > VIEW_TOGGLE_BUTTON_W / 2 ? 1 : 0;
+        const nextSide = targetIndex === 0 ? 'front' : 'back';
+
+        if (nextSide !== bodySideRef.current) {
+          setBodySide(nextSide);
+          Haptics.selectionAsync();
+          return;
+        }
+
+        Animated.spring(togglePillX, {
+          toValue: sideIndexRef.current * VIEW_TOGGLE_BUTTON_W,
+          useNativeDriver: false,
+          speed: 18,
+          bounciness: 5,
+        }).start();
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(togglePillX, {
+          toValue: sideIndexRef.current * VIEW_TOGGLE_BUTTON_W,
+          useNativeDriver: false,
+          speed: 18,
+          bounciness: 5,
+        }).start();
+      },
+    }),
+  ).current;
+
   // ── Data loading ──────────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       const nextGuides = await machineGuideService.getMachineGuides();
       const first =
-        muscleOrder.find((g) => nextGuides.some((m) => m.muscleGroup === g)) ?? 'Chest';
+        muscleOrder.find((g) => nextGuides.some((m) => m.muscleGroup === g)) ?? muscleOrder[0];
       setGuides(nextGuides);
       setSelectedGroup(first);
       setIsLoading(false);
@@ -200,54 +254,44 @@ export default function MachineGuideScreen() {
     [guides, selectedGroup],
   );
 
-  // Build the highlighter data: selected muscle = bright neon, the rest faded.
-  // Every muscle is its own group, so only the tapped one lights up.
+  // Build the highlighter data: the selected muscle's region = bright neon, every
+  // other trained region = faded. Slugs are de-duped so heads that share a region
+  // (e.g. the three triceps heads) never fight over the same silhouette.
   const bodyData = useMemo((): ExtendedBodyPart[] => {
-    const parts: ExtendedBodyPart[] = [];
-    for (const group of availableGroups) {
-      const color = group === selectedGroup
-        ? MUSCLE_COLORS[group]
-        : 'rgba(255,255,255,0.10)';
-      for (const slug of GROUP_TO_SLUGS[group] ?? []) {
-        parts.push({ slug, color });
-      }
-    }
-    return parts;
+    const selectedSlug = slugOf(selectedGroup);
+    const slugs = new Set(availableGroups.map(slugOf));
+    return [...slugs].map((slug) => ({
+      slug,
+      color: slug === selectedSlug
+        ? colorOf(selectedGroup)
+        : 'rgba(255,255,255,0.10)',
+    }));
   }, [availableGroups, selectedGroup]);
 
   // Auto-switch to the side where a muscle is actually visible
   const showMuscleSide = (group: MuscleGroupKey) => {
-    const frontSlugs = GROUP_SLUGS_BY_SIDE[group].front;
-    const backSlugs  = GROUP_SLUGS_BY_SIDE[group].back;
-    if (frontSlugs.length === 0 && backSlugs.length > 0) setBodySide('back');
-    if (backSlugs.length === 0 && frontSlugs.length > 0) setBodySide('front');
+    const side = MUSCLE_BY_KEY[group]?.side;
+    if (side === 'front' || side === 'back') setBodySide(side);
   };
 
-  // Tap a muscle on the body
+  // Tap a region on the body → select the first trained head in that region
   const handleBodyPartPress = (part: ExtendedBodyPart) => {
     if (!part.slug) return;
-    const group = SLUG_TO_GROUP[part.slug];
-    if (!group || !availableGroups.includes(group)) return;
+    const group = availableGroups.find((g) => slugOf(g) === part.slug);
+    if (!group) return;
     setSelectedGroup(group);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     showMuscleSide(group);
   };
 
-  // Tap a muscle chip
-  const handleChipPress = (group: MuscleGroupKey) => {
-    setSelectedGroup(group);
-    Haptics.selectionAsync();
-    showMuscleSide(group);
-  };
-
-  const activeColor = MUSCLE_COLORS[selectedGroup] ?? premiumColors.redBright;
-  const activeTint  = MUSCLE_TINTS[selectedGroup]  ?? 'rgba(177,18,38,0.10)';
+  const activeColor = colorOf(selectedGroup);
+  const activeTint  = tintOf(selectedGroup);
 
   const selectedMuscleColor = selectedGuide
-    ? (MUSCLE_COLORS[selectedGuide.muscleGroup] ?? premiumColors.redBright)
+    ? colorOf(selectedGuide.muscleGroup)
     : premiumColors.redBright;
   const selectedMuscleTint = selectedGuide
-    ? (MUSCLE_TINTS[selectedGuide.muscleGroup] ?? 'rgba(177,18,38,0.10)')
+    ? tintOf(selectedGuide.muscleGroup)
     : 'rgba(177,18,38,0.10)';
 
   if (isLoading) {
@@ -285,7 +329,21 @@ export default function MachineGuideScreen() {
         <View style={styles.bodyMapSection}>
 
           {/* Front / Back toggle */}
-          <View style={styles.viewToggle}>
+          <View style={styles.viewToggle} {...togglePanResponder.panHandlers}>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.viewToggleGlide,
+                { transform: [{ translateX: togglePillX }] },
+              ]}>
+              <LinearGradient
+                colors={['#FF2638', '#B11226', '#2A0308']}
+                locations={[0, 0.58, 1]}
+                start={{ x: 0.08, y: 0 }}
+                end={{ x: 0.92, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+            </Animated.View>
             {(['front', 'back'] as const).map((side) => {
               const isActive = bodySide === side;
               return (
@@ -294,7 +352,7 @@ export default function MachineGuideScreen() {
                   onPress={() => { setBodySide(side); Haptics.selectionAsync(); }}
                   style={({ pressed }) => [
                     styles.viewToggleBtn,
-                    isActive && styles.viewToggleBtnActive,
+                    side === 'front' ? styles.viewToggleBtnLeft : styles.viewToggleBtnRight,
                     pressed && { opacity: 0.75 },
                   ]}>
                   <Text style={[styles.viewToggleText, isActive && styles.viewToggleTextActive]}>
@@ -305,28 +363,44 @@ export default function MachineGuideScreen() {
             })}
           </View>
 
-          {/* Anatomical SVG body — each muscle is individually selectable */}
-          <Body
-            data={bodyData}
-            side={bodySide}
-            gender="male"
-            scale={1.7}
-            border="none"
-            defaultFill="rgba(255,255,255,0.06)"
-            defaultStroke="rgba(255,255,255,0.12)"
-            defaultStrokeWidth={0.8}
-            onBodyPartPress={handleBodyPartPress}
-          />
-
-          {/* Selected muscle info pill */}
-          <View style={[styles.bodySelectedPill, {
-            backgroundColor: activeTint,
-            borderColor: activeColor,
-          }]}>
-            <View style={[styles.bodySelectedDot, { backgroundColor: activeColor }]} />
-            <Text style={[styles.bodySelectedText, { color: activeColor }]}>
-              {selectedGroup} · {selectedGuides.length} machine{selectedGuides.length === 1 ? '' : 's'}
+          {/* Selected muscle — clean label, top-left under the toggle */}
+          <View style={styles.selectedMuscleHeader}>
+            <View style={styles.selectedMuscleRow}>
+              <View style={[styles.selectedMuscleDot, { backgroundColor: activeColor }]} />
+              <Text style={[styles.selectedMuscleName, { color: activeColor }]}>
+                {labelOf(selectedGroup)}
+              </Text>
+            </View>
+            <Text style={styles.selectedMuscleMeta}>
+              {selectedGuides.length} machine{selectedGuides.length === 1 ? '' : 's'}
             </Text>
+          </View>
+
+          {/* Anatomical body — button-controlled front ⇄ back glide */}
+          <View
+            style={{ width: bodyPageW, alignSelf: 'center', overflow: 'hidden' }}>
+            <Animated.View
+              style={{
+                flexDirection: 'row',
+                width: bodyPageW * 2,
+                transform: [{ translateX }],
+              }}>
+              {(['front', 'back'] as const).map((side) => (
+                <View key={side} style={[styles.bodyPage, { width: bodyPageW }]}>
+                  <Body
+                    data={bodyData}
+                    side={side}
+                    gender="male"
+                    scale={1.7}
+                    border="none"
+                    defaultFill="rgba(255,255,255,0.06)"
+                    defaultStroke="rgba(255,255,255,0.12)"
+                    defaultStrokeWidth={0.8}
+                    onBodyPartPress={handleBodyPartPress}
+                  />
+                </View>
+              ))}
+            </Animated.View>
           </View>
 
           {/* Legend */}
@@ -353,58 +427,6 @@ export default function MachineGuideScreen() {
           </Pressable>
         </View>
 
-        {/* ── Muscle Chips ─────────────────────────────────────────────── */}
-        <View style={styles.chipSectionLabel}>
-          <Text style={styles.chipSectionTitle}>Or browse by muscle</Text>
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipsRow}
-          style={styles.chipsScroller}>
-          {availableGroups.map((group) => {
-            const isSelected = selectedGroup === group;
-            const color = MUSCLE_COLORS[group];
-            const tint  = MUSCLE_TINTS[group];
-            const glow  = MUSCLE_GLOW[group];
-            const count = guides.filter((m) => m.muscleGroup === group).length;
-            return (
-              <Pressable
-                key={group}
-                onPress={() => handleChipPress(group)}
-                style={({ pressed }) => [
-                  styles.chip,
-                  isSelected && {
-                    backgroundColor: tint,
-                    borderColor: color,
-                    shadowColor: glow,
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 1,
-                    shadowRadius: 14,
-                    elevation: 8,
-                  },
-                  !isSelected && styles.chipInactive,
-                  pressed && { opacity: 0.72 },
-                ]}>
-                <Text style={[
-                  styles.chipLabel,
-                  { color: isSelected ? color : premiumColors.textMuted },
-                  isSelected && { fontWeight: '900' },
-                ]}>
-                  {group}
-                </Text>
-                <Text style={[
-                  styles.chipCount,
-                  { color: isSelected ? color : premiumColors.textFaint },
-                ]}>
-                  {count}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-
         {/* ── Machines Section Header ──────────────────────────────────── */}
         <View
           style={styles.machinesSectionHeader}
@@ -412,7 +434,7 @@ export default function MachineGuideScreen() {
           <View style={[styles.accentBar, { backgroundColor: activeColor }]} />
           <View style={styles.machinesSectionText}>
             <Text style={[styles.machinesSectionEyebrow, { color: activeColor }]}>
-              {selectedGroup.toUpperCase()}
+              {labelOf(selectedGroup).toUpperCase()}
             </Text>
             <Text style={styles.machinesSectionTitle}>Machines</Text>
           </View>
@@ -427,9 +449,9 @@ export default function MachineGuideScreen() {
         <View style={styles.machineGrid}>
           {selectedGuides.map((guide) => {
             const imageUri = getMachineImage(guide.name, guide.imageUri);
-            const color = MUSCLE_COLORS[guide.muscleGroup] ?? premiumColors.redBright;
-            const tint  = MUSCLE_TINTS[guide.muscleGroup]  ?? 'rgba(177,18,38,0.10)';
-            const glow  = MUSCLE_GLOW[guide.muscleGroup]   ?? 'rgba(177,18,38,0.28)';
+            const color = colorOf(guide.muscleGroup);
+            const tint  = tintOf(guide.muscleGroup);
+            const glow  = glowOf(guide.muscleGroup);
             return (
               <Pressable
                 key={guide.id}
@@ -459,7 +481,7 @@ export default function MachineGuideScreen() {
                   />
                   <View style={[styles.muscleTag, { backgroundColor: tint, borderColor: color }]}>
                     <Text style={[styles.muscleTagText, { color }]}>
-                      {guide.muscleGroup}
+                      {labelOf(guide.muscleGroup)}
                     </Text>
                   </View>
                 </View>
@@ -518,7 +540,7 @@ export default function MachineGuideScreen() {
                       borderColor: selectedMuscleColor,
                     }]}>
                       <Text style={[styles.modalGroupPillText, { color: selectedMuscleColor }]}>
-                        {selectedGuide.muscleGroup}
+                        {labelOf(selectedGuide.muscleGroup)}
                       </Text>
                     </View>
                     <Text style={styles.modalMachineName}>{selectedGuide.name}</Text>
@@ -583,19 +605,22 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   content: {
-    paddingTop: 60,
+    paddingTop: 86,
     paddingBottom: 130,
   },
   pageHeader: {
+    alignItems: 'center',
     paddingHorizontal: 22,
     marginBottom: 28,
   },
   pageEyebrow: {
+    alignSelf: 'center',
     color: premiumColors.redBright,
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 3,
     marginBottom: 6,
+    textAlign: 'center',
   },
   pageTitle: {
     color: premiumColors.text,
@@ -604,6 +629,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     lineHeight: 48,
     letterSpacing: -1,
+    textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.4)',
     textShadowOffset: { width: 0, height: 3 },
     textShadowRadius: 8,
@@ -615,6 +641,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginTop: 10,
     maxWidth: 300,
+    textAlign: 'center',
   },
   headerDivider: {
     height: 1,
@@ -630,21 +657,83 @@ const styles = StyleSheet.create({
   },
   viewToggle: {
     flexDirection: 'row',
-    gap: 4,
-    padding: 4,
+    gap: 0,
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    backgroundColor: premiumColors.surfaceSoft,
     marginBottom: 16,
+    overflow: 'visible',
+  },
+  viewToggleGlide: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: VIEW_TOGGLE_BUTTON_W,
+    overflow: 'hidden',
+    borderRadius: 999,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.32,
+    shadowRadius: 14,
+    elevation: 6,
   },
   viewToggleBtn: {
-    paddingHorizontal: 26,
+    position: 'relative',
+    overflow: 'hidden',
+    width: VIEW_TOGGLE_BUTTON_W,
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 9,
-    borderRadius: 999,
+    zIndex: 2,
   },
-  viewToggleBtnActive: {
-    backgroundColor: premiumColors.redBright,
+  // Inner edge (towards the centre) is a straight line; the outer edge stays round
+  viewToggleBtnLeft: {
+    borderTopLeftRadius: 999,
+    borderBottomLeftRadius: 999,
+    borderTopRightRadius: 2,
+    borderBottomRightRadius: 2,
+  },
+  viewToggleBtnRight: {
+    borderTopRightRadius: 999,
+    borderBottomRightRadius: 999,
+    borderTopLeftRadius: 2,
+    borderBottomLeftRadius: 2,
+  },
+  selectedMuscleHeader: {
+    alignSelf: 'stretch',
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  selectedMuscleEyebrow: {
+    color: premiumColors.textFaint,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginBottom: 6,
+  },
+  selectedMuscleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  selectedMuscleDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+  },
+  selectedMuscleName: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+  },
+  selectedMuscleMeta: {
+    color: premiumColors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  bodyPage: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   viewToggleText: {
     color: premiumColors.textMuted,
@@ -713,7 +802,7 @@ const styles = StyleSheet.create({
   // ── Chips
   chipSectionLabel: {
     paddingHorizontal: 22,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   chipSectionTitle: {
     color: premiumColors.textFaint,
@@ -722,14 +811,26 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
-  chipsScroller: {
-    marginBottom: 28,
-  },
-  chipsRow: {
+  chipGroupsContainer: {
     paddingHorizontal: 20,
-    gap: 10,
+    marginBottom: 28,
+    gap: 18,
+  },
+  chipGroup: {
+    gap: 8,
+  },
+  chipGroupHeader: {
+    color: premiumColors.textFaint,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  chipGroupRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   chip: {
     flexDirection: 'row',
