@@ -22,6 +22,7 @@ import {
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import { premiumColors, premiumGlow, premiumShadow } from '@/constants/premiumTheme';
 import { classService, voucherService } from '@/services';
+import { useAppTheme } from '@/theme/useAppTheme';
 import type { ClassCategory, GymClass, Voucher } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -339,7 +340,11 @@ function HeartButton({
           tintColor={classHeartPurple}
           weight={isFav ? 'semibold' : 'bold'}
           fallback={
-            <Text style={[hStyles.glyph, { fontSize: isFav ? iconSize : iconSize + 2 }]}>
+            <Text
+              style={[
+                hStyles.glyph,
+                { fontSize: isFav ? iconSize : iconSize + 2 },
+              ]}>
               {isFav ? '♥' : '♡'}
             </Text>
           }
@@ -353,13 +358,13 @@ const hStyles = StyleSheet.create({
   btn: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.13)',
+    backgroundColor: 'rgba(148, 163, 184, 0.18)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.20)',
+    borderColor: 'rgba(148, 163, 184, 0.30)',
   },
   btnLiked: {
-    backgroundColor: classHeartPurpleBg,
-    borderColor: classHeartPurpleBorder,
+    backgroundColor: 'rgba(148, 163, 184, 0.26)',
+    borderColor: 'rgba(148, 163, 184, 0.42)',
     shadowColor: classHeartPurple,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.65,
@@ -439,6 +444,16 @@ function WeekPageStrip({
 }
 
 export default function ClassesScreen() {
+  const theme = useAppTheme();
+  const isLight = theme.scheme === 'light';
+  const surfaceTextStyle = isLight ? { color: theme.colors.text } : undefined;
+  const mutedTextStyle = isLight ? { color: theme.colors.textMuted } : undefined;
+  const themedSurfaceStyle = isLight
+    ? {
+        backgroundColor: theme.colors.surface,
+        borderColor: theme.colors.border,
+      }
+    : undefined;
   const [classes, setClasses] = useState<GymClass[]>([]);
   const [classVouchers, setClassVouchers] = useState<Voucher[]>([]);
   const [selectedIso, setSelectedIso] = useState(() => {
@@ -462,6 +477,7 @@ export default function ClassesScreen() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [ptBookPending, setPtBookPending] = useState<string | undefined>(undefined);
+  const [previewInstructor, setPreviewInstructor] = useState<GymClass | undefined>(undefined);
   const [ptSearchOpen, setPtSearchOpen] = useState(false);
   const [ptSearch, setPtSearch] = useState('');
   const [ptShowFavoritesOnly, setPtShowFavoritesOnly] = useState(false);
@@ -641,10 +657,10 @@ export default function ClassesScreen() {
   if (isLoading) {
     return (
       <PremiumScreenBackground>
-        <StatusBar style="light" />
+        <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
         <View style={styles.loadingState}>
           <ActivityIndicator color={accentColor} />
-          <Text style={styles.loadingText}>Loading classes...</Text>
+          <Text style={[styles.loadingText, mutedTextStyle]}>Loading classes...</Text>
         </View>
       </PremiumScreenBackground>
     );
@@ -663,7 +679,7 @@ export default function ClassesScreen() {
 
   return (
     <PremiumScreenBackground>
-      <StatusBar style="light" />
+      <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
@@ -671,8 +687,8 @@ export default function ClassesScreen() {
         {/* ── HEADER ───────────────────────────────────────────── */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerTitle}>CLASSES</Text>
-            <Text style={styles.headerTagline}>
+            <Text style={[styles.headerTitle, surfaceTextStyle]}>CLASSES</Text>
+            <Text style={[styles.headerTagline, mutedTextStyle]}>
               Challenge yourself. Become{' '}
               <Text style={styles.headerAccent}>legendary.</Text>
             </Text>
@@ -681,7 +697,7 @@ export default function ClassesScreen() {
 
         {/* ── FEATURED — fixed widget, swipe inside to change ──────── */}
         <View style={styles.featuredOuterLabel}>
-          <Text style={styles.featuredOuterLabelText}>MOST POPULAR</Text>
+          <Text style={[styles.featuredOuterLabelText, surfaceTextStyle]}>MOST POPULAR</Text>
         </View>
 
         <View style={styles.featuredWidget}>
@@ -817,7 +833,7 @@ export default function ClassesScreen() {
           <View style={styles.accentBar} />
           <View style={{ flex: 1 }}>
             <Text style={styles.spaEyebrow}>Marvel the Gym</Text>
-            <Text style={styles.spaHeadingTitle}>Featured</Text>
+            <Text style={[styles.spaHeadingTitle, surfaceTextStyle]}>Featured</Text>
           </View>
           <View style={styles.spaTagPill}>
             <Text style={styles.spaTagText}>WELLNESS & SPA</Text>
@@ -915,7 +931,7 @@ export default function ClassesScreen() {
 
         {/* ── DATES — paging strip with edge arrows ─────────────── */}
         <View style={styles.datesHeader}>
-          <Text style={styles.datesTitle}>Dates</Text>
+          <Text style={[styles.datesTitle, surfaceTextStyle]}>Dates</Text>
         </View>
 
         {/* Container: strip + arrows overlaid at edges */}
@@ -928,6 +944,7 @@ export default function ClassesScreen() {
             }}
             style={({ pressed }) => [
               styles.weekEdgeBtn,
+              isLight && styles.weekEdgeBtnLight,
               styles.weekEdgeBtnLeft,
               !canGoPrev && styles.weekEdgeBtnHidden,
               pressed && { transform: [{ scale: 0.86 }], opacity: 0.7 },
@@ -937,7 +954,7 @@ export default function ClassesScreen() {
             <SymbolView
               name="chevron.left"
               size={13}
-              tintColor="#FFFFFF"
+              tintColor={isLight ? theme.colors.text : '#FFFFFF'}
               fallback={<Text style={styles.weekEdgeGlyph}>‹</Text>}
             />
           </Pressable>
@@ -976,6 +993,7 @@ export default function ClassesScreen() {
             }}
             style={({ pressed }) => [
               styles.weekEdgeBtn,
+              isLight && styles.weekEdgeBtnLight,
               styles.weekEdgeBtnRight,
               !canGoNext && styles.weekEdgeBtnHidden,
               pressed && { transform: [{ scale: 0.86 }], opacity: 0.7 },
@@ -985,7 +1003,7 @@ export default function ClassesScreen() {
             <SymbolView
               name="chevron.right"
               size={13}
-              tintColor="#FFFFFF"
+              tintColor={isLight ? theme.colors.text : '#FFFFFF'}
               fallback={<Text style={styles.weekEdgeGlyph}>›</Text>}
             />
           </Pressable>
@@ -994,10 +1012,10 @@ export default function ClassesScreen() {
         {/* ── SELECTED-DAY HEADER + SEARCH / FAVORITES ────────── */}
         <View style={styles.todayRow}>
           <View style={styles.todayLabelBlock}>
-            <Text style={styles.todayLabel} numberOfLines={1}>
+            <Text style={[styles.todayLabel, surfaceTextStyle]} numberOfLines={1}>
               {relativeDayLabel(selectedOffset).toUpperCase()}
             </Text>
-            <Text style={styles.todayDate} numberOfLines={1}>
+            <Text style={[styles.todayDate, mutedTextStyle]} numberOfLines={1}>
               {fmtFullDate(selectedIso)}
             </Text>
           </View>
@@ -1013,7 +1031,7 @@ export default function ClassesScreen() {
                 <SymbolView
                   name="magnifyingglass"
                   size={15}
-                  tintColor={premiumColors.textFaint}
+                  tintColor={theme.colors.textFaint}
                   fallback={<Text style={styles.searchGlyphSmall}>⌕</Text>}
                 />
                 <TextInput
@@ -1021,8 +1039,8 @@ export default function ClassesScreen() {
                   value={search}
                   onChangeText={setSearch}
                   placeholder="Search"
-                  placeholderTextColor={premiumColors.textFaint}
-                  style={styles.searchExpandedInput}
+                  placeholderTextColor={theme.colors.textFaint}
+                  style={[styles.searchExpandedInput, surfaceTextStyle]}
                   returnKeyType="search"
                   autoCorrect={false}
                   onBlur={() => {
@@ -1038,7 +1056,7 @@ export default function ClassesScreen() {
                   <SymbolView
                     name="xmark"
                     size={13}
-                    tintColor={premiumColors.textMuted}
+                    tintColor={theme.colors.textMuted}
                     fallback={<Text style={styles.searchGlyphSmall}>×</Text>}
                   />
                 </Pressable>
@@ -1050,7 +1068,7 @@ export default function ClassesScreen() {
                 <SymbolView
                   name="magnifyingglass"
                   size={18}
-                  tintColor="#FFFFFF"
+                  tintColor={theme.colors.text}
                   fallback={<Text style={styles.iconGlyph}>⌕</Text>}
                 />
               </Pressable>
@@ -1095,6 +1113,7 @@ export default function ClassesScreen() {
                 <Text
                   style={[
                     styles.chipText,
+                    scheduleFilter !== f.key && mutedTextStyle,
                     scheduleFilter === f.key && styles.chipTextActive,
                   ]}>
                   {f.label}
@@ -1118,11 +1137,11 @@ export default function ClassesScreen() {
         </ScrollView>
 
         {todayClasses.length === 0 ? (
-          <View style={[styles.emptyCard, { marginHorizontal: 20 }]}>
-            <Text style={styles.emptyTitle}>
+          <View style={[styles.emptyCard, themedSurfaceStyle, { marginHorizontal: 20 }]}>
+            <Text style={[styles.emptyTitle, surfaceTextStyle]}>
               {showFavoritesOnly ? 'No favorite classes' : 'No classes'}
             </Text>
-            <Text style={styles.emptyBody}>
+            <Text style={[styles.emptyBody, mutedTextStyle]}>
               {showFavoritesOnly
                 ? 'Tap the heart on a class to add it here.'
                 : 'Try another day, category, or search term.'}
@@ -1155,14 +1174,14 @@ export default function ClassesScreen() {
                       {fmt24(gymClass.endTime)}
                     </Text>
                   </View>
-                  <View style={styles.timelineCard}>
+                  <View style={[styles.timelineCard, themedSurfaceStyle]}>
                     <Image
                       source={{ uri: imgUri }}
                       style={styles.timelineThumb}
                       resizeMode="cover"
                     />
                     <View style={styles.timelineBody}>
-                      <Text style={styles.timelineTitle} numberOfLines={1}>
+                      <Text style={[styles.timelineTitle, surfaceTextStyle]} numberOfLines={1}>
                         {gymClass.title.toUpperCase()}
                       </Text>
                       <Text style={styles.timelineCat}>{gymClass.category}</Text>
@@ -1210,18 +1229,27 @@ export default function ClassesScreen() {
                     </View>
                     {/* Right column: avatar + name + heart (stacked, no overlap) */}
                     <View style={styles.timelineRight}>
-                      {gymClass.instructorImageUrl ? (
-                        <Image
-                          source={{ uri: gymClass.instructorImageUrl }}
-                          style={styles.instructorAvatar}
-                        />
-                      ) : (
-                        <View style={styles.instructorAvatarFallback}>
-                          <Text style={styles.instructorAvatarText}>
-                            {initial(gymClass.instructorName)}
-                          </Text>
-                        </View>
-                      )}
+                      <Pressable
+                        hitSlop={6}
+                        onPressIn={() => {
+                          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+                            () => undefined,
+                          );
+                        }}
+                        onPress={() => setPreviewInstructor(gymClass)}>
+                        {gymClass.instructorImageUrl ? (
+                          <Image
+                            source={{ uri: gymClass.instructorImageUrl }}
+                            style={styles.instructorAvatar}
+                          />
+                        ) : (
+                          <View style={styles.instructorAvatarFallback}>
+                            <Text style={styles.instructorAvatarText}>
+                              {initial(gymClass.instructorName)}
+                            </Text>
+                          </View>
+                        )}
+                      </Pressable>
                       <Text style={styles.instructorName} numberOfLines={1}>
                         {shortName}
                       </Text>
@@ -1245,8 +1273,8 @@ export default function ClassesScreen() {
           <View style={styles.ptSectionHeading}>
             <View style={styles.accentBar} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.ptHeadingTitle}>Personal Trainers</Text>
               <Text style={styles.ptReserveNow}>Reserve Now</Text>
+              <Text style={[styles.ptHeadingTitle, surfaceTextStyle]}>Personal Trainers</Text>
             </View>
             <View style={styles.sectionIcons}>
               <HeartButton
@@ -1365,7 +1393,7 @@ export default function ClassesScreen() {
           <View style={styles.accentBar} />
           <View>
             <Text style={styles.boxesEyebrow}>My activity</Text>
-            <Text style={styles.boxesTitle}>Bookings &amp; Vouchers</Text>
+            <Text style={[styles.boxesTitle, surfaceTextStyle]}>Bookings &amp; Vouchers</Text>
           </View>
         </View>
         <View style={styles.boxesRow}>
@@ -1375,6 +1403,7 @@ export default function ClassesScreen() {
             }
             style={[
               styles.actBox,
+              themedSurfaceStyle,
               expandedBox === 'bookings' && styles.actBoxActive,
             ]}>
             <Image source={BOOKINGS_SIGN} style={styles.boxWatermark} resizeMode="contain" />
@@ -1384,9 +1413,9 @@ export default function ClassesScreen() {
               tintColor={premiumColors.redBright}
               fallback={<Text style={styles.boxGlyph}>≡</Text>}
             />
-            <Text style={styles.actBoxCount}>{historyVouchers.length}</Text>
-            <Text style={styles.actBoxLabel}>Bookings</Text>
-            <Text style={styles.actBoxSub}>History</Text>
+            <Text style={[styles.actBoxCount, surfaceTextStyle]}>{historyVouchers.length}</Text>
+            <Text style={[styles.actBoxLabel, surfaceTextStyle]}>Bookings</Text>
+            <Text style={[styles.actBoxSub, mutedTextStyle]}>History</Text>
           </Pressable>
 
           <Pressable
@@ -1395,6 +1424,7 @@ export default function ClassesScreen() {
             }
             style={[
               styles.actBox,
+              themedSurfaceStyle,
               expandedBox === 'vouchers' && styles.actBoxActive,
             ]}>
             <Image source={VOUCHERS_SIGN} style={styles.boxWatermark} resizeMode="contain" />
@@ -1404,31 +1434,31 @@ export default function ClassesScreen() {
               tintColor={premiumColors.redBright}
               fallback={<Text style={styles.boxGlyph}>▤</Text>}
             />
-            <Text style={styles.actBoxCount}>{pendingVouchers.length}</Text>
-            <Text style={styles.actBoxLabel}>Vouchers</Text>
-            <Text style={styles.actBoxSub}>Pending approval</Text>
+            <Text style={[styles.actBoxCount, surfaceTextStyle]}>{pendingVouchers.length}</Text>
+            <Text style={[styles.actBoxLabel, surfaceTextStyle]}>Vouchers</Text>
+            <Text style={[styles.actBoxSub, mutedTextStyle]}>Pending approval</Text>
           </Pressable>
         </View>
 
         {expandedBox === 'vouchers' ? (
-          <View style={styles.expandedPanel}>
-            <Text style={styles.expandedTitle}>Pending Vouchers</Text>
-            <Text style={styles.expandedSub}>
+          <View style={[styles.expandedPanel, themedSurfaceStyle]}>
+            <Text style={[styles.expandedTitle, surfaceTextStyle]}>Pending Vouchers</Text>
+            <Text style={[styles.expandedSub, mutedTextStyle]}>
               Awaiting admin approval. You can cancel before confirmation.
             </Text>
             {pendingVouchers.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>No pending vouchers</Text>
-                <Text style={styles.emptyBody}>Book a class to generate a pending voucher.</Text>
+              <View style={[styles.emptyCard, themedSurfaceStyle]}>
+                <Text style={[styles.emptyTitle, surfaceTextStyle]}>No pending vouchers</Text>
+                <Text style={[styles.emptyBody, mutedTextStyle]}>Book a class to generate a pending voucher.</Text>
               </View>
             ) : (
               <View style={styles.voucherList}>
                 {pendingVouchers.map((v) => (
-                  <View key={v.id} style={styles.voucherRow}>
+                  <View key={v.id} style={[styles.voucherRow, isLight && styles.voucherRowLight]}>
                     <View style={[styles.voucherRail, { backgroundColor: premiumColors.warning }]} />
                     <View style={styles.voucherBody}>
-                      <Text style={styles.voucherTitle}>{v.description}</Text>
-                      <Text style={styles.voucherMeta}>{fmtVoucherDate(v.date)} · Pending</Text>
+                      <Text style={[styles.voucherTitle, surfaceTextStyle]}>{v.description}</Text>
+                      <Text style={[styles.voucherMeta, mutedTextStyle]}>{fmtVoucherDate(v.date)} · Pending</Text>
                     </View>
                     <Pressable
                       onPress={() => handleCancelVoucher(v.id)}
@@ -1443,9 +1473,9 @@ export default function ClassesScreen() {
         ) : null}
 
         {expandedBox === 'bookings' ? (
-          <View style={styles.expandedPanel}>
-            <Text style={styles.expandedTitle}>Booking History</Text>
-            <Text style={styles.expandedSub}>Confirmed and canceled class reservations.</Text>
+          <View style={[styles.expandedPanel, themedSurfaceStyle]}>
+            <Text style={[styles.expandedTitle, surfaceTextStyle]}>Booking History</Text>
+            <Text style={[styles.expandedSub, mutedTextStyle]}>Confirmed and canceled class reservations.</Text>
             <View style={styles.tabsRow}>
               {(['Confirmed', 'Canceled'] as const).map((tab) => (
                 <Pressable
@@ -1459,9 +1489,9 @@ export default function ClassesScreen() {
               ))}
             </View>
             {ordersFiltered.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>No {ordersTab.toLowerCase()} bookings</Text>
-                <Text style={styles.emptyBody}>
+              <View style={[styles.emptyCard, themedSurfaceStyle]}>
+                <Text style={[styles.emptyTitle, surfaceTextStyle]}>No {ordersTab.toLowerCase()} bookings</Text>
+                <Text style={[styles.emptyBody, mutedTextStyle]}>
                   {ordersTab === 'Confirmed'
                     ? 'Approved bookings will appear here.'
                     : 'Canceled bookings will appear here.'}
@@ -1470,11 +1500,11 @@ export default function ClassesScreen() {
             ) : (
               <View style={styles.voucherList}>
                 {ordersFiltered.map((v) => (
-                  <View key={v.id} style={styles.voucherRow}>
+                  <View key={v.id} style={[styles.voucherRow, isLight && styles.voucherRowLight]}>
                     <View style={[styles.voucherRail, { backgroundColor: statusColor(v.status) }]} />
                     <View style={styles.voucherBody}>
-                      <Text style={styles.voucherTitle}>{v.description}</Text>
-                      <Text style={styles.voucherMeta}>{fmtVoucherDate(v.date)}</Text>
+                      <Text style={[styles.voucherTitle, surfaceTextStyle]}>{v.description}</Text>
+                      <Text style={[styles.voucherMeta, mutedTextStyle]}>{fmtVoucherDate(v.date)}</Text>
                     </View>
                     <View style={[styles.statusChip, { borderColor: statusColor(v.status) }]}>
                       <Text style={[styles.statusChipText, { color: statusColor(v.status) }]}>
@@ -1493,14 +1523,14 @@ export default function ClassesScreen() {
       <Modal transparent visible={Boolean(ptBookPending)} animationType="fade">
         <View style={styles.modalOverlay}>
           <Pressable style={styles.modalBackdrop} onPress={() => setPtBookPending(undefined)} />
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, themedSurfaceStyle]}>
             {ptBookPending ? (
               <>
                 <Text style={styles.modalKicker}>Personal Training</Text>
-                <Text style={styles.modalTitle}>
+                <Text style={[styles.modalTitle, surfaceTextStyle]}>
                   {PT_TRAINERS.find((t) => t.id === ptBookPending)?.name}
                 </Text>
-                <Text style={styles.modalMeta}>
+                <Text style={[styles.modalMeta, mutedTextStyle]}>
                   {PT_TRAINERS.find((t) => t.id === ptBookPending)?.specialty}
                 </Text>
                 <Text style={styles.modalNote}>
@@ -1524,18 +1554,47 @@ export default function ClassesScreen() {
         </View>
       </Modal>
 
+      {/* ── INSTRUCTOR PHOTO PREVIEW ──────────────────────────────── */}
+      <Modal transparent visible={Boolean(previewInstructor)} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setPreviewInstructor(undefined)}
+          />
+          {previewInstructor ? (
+            <View style={styles.instructorPreviewCard}>
+              {previewInstructor.instructorImageUrl ? (
+                <Image
+                  source={{ uri: previewInstructor.instructorImageUrl }}
+                  style={styles.instructorPreviewImage}
+                />
+              ) : (
+                <View style={styles.instructorPreviewFallback}>
+                  <Text style={styles.instructorPreviewFallbackText}>
+                    {initial(previewInstructor.instructorName)}
+                  </Text>
+                </View>
+              )}
+              <Text style={[styles.instructorPreviewName, surfaceTextStyle]}>
+                {previewInstructor.instructorName}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      </Modal>
+
       {/* ── BOOKING MODAL ─────────────────────────────────────────── */}
       <Modal transparent visible={Boolean(pendingAction)} animationType="fade">
         <View style={styles.modalOverlay}>
           <Pressable style={styles.modalBackdrop} onPress={() => setPendingAction(undefined)} />
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, themedSurfaceStyle]}>
             {pendingAction ? (
               <>
                 <Text style={styles.modalKicker}>
                   {pendingAction.action === 'reserve' ? 'Reserve class' : 'Cancel reservation'}
                 </Text>
-                <Text style={styles.modalTitle}>{pendingAction.gymClass.title}</Text>
-                <Text style={styles.modalMeta}>
+                <Text style={[styles.modalTitle, surfaceTextStyle]}>{pendingAction.gymClass.title}</Text>
+                <Text style={[styles.modalMeta, mutedTextStyle]}>
                   Coach {pendingAction.gymClass.instructorName} ·{' '}
                   {fmt24(pendingAction.gymClass.startTime)}
                 </Text>
@@ -1690,6 +1749,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(8,5,5,0.72)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
+  },
+  weekEdgeBtnLight: {
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderColor: 'rgba(10,11,15,0.12)',
   },
   weekEdgeBtnLeft: {},
   weekEdgeBtnRight: {},
@@ -1955,10 +2018,38 @@ const styles = StyleSheet.create({
   },
   instructorAvatarText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
   instructorName: {
-    color: '#FFFFFF',
+    color: '#000000',
     fontSize: 11,
     fontWeight: '800',
     marginTop: 4,
+    textAlign: 'center',
+  },
+  instructorPreviewCard: {
+    alignItems: 'center',
+    gap: 14,
+  },
+  instructorPreviewImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.24)',
+  },
+  instructorPreviewFallback: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.24)',
+  },
+  instructorPreviewFallbackText: { color: '#FFFFFF', fontSize: 56, fontWeight: '900' },
+  instructorPreviewName: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
     textAlign: 'center',
   },
   timelineHeart: {
@@ -2038,10 +2129,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: premiumColors.redBright,
     shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.42,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.55,
+    shadowRadius: 3,
+    elevation: 3,
   },
   chip: {
     flexDirection: 'row',
@@ -2067,14 +2158,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 9,
-    backgroundColor: 'rgba(255,255,255,0.11)',
+    backgroundColor: 'rgba(148, 163, 184, 0.18)',
     paddingHorizontal: 5,
   },
   chipCountBadgeActive: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(148, 163, 184, 0.26)',
   },
   chipCountText: {
-    color: 'rgba(255,255,255,0.62)',
+    color: mutedColor,
     fontSize: 9,
     fontWeight: '900',
     lineHeight: 10,
@@ -2103,13 +2194,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: premiumColors.redBright,
     shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.55,
+    shadowRadius: 3,
+    elevation: 3,
   },
   dayCellShort: { color: mutedColor, fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
-  dayCellNum: { color: '#FFFFFF', fontSize: 15, fontWeight: '900', marginTop: 2 },
+  dayCellNum: { color: mutedColor, fontSize: 15, fontWeight: '900', marginTop: 2 },
   dayCellTextActive: { color: '#FFFFFF' },
   todayDot: {
     width: 4,
@@ -2215,6 +2306,10 @@ const styles = StyleSheet.create({
     borderColor: premiumColors.glassBorder,
     borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  voucherRowLight: {
+    backgroundColor: 'rgba(255,255,255,0.74)',
+    borderColor: 'rgba(10,11,15,0.10)',
   },
   voucherRail: { width: 4, alignSelf: 'stretch' },
   voucherBody: { flex: 1, paddingVertical: 12, paddingHorizontal: 12 },
@@ -2474,9 +2569,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(225,29,46,0.65)',
+    borderColor: premiumColors.redBright,
     borderRadius: 14,
-    backgroundColor: 'rgba(225,29,46,0.15)',
+    backgroundColor: premiumColors.red,
     paddingVertical: 9,
     shadowColor: premiumColors.redBright,
     shadowOffset: { width: 0, height: 0 },
@@ -2525,11 +2620,12 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   ptReserveNow: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-    marginTop: 2,
-    opacity: 0.72,
+    color: premiumColors.redBright,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    marginBottom: 2,
+    textTransform: 'uppercase',
   },
   ptSubText: {
     color: mutedColor,

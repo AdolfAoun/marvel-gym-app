@@ -1,8 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
+import { useMemo } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 
-import { premiumColors, premiumGradients } from '@/constants/premiumTheme';
+import { useAppTheme, type AppTheme } from '@/theme/useAppTheme';
 
 type PremiumScreenBackgroundProps = {
   children: ReactNode;
@@ -43,21 +44,29 @@ export function PremiumScreenBackground({
   bottomInset = true,
   signs = true,
 }: PremiumScreenBackgroundProps) {
+  const theme = useAppTheme();
+  const styles = useStyles(theme);
+  const isDark = theme.scheme === 'dark';
+
   return (
     // Full-bleed: the backdrop fills the whole screen and continues underneath
     // the floating tab bar so every tab feels edge-to-edge.
     <View style={styles.safeArea}>
-      {/* Base charcoal depth */}
+      {/* Base depth gradient */}
       <LinearGradient
         pointerEvents="none"
-        colors={premiumGradients.screen}
+        colors={theme.gradients.screen}
         locations={[0, 0.5, 1]}
         style={StyleSheet.absoluteFill}
       />
-      {/* Soft cool light reflecting from the top-left */}
+      {/* Soft light reflecting from the top-left */}
       <LinearGradient
         pointerEvents="none"
-        colors={['rgba(255, 255, 255, 0.05)', 'transparent']}
+        colors={
+          isDark
+            ? ['rgba(255, 255, 255, 0.05)', 'transparent']
+            : ['rgba(10, 11, 15, 0.04)', 'transparent']
+        }
         start={{ x: 0.1, y: 0 }}
         end={{ x: 0.7, y: 0.42 }}
         style={styles.topLight}
@@ -77,8 +86,8 @@ export function PremiumScreenBackground({
                 right: 'right' in mark ? mark.right : undefined,
                 width: mark.size,
                 height: mark.size,
-                opacity: mark.opacity,
-                tintColor: '#FFFFFF',
+                opacity: isDark ? mark.opacity : Math.min(mark.opacity + 0.025, 0.09),
+                tintColor: isDark ? '#FFFFFF' : '#B11226',
                 transform: [{ rotate: mark.rotate }],
               }}
             />
@@ -88,7 +97,11 @@ export function PremiumScreenBackground({
       {/* Subtle red horizon glow rising from the bottom — accent only */}
       <LinearGradient
         pointerEvents="none"
-        colors={['transparent', 'rgba(177, 18, 38, 0.16)']}
+        colors={
+          isDark
+            ? ['transparent', 'rgba(177, 18, 38, 0.16)']
+            : ['transparent', 'rgba(177, 18, 38, 0.20)']
+        }
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={styles.redHorizon}
@@ -99,34 +112,41 @@ export function PremiumScreenBackground({
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    overflow: 'hidden',
-    backgroundColor: premiumColors.background,
-  },
-  topLight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 420,
-  },
-  signLayer: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
-  },
-  redHorizon: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 360,
-  },
-  vignette: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 1,
-    borderColor: 'rgba(0, 0, 0, 0.28)',
-    borderWidth: 0,
-  },
-});
+function useStyles(theme: AppTheme) {
+  return useMemo(
+    () =>
+      StyleSheet.create({
+        safeArea: {
+          flex: 1,
+          overflow: 'hidden',
+          backgroundColor: theme.colors.background,
+        },
+        topLight: {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 420,
+        },
+        signLayer: {
+          ...StyleSheet.absoluteFillObject,
+          overflow: 'hidden',
+        },
+        redHorizon: {
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 360,
+        },
+        vignette: {
+          ...StyleSheet.absoluteFillObject,
+          borderRadius: 1,
+          borderColor:
+            theme.scheme === 'dark' ? 'rgba(0, 0, 0, 0.28)' : 'rgba(0, 0, 0, 0.06)',
+          borderWidth: 0,
+        },
+      }),
+    [theme],
+  );
+}

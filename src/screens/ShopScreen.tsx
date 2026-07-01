@@ -27,6 +27,7 @@ import {
   premiumShadow,
 } from '@/constants/premiumTheme';
 import { productService, voucherService } from '@/services';
+import { useAppTheme } from '@/theme/useAppTheme';
 import type {
   Product,
   ProductCategory,
@@ -40,8 +41,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const accentColor = premiumColors.red;
 const mutedColor = premiumColors.textMuted;
 const shopHeartPurple = '#3B1D7A';
-const shopHeartPurpleBg = 'rgba(46,16,101,0.30)';
-const shopHeartPurpleBorder = 'rgba(76,42,158,0.52)';
 
 // Faint Marvel logo signs used as glow-box watermarks.
 const ORDERS_SIGN = require('@/assets/images/marvel-logo-startup-sign-dot.png');
@@ -228,13 +227,13 @@ const hStyles = StyleSheet.create({
   btn: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.13)',
+    backgroundColor: 'rgba(148, 163, 184, 0.18)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.20)',
+    borderColor: 'rgba(148, 163, 184, 0.30)',
   },
   btnLiked: {
-    backgroundColor: shopHeartPurpleBg,
-    borderColor: shopHeartPurpleBorder,
+    backgroundColor: 'rgba(148, 163, 184, 0.26)',
+    borderColor: 'rgba(148, 163, 184, 0.42)',
     shadowColor: shopHeartPurple,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.65,
@@ -246,6 +245,16 @@ const hStyles = StyleSheet.create({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ShopScreen() {
+  const theme = useAppTheme();
+  const isLight = theme.scheme === 'light';
+  const surfaceTextStyle = isLight ? { color: theme.colors.text } : undefined;
+  const mutedTextStyle = isLight ? { color: theme.colors.textMuted } : undefined;
+  const themedSurfaceStyle = isLight
+    ? {
+        backgroundColor: theme.colors.surface,
+        borderColor: theme.colors.border,
+      }
+    : undefined;
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] =
     useState<ShopCategory>('Supplements');
@@ -420,10 +429,10 @@ export default function ShopScreen() {
   if (isLoading) {
     return (
       <PremiumScreenBackground>
-        <StatusBar style="light" />
+        <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
         <View style={styles.loadingState}>
           <ActivityIndicator color={accentColor} />
-          <Text style={styles.loadingText}>Loading marketplace...</Text>
+          <Text style={[styles.loadingText, mutedTextStyle]}>Loading marketplace...</Text>
         </View>
       </PremiumScreenBackground>
     );
@@ -431,15 +440,15 @@ export default function ShopScreen() {
 
   return (
     <PremiumScreenBackground>
-      <StatusBar style="light" />
+      <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         {/* Header — matches Classes (big italic title + tagline) */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerTitle}>SHOP</Text>
-            <Text style={styles.headerTagline}>
+            <Text style={[styles.headerTitle, surfaceTextStyle]}>SHOP</Text>
+            <Text style={[styles.headerTagline, mutedTextStyle]}>
               Fuel your grind. Stay{' '}
               <Text style={styles.headerAccent}>unstoppable.</Text>
             </Text>
@@ -554,7 +563,7 @@ export default function ShopScreen() {
           <View style={styles.accentBar} />
           <View style={styles.sectionHeadingText}>
             <Text style={styles.sectionEyebrow}>Browse</Text>
-            <Text style={styles.sectionHeadingTitle}>Shop by Category</Text>
+            <Text style={[styles.sectionHeadingTitle, surfaceTextStyle]}>Shop by Category</Text>
           </View>
         </View>
 
@@ -609,7 +618,7 @@ export default function ShopScreen() {
                   <SymbolView
                     name={meta.symbol as never}
                     size={20}
-                    tintColor={isSelected ? '#FFFFFF' : premiumColors.textMuted}
+                  tintColor={isSelected ? '#FFFFFF' : theme.colors.textMuted}
                     fallback={
                       <Text
                         style={[
@@ -627,11 +636,12 @@ export default function ShopScreen() {
                   minimumFontScale={0.8}
                   style={[
                     styles.categoryLabel,
+                    !isSelected && surfaceTextStyle,
                     isSelected && styles.categoryLabelSelected,
                   ]}>
                   {meta.key}
                 </Text>
-                <Text style={styles.categoryCount}>{count} items</Text>
+                <Text style={[styles.categoryCount, mutedTextStyle]}>{count} items</Text>
               </Pressable>
             );
           })}
@@ -643,7 +653,7 @@ export default function ShopScreen() {
           <View style={styles.accentBar} />
           <View style={styles.sectionHeadingText}>
             <Text style={styles.sectionEyebrow}>{selectedCategory}</Text>
-            <Text style={styles.sectionHeadingTitle}>
+            <Text style={[styles.sectionHeadingTitle, surfaceTextStyle]}>
               {showFavoritesOnly ? 'Favorites' : 'Available Products'}
             </Text>
           </View>
@@ -659,7 +669,7 @@ export default function ShopScreen() {
                 <SymbolView
                   name="magnifyingglass"
                   size={14}
-                  tintColor={premiumColors.textFaint}
+                  tintColor={theme.colors.textFaint}
                   fallback={<Text style={styles.searchGlyphSmall}>⌕</Text>}
                 />
                 <TextInput
@@ -667,8 +677,8 @@ export default function ShopScreen() {
                   value={search}
                   onChangeText={setSearch}
                   placeholder="Search"
-                  placeholderTextColor={premiumColors.textFaint}
-                  style={styles.searchExpandedInput}
+                  placeholderTextColor={theme.colors.textFaint}
+                  style={[styles.searchExpandedInput, surfaceTextStyle]}
                   returnKeyType="search"
                   autoCorrect={false}
                   onBlur={() => {
@@ -684,20 +694,23 @@ export default function ShopScreen() {
                   <SymbolView
                     name="xmark"
                     size={12}
-                    tintColor={premiumColors.textMuted}
+                    tintColor={theme.colors.textMuted}
                     fallback={<Text style={styles.searchGlyphSmall}>×</Text>}
                   />
                 </Pressable>
               </View>
             ) : (
               <Pressable
-                onPress={() => setSearchOpen(true)}
+                onPress={() => {
+                  void Haptics.selectionAsync().catch(() => undefined);
+                  setSearchOpen(true);
+                }}
                 style={styles.iconBtnSmall}>
                 <SymbolView
                   name="magnifyingglass"
                   size={17}
-                  tintColor="#FFFFFF"
-                  fallback={<Text style={styles.iconGlyph}>⌕</Text>}
+                  tintColor="#000000"
+                  fallback={<Text style={[styles.iconGlyph, { color: '#000000' }]}>⌕</Text>}
                 />
               </Pressable>
             )}
@@ -705,11 +718,11 @@ export default function ShopScreen() {
         </View>
 
         {visibleProducts.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>
+          <View style={[styles.emptyCard, themedSurfaceStyle]}>
+            <Text style={[styles.emptyTitle, surfaceTextStyle]}>
               {showFavoritesOnly ? 'No favorite products' : 'No products found'}
             </Text>
-            <Text style={styles.emptyBody}>
+            <Text style={[styles.emptyBody, mutedTextStyle]}>
               {showFavoritesOnly
                 ? 'Tap the heart on a product to add it here.'
                 : normalizedSearch
@@ -731,7 +744,7 @@ export default function ShopScreen() {
                     )
                   : undefined;
               return (
-                <View key={product.id} style={styles.productCard}>
+                <View key={product.id} style={[styles.productCard, themedSurfaceStyle]}>
                   <View style={styles.productImageWrap}>
                     {imageUri ? (
                       <Image
@@ -765,10 +778,10 @@ export default function ShopScreen() {
                   </View>
 
                   <View style={styles.productInfo}>
-                    <Text style={styles.productName} numberOfLines={1}>
+                    <Text style={[styles.productName, surfaceTextStyle]} numberOfLines={1}>
                       {product.name}
                     </Text>
-                    <Text style={styles.productDesc} numberOfLines={1}>
+                    <Text style={[styles.productDesc, mutedTextStyle]} numberOfLines={1}>
                       {product.description}
                     </Text>
                     {product.rating ? (
@@ -816,7 +829,7 @@ export default function ShopScreen() {
           <View style={styles.accentBar} />
           <View style={styles.sectionHeadingText}>
             <Text style={styles.sectionEyebrow}>My activity</Text>
-            <Text style={styles.sectionHeadingTitle}>Orders &amp; Vouchers</Text>
+            <Text style={[styles.sectionHeadingTitle, surfaceTextStyle]}>Orders &amp; Vouchers</Text>
           </View>
         </View>
         <View style={styles.actBoxRow}>
@@ -827,6 +840,7 @@ export default function ShopScreen() {
             }
             style={[
               styles.actBox,
+              themedSurfaceStyle,
               expandedBox === 'orders' && styles.actBoxActive,
             ]}>
             <Image
@@ -840,9 +854,9 @@ export default function ShopScreen() {
               tintColor={premiumColors.redBright}
               fallback={<Text style={styles.actBoxGlyph}>≡</Text>}
             />
-            <Text style={styles.actBoxCount}>{historyVouchers.length}</Text>
-            <Text style={styles.actBoxLabel}>Orders</Text>
-            <Text style={styles.actBoxSub}>History</Text>
+            <Text style={[styles.actBoxCount, surfaceTextStyle]}>{historyVouchers.length}</Text>
+            <Text style={[styles.actBoxLabel, surfaceTextStyle]}>Orders</Text>
+            <Text style={[styles.actBoxSub, mutedTextStyle]}>History</Text>
           </Pressable>
 
           {/* VOUCHERS (right): pending, awaiting counter — can be canceled */}
@@ -852,6 +866,7 @@ export default function ShopScreen() {
             }
             style={[
               styles.actBox,
+              themedSurfaceStyle,
               expandedBox === 'vouchers' && styles.actBoxActive,
             ]}>
             <Image
@@ -865,30 +880,30 @@ export default function ShopScreen() {
               tintColor={premiumColors.redBright}
               fallback={<Text style={styles.actBoxGlyph}>▤</Text>}
             />
-            <Text style={styles.actBoxCount}>{pendingVouchers.length}</Text>
-            <Text style={styles.actBoxLabel}>Vouchers</Text>
-            <Text style={styles.actBoxSub}>Pending</Text>
+            <Text style={[styles.actBoxCount, surfaceTextStyle]}>{pendingVouchers.length}</Text>
+            <Text style={[styles.actBoxLabel, surfaceTextStyle]}>Vouchers</Text>
+            <Text style={[styles.actBoxSub, mutedTextStyle]}>Pending</Text>
           </Pressable>
         </View>
 
         {/* Vouchers expanded — pending, can cancel */}
         {expandedBox === 'vouchers' ? (
-          <View style={styles.expandedPanel}>
-            <Text style={styles.expandedTitle}>My Vouchers</Text>
-            <Text style={styles.expandedSub}>
+          <View style={[styles.expandedPanel, themedSurfaceStyle]}>
+            <Text style={[styles.expandedTitle, surfaceTextStyle]}>My Vouchers</Text>
+            <Text style={[styles.expandedSub, mutedTextStyle]}>
               Awaiting counter confirmation. Cancel anytime before pickup.
             </Text>
             {pendingVouchers.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>No pending vouchers</Text>
-                <Text style={styles.emptyBody}>
+              <View style={[styles.emptyCard, themedSurfaceStyle]}>
+                <Text style={[styles.emptyTitle, surfaceTextStyle]}>No pending vouchers</Text>
+                <Text style={[styles.emptyBody, mutedTextStyle]}>
                   Reserve a product to create a cash voucher.
                 </Text>
               </View>
             ) : (
               <View style={styles.voucherList}>
                 {pendingVouchers.map((voucher) => (
-                  <View key={voucher.id} style={styles.voucherRow}>
+                  <View key={voucher.id} style={[styles.voucherRow, themedSurfaceStyle]}>
                     <View
                       style={[
                         styles.voucherRail,
@@ -896,10 +911,10 @@ export default function ShopScreen() {
                       ]}
                     />
                     <View style={styles.voucherRowBody}>
-                      <Text style={styles.voucherRowTitle} numberOfLines={2}>
+                      <Text style={[styles.voucherRowTitle, surfaceTextStyle]} numberOfLines={2}>
                         {voucher.description}
                       </Text>
-                      <Text style={styles.voucherRowMeta}>
+                      <Text style={[styles.voucherRowMeta, mutedTextStyle]}>
                         {formatVoucherDate(voucher.date)} ·{' '}
                         {formatPrice(voucher.amount)}
                       </Text>
@@ -921,9 +936,9 @@ export default function ShopScreen() {
 
         {/* Orders expanded — confirmed + canceled history */}
         {expandedBox === 'orders' ? (
-          <View style={styles.expandedPanel}>
-            <Text style={styles.expandedTitle}>Order History</Text>
-            <Text style={styles.expandedSub}>
+          <View style={[styles.expandedPanel, themedSurfaceStyle]}>
+            <Text style={[styles.expandedTitle, surfaceTextStyle]}>Order History</Text>
+            <Text style={[styles.expandedSub, mutedTextStyle]}>
               Confirmed and canceled shop orders.
             </Text>
             <View style={styles.tabsRow}>
@@ -943,11 +958,11 @@ export default function ShopScreen() {
               ))}
             </View>
             {orderedVouchers.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>
+              <View style={[styles.emptyCard, themedSurfaceStyle]}>
+                <Text style={[styles.emptyTitle, surfaceTextStyle]}>
                   No {orderTab.toLowerCase()} orders
                 </Text>
-                <Text style={styles.emptyBody}>
+                <Text style={[styles.emptyBody, mutedTextStyle]}>
                   {orderTab === 'Confirmed'
                     ? 'Orders confirmed at the counter will appear here.'
                     : 'Cancelled orders will appear here.'}
@@ -956,7 +971,7 @@ export default function ShopScreen() {
             ) : (
               <View style={styles.voucherList}>
                 {orderedVouchers.map((voucher) => (
-                  <View key={voucher.id} style={styles.voucherRow}>
+                  <View key={voucher.id} style={[styles.voucherRow, themedSurfaceStyle]}>
                     <View
                       style={[
                         styles.voucherRail,
@@ -964,10 +979,10 @@ export default function ShopScreen() {
                       ]}
                     />
                     <View style={styles.voucherRowBody}>
-                      <Text style={styles.voucherRowTitle} numberOfLines={2}>
+                      <Text style={[styles.voucherRowTitle, surfaceTextStyle]} numberOfLines={2}>
                         {voucher.description}
                       </Text>
-                      <Text style={styles.voucherRowMeta}>
+                      <Text style={[styles.voucherRowMeta, mutedTextStyle]}>
                         {formatVoucherDate(voucher.date)} ·{' '}
                         {formatPrice(voucher.amount)}
                       </Text>
@@ -1000,12 +1015,12 @@ export default function ShopScreen() {
             style={styles.modalBackdrop}
             onPress={() => setPendingVoucherProduct(undefined)}
           />
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, themedSurfaceStyle]}>
             {pendingVoucherProduct ? (
               <>
                 <Text style={styles.modalKicker}>Place Order</Text>
-                <Text style={styles.modalTitle}>{pendingVoucherProduct.name}</Text>
-                <Text style={styles.modalBody}>
+                <Text style={[styles.modalTitle, surfaceTextStyle]}>{pendingVoucherProduct.name}</Text>
+                <Text style={[styles.modalBody, mutedTextStyle]}>
                   A pending order is created and paid in cash at the counter.
                 </Text>
 
@@ -1113,9 +1128,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: 'rgba(148, 163, 184, 0.30)',
     borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: 'rgba(148, 163, 184, 0.18)',
   },
   iconBtnActive: {
     borderColor: 'rgba(225,29,46,0.55)',
@@ -1346,7 +1361,7 @@ const styles = StyleSheet.create({
     width: 104,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: premiumColors.glassBorder,
+    borderColor: 'rgba(148, 163, 184, 0.35)',
     borderRadius: 18,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     paddingVertical: 13,
@@ -1528,7 +1543,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   price: {
-    color: '#FFFFFF',
+    color: '#000000',
     fontSize: 18,
     fontWeight: '900',
   },
@@ -1545,18 +1560,19 @@ const styles = StyleSheet.create({
     gap: 6,
     minHeight: 40,
     borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.4)',
+    borderColor: premiumColors.redBright,
     borderRadius: 12,
-    backgroundColor: 'rgba(177, 18, 38, 0.1)',
+    backgroundColor: premiumColors.red,
     marginTop: 12,
+    ...premiumGlow,
   },
   voucherButtonGlyph: {
-    color: premiumColors.redBright,
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '900',
   },
   voucherButtonText: {
-    color: premiumColors.redBright,
+    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '900',
   },

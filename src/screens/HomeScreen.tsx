@@ -21,10 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GlowingChips } from '@/components/GlowingChips';
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
-import {
-  premiumColors,
-  premiumShadow,
-} from '@/constants/premiumTheme';
+import { useAppTheme, type AppTheme } from '@/theme/useAppTheme';
 import {
   activityService,
   classService,
@@ -47,12 +44,9 @@ import type {
   Voucher,
 } from '@/types';
 
-const accentColor = premiumColors.red;
-const wineColor = premiumColors.redBright;
-const backgroundColor = premiumColors.background;
-const surfaceColor = premiumColors.surface;
-const textColor = premiumColors.text;
-const mutedColor = premiumColors.textMuted;
+// Brand accents are identical in both themes.
+const accentColor = '#B11226';
+const wineColor = '#E11D2E';
 const weeklyFreezePrice = FREEZE_WEEKLY_PRICE;
 const maxRenewMonths = 12;
 const minRenewMonths = 1;
@@ -222,6 +216,8 @@ function formatVoucherDate(value: string) {
 }
 
 export default function HomeScreen() {
+  const theme = useAppTheme();
+  const styles = useStyles(theme);
   const router = useRouter();
   const { width: windowWidth } = useWindowDimensions();
   // Big swipeable feature cards (Machine Guide / AI Gym Help) snap one-per-view
@@ -598,7 +594,7 @@ export default function HomeScreen() {
   if (isLoading) {
     return (
       <PremiumScreenBackground>
-        <StatusBar style="light" />
+        <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
         <View style={styles.loadingState}>
           <ActivityIndicator color={accentColor} />
           <Text style={styles.loadingText}>Loading member dashboard...</Text>
@@ -640,7 +636,7 @@ export default function HomeScreen() {
   const sheetSymbolFallback = isFreezeSheet ? '❄' : '✦';
   return (
     <PremiumScreenBackground>
-      <StatusBar style="light" />
+      <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
@@ -658,7 +654,7 @@ export default function HomeScreen() {
               'rgba(30,64,175,0.24)',
               'rgba(37,99,235,0.08)',
               'rgba(168,85,247,0.14)',
-              'rgba(255,255,255,0)',
+              theme.ink(0),
             ]}
             locations={[0, 0.32, 0.66, 1]}
             start={{ x: 0.1, y: 0 }}
@@ -681,14 +677,14 @@ export default function HomeScreen() {
           />
           <LinearGradient
             pointerEvents="none"
-            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.14)', 'rgba(255,255,255,0)']}
+            colors={[theme.ink(0), theme.ink(0.14), theme.ink(0)]}
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
             style={[styles.daysCrystalFacet, styles.daysCrystalFacetTop]}
           />
           <LinearGradient
             pointerEvents="none"
-            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.07)', 'rgba(255,255,255,0)']}
+            colors={[theme.ink(0), theme.ink(0.07), theme.ink(0)]}
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
             style={[styles.daysCrystalFacet, styles.daysCrystalFacetBottom]}
@@ -830,19 +826,23 @@ export default function HomeScreen() {
             <Text style={styles.sectionEyebrow}>Membership</Text>
             <Text style={styles.sectionHeadingTitle}>Days Remaining</Text>
           </View>
-          <View style={styles.expiryPill}>
+          <LinearGradient
+            colors={[theme.ink(0.12), theme.ink(0.055), 'rgba(177, 18, 38, 0.1)']}
+            start={{ x: 0.08, y: 0 }}
+            end={{ x: 0.92, y: 1 }}
+            style={styles.expiryPill}>
             <Text style={styles.expiryPillLabel}>Expires</Text>
             <Text style={styles.expiryPillText}>{expiryDate}</Text>
-          </View>
+          </LinearGradient>
         </View>
 
         <View style={styles.ringStage}>
           <View style={styles.daysGlassCard}>
             <LinearGradient
               pointerEvents="none"
-              colors={['rgba(20, 10, 36, 0.94)', 'rgba(38, 16, 66, 0.82)', 'rgba(10, 11, 15, 0.2)']}
-              start={{ x: 0, y: 0.5 }}
-              end={{ x: 1, y: 0.5 }}
+              colors={[theme.ink(0.12), theme.ink(0.055), 'rgba(177, 18, 38, 0.1)']}
+              start={{ x: 0.08, y: 0 }}
+              end={{ x: 0.92, y: 1 }}
               style={StyleSheet.absoluteFill}
             />
             <View pointerEvents="none" style={styles.heroGloss} />
@@ -904,7 +904,7 @@ export default function HomeScreen() {
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0)']}
+                colors={[theme.ink(0.08), theme.ink(0)]}
                 style={styles.actionChipGloss}
               />
               <View style={[styles.actionIconWrap, styles.actionIconWrapRenew]}>
@@ -926,7 +926,7 @@ export default function HomeScreen() {
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0)']}
+                colors={[theme.ink(0.08), theme.ink(0)]}
                 style={styles.actionChipGloss}
               />
               <View style={[styles.actionIconWrap, styles.actionIconWrapFreeze]}>
@@ -947,7 +947,7 @@ export default function HomeScreen() {
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0)']}
+                colors={[theme.ink(0.08), theme.ink(0)]}
                 style={styles.actionChipGloss}
               />
               <View style={[styles.actionIconWrap, styles.actionIconWrapRenew]}>
@@ -1012,7 +1012,7 @@ export default function HomeScreen() {
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={['#7E0F1E', '#3A0B14', '#160609']}
+                colors={[theme.colors.red, '#3A0B14', '#160609']}
                 start={{ x: 0.1, y: 0 }}
                 end={{ x: 0.9, y: 1 }}
                 style={StyleSheet.absoluteFill}
@@ -1254,7 +1254,7 @@ export default function HomeScreen() {
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0)', 'rgba(0,0,0,0.08)']}
+                colors={[theme.ink(0.08), theme.ink(0), 'rgba(0,0,0,0.08)']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFillObject}
@@ -1293,18 +1293,12 @@ export default function HomeScreen() {
         <View style={styles.infoCard}>
           <LinearGradient
             pointerEvents="none"
-            colors={['rgba(255,255,255,0.07)', 'rgba(225,29,46,0.05)', 'rgba(255,255,255,0)']}
+            colors={[theme.ink(0.07), 'rgba(225,29,46,0.05)', theme.ink(0)]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
           />
-          <Text style={styles.cardLabel}>Latest update</Text>
-            <Text style={styles.infoTitle}>
-              {notification?.title ?? 'No notifications yet'}
-            </Text>
-            <Text style={styles.infoBody}>
-              {feedback || notification?.message || 'Important membership updates will appear here.'}
-            </Text>
+          <Text style={styles.infoEmpty}>No recent updates</Text>
         </View>
       </ScrollView>
 
@@ -1367,7 +1361,7 @@ export default function HomeScreen() {
             <View style={[styles.modalHeroCard, { borderColor: sheetAccentBorder }]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0)', 'rgba(0,0,0,0.08)']}
+                colors={[theme.ink(0.08), theme.ink(0), 'rgba(0,0,0,0.08)']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFillObject}
@@ -1552,10 +1546,13 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function useStyles(theme: AppTheme) {
+  return useMemo(
+    () =>
+      StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor,
+    backgroundColor: theme.colors.background,
   },
   content: {
     position: 'relative',
@@ -1570,7 +1567,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    color: mutedColor,
+    color: theme.colors.textMuted,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -1578,7 +1575,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderColor: theme.ink(0.18),
     borderRadius: 28,
     padding: 18,
     marginBottom: 22,
@@ -1597,7 +1594,7 @@ const styles = StyleSheet.create({
     left: 18,
     right: 18,
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: theme.ink(0.22),
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -1639,9 +1636,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.28)',
+    borderColor: theme.ink(0.28),
     borderRadius: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: theme.ink(0.06),
     overflow: 'hidden',
   },
   avatarImage: {
@@ -1649,7 +1646,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   avatarText: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: '900',
   },
@@ -1669,9 +1666,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderColor: theme.ink(0.14),
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: theme.ink(0.06),
     paddingHorizontal: 12,
   },
   statusDot: {
@@ -1696,7 +1693,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   whatsNewLabelText: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 2.5,
@@ -1709,8 +1706,8 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
-    ...premiumShadow,
+    borderColor: theme.ink(0.22),
+    ...theme.shadow,
   },
   whatsNewPage: {
     height: 220,
@@ -1726,7 +1723,7 @@ const styles = StyleSheet.create({
     left: 18,
     right: 18,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.55)',
+    backgroundColor: theme.ink(0.55),
   },
   whatsNewTopRow: {
     flexDirection: 'row',
@@ -1741,7 +1738,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(225,29,46,0.10)',
     paddingHorizontal: 14,
     paddingVertical: 7,
-    shadowColor: premiumColors.redBright,
+    shadowColor: theme.colors.redBright,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
     shadowRadius: 14,
@@ -1763,7 +1760,7 @@ const styles = StyleSheet.create({
     lineHeight: 29,
   },
   whatsNewDesc: {
-    color: 'rgba(255,255,255,0.72)',
+    color: 'rgba(255, 255, 255, 0.72)',
     fontSize: 13,
     fontWeight: '600',
     marginTop: 4,
@@ -1790,12 +1787,12 @@ const styles = StyleSheet.create({
   },
   progressCard: {
     borderWidth: 1,
-    borderColor: premiumColors.border,
+    borderColor: theme.colors.border,
     borderRadius: 28,
-    backgroundColor: surfaceColor,
+    backgroundColor: theme.colors.surface,
     padding: 18,
     marginBottom: 16,
-    ...premiumShadow,
+    ...theme.shadow,
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -1813,27 +1810,32 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   cardTitle: {
-    color: textColor,
+    color: theme.colors.text,
     fontSize: 20,
     fontWeight: '900',
   },
   expiryPill: {
-    alignItems: 'flex-end',
+    alignItems: 'center',
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: theme.ink(0.14),
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.055)',
     paddingHorizontal: 12,
     paddingVertical: 9,
+    shadowColor: '#E11D2E',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.12,
+    shadowRadius: 28,
+    elevation: 6,
   },
   expiryPillLabel: {
-    color: mutedColor,
+    color: theme.colors.textMuted,
     fontSize: 10,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
   expiryPillText: {
-    color: wineColor,
+    color: theme.colors.text,
     fontSize: 12,
     fontWeight: '900',
     marginTop: 2,
@@ -1848,16 +1850,15 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderRadius: 28,
-    backgroundColor: 'rgba(15, 17, 23, 0.74)',
+    borderColor: theme.ink(0.14),
+    borderRadius: 26,
     width: '100%',
-    padding: 18,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.22,
+    padding: 20,
+    shadowColor: '#E11D2E',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.12,
     shadowRadius: 28,
-    elevation: 8,
+    elevation: 6,
   },
   daysCrystalFacet: {
     position: 'absolute',
@@ -1879,7 +1880,7 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.38)',
+    backgroundColor: theme.ink(0.38),
   },
   daysLeftEdge: {
     position: 'absolute',
@@ -1887,7 +1888,7 @@ const styles = StyleSheet.create({
     bottom: 16,
     left: 0,
     width: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    backgroundColor: theme.ink(0.14),
   },
   daysTopRow: {
     flexDirection: 'row',
@@ -1896,14 +1897,14 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   daysNumber: {
-    color: textColor,
+    color: theme.colors.text,
     fontSize: 54,
     fontWeight: '900',
     letterSpacing: 0,
     lineHeight: 58,
   },
   daysLabel: {
-    color: 'rgba(255, 255, 255, 0.72)',
+    color: theme.ink(0.72),
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0,
@@ -1915,13 +1916,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: theme.ink(0.12),
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    backgroundColor: theme.ink(0.07),
     paddingHorizontal: 12,
   },
   daysStatusText: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 11,
     fontWeight: '900',
     textTransform: 'uppercase',
@@ -1930,7 +1931,7 @@ const styles = StyleSheet.create({
     height: 8,
     overflow: 'hidden',
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.095)',
+    backgroundColor: theme.ink(0.095),
     marginTop: 12,
   },
   membershipTrackFill: {
@@ -1944,19 +1945,19 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   daysMetaText: {
-    color: 'rgba(255, 255, 255, 0.62)',
+    color: theme.ink(0.62),
     flexShrink: 1,
     fontSize: 11,
     fontWeight: '800',
   },
   quickActionsCard: {
     borderWidth: 1,
-    borderColor: premiumColors.border,
+    borderColor: theme.colors.border,
     borderRadius: 26,
-    backgroundColor: surfaceColor,
+    backgroundColor: theme.colors.surface,
     padding: 12,
     marginBottom: 16,
-    ...premiumShadow,
+    ...theme.shadow,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -1966,12 +1967,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sectionTitle: {
-    color: textColor,
+    color: theme.colors.text,
     fontSize: 18,
     fontWeight: '900',
   },
   sectionHint: {
-    color: mutedColor,
+    color: theme.colors.textMuted,
     flexShrink: 1,
     fontSize: 12,
     fontWeight: '800',
@@ -1987,8 +1988,8 @@ const styles = StyleSheet.create({
     width: 4,
     height: 36,
     borderRadius: 999,
-    backgroundColor: premiumColors.redBright,
-    shadowColor: premiumColors.redBright,
+    backgroundColor: theme.colors.redBright,
+    shadowColor: theme.colors.redBright,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.36,
     shadowRadius: 8,
@@ -1997,7 +1998,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sectionEyebrow: {
-    color: premiumColors.redBright,
+    color: theme.colors.redBright,
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 1.2,
@@ -2005,19 +2006,19 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   sectionHeadingTitle: {
-    color: textColor,
+    color: theme.colors.text,
     fontSize: 21,
     fontWeight: '900',
   },
   activityPanel: {
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: theme.ink(0.12),
     borderRadius: 26,
     backgroundColor: 'rgba(18, 20, 28, 0.68)',
     padding: 15,
     marginBottom: 22,
-    shadowColor: premiumColors.red,
+    shadowColor: theme.colors.redBright,
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.16,
     shadowRadius: 22,
@@ -2045,9 +2046,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'flex-start',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: theme.ink(0.12),
     borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: theme.ink(0.05),
     paddingHorizontal: 14,
     paddingVertical: 15,
   },
@@ -2061,7 +2062,7 @@ const styles = StyleSheet.create({
   actionChipPrimary: {
     borderColor: 'rgba(225, 29, 46, 0.5)',
     backgroundColor: 'rgba(177, 18, 38, 0.18)',
-    shadowColor: premiumColors.redBright,
+    shadowColor: theme.colors.redBright,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.4,
     shadowRadius: 18,
@@ -2069,8 +2070,8 @@ const styles = StyleSheet.create({
   },
   actionChipRenew: {
     borderColor: 'rgba(225, 29, 46, 0.28)',
-    backgroundColor: 'rgba(120, 15, 30, 0.22)',
-    shadowColor: premiumColors.red,
+    backgroundColor: 'rgba(177, 18, 38, 0.22)',
+    shadowColor: theme.colors.redBright,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.22,
     shadowRadius: 14,
@@ -2091,14 +2092,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 13,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: theme.ink(0.08),
     marginBottom: 12,
   },
   actionIconWrapPrimary: {
     backgroundColor: accentColor,
   },
   actionIconWrapRenew: {
-    backgroundColor: 'rgba(225, 29, 46, 0.85)',
+    backgroundColor: theme.colors.redBright,
   },
   actionIconWrapFreeze: {
     backgroundColor: 'rgba(59, 130, 246, 0.7)',
@@ -2112,12 +2113,12 @@ const styles = StyleSheet.create({
     opacity: 0.48,
   },
   actionTitle: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 14,
     fontWeight: '900',
   },
   actionCaption: {
-    color: mutedColor,
+    color: theme.colors.textMuted,
     fontSize: 11,
     fontWeight: '800',
     marginTop: 2,
@@ -2152,10 +2153,10 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: theme.ink(0.15),
     borderRadius: 28,
     padding: 16,
-    shadowColor: premiumColors.red,
+    shadowColor: theme.colors.redBright,
     shadowOffset: { width: 0, height: 14 },
     shadowOpacity: 0.28,
     shadowRadius: 24,
@@ -2177,7 +2178,7 @@ const styles = StyleSheet.create({
   },
   featureWatermarkAi: {
     opacity: 0.12,
-    tintColor: '#FF8088',
+    tintColor: theme.colors.redBright,
   },
   featureTopRow: {
     flexDirection: 'row',
@@ -2191,9 +2192,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.28)',
+    borderColor: theme.ink(0.28),
     borderRadius: 17,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    backgroundColor: theme.ink(0.16),
   },
   featureIconBadgeAi: {
     borderColor: 'rgba(225, 29, 46, 0.5)',
@@ -2210,7 +2211,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 15,
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    backgroundColor: theme.ink(0.14),
   },
   featureArrowText: {
     position: 'absolute',
@@ -2251,7 +2252,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   featureKickerAi: {
-    color: '#FF8088',
+    color: theme.colors.redBright,
   },
   featureIconBadgeAiPlan: {
     borderColor: 'rgba(192,132,252,0.55)',
@@ -2278,12 +2279,12 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: theme.ink(0.1),
     borderRadius: 24,
     backgroundColor: '#101116',
     padding: 16,
     marginBottom: 16,
-    ...premiumShadow,
+    ...theme.shadow,
   },
   daySelector: {
     paddingBottom: 14,
@@ -2295,7 +2296,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 999,
-    backgroundColor: premiumColors.surfaceSoft,
+    backgroundColor: theme.colors.surfaceSoft,
     paddingHorizontal: 14,
   },
   dayChipSelected: {
@@ -2315,9 +2316,9 @@ const styles = StyleSheet.create({
     gap: 16,
     minHeight: 186,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: theme.ink(0.12),
     borderRadius: 22,
-    backgroundColor: 'rgba(3, 5, 10, 0.72)',
+    backgroundColor: 'rgba(18, 20, 28, 0.68)',
     paddingHorizontal: 14,
     paddingTop: 16,
     paddingBottom: 14,
@@ -2340,9 +2341,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderColor: theme.ink(0.14),
     borderRadius: 9,
-    backgroundColor: 'rgba(255, 255, 255, 0.075)',
+    backgroundColor: theme.ink(0.075),
   },
   activityFill: {
     width: '100%',
@@ -2355,7 +2356,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   activityLabel: {
-    color: premiumColors.textMuted,
+    color: theme.colors.textMuted,
     fontSize: 10,
     fontWeight: '900',
   },
@@ -2372,7 +2373,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 24,
     padding: 16,
-    ...premiumShadow,
+    ...theme.shadow,
   },
   requestLinkCardPayments: {
     borderColor: 'rgba(76, 42, 158, 0.55)',
@@ -2415,7 +2416,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: theme.ink(0.1),
     paddingHorizontal: 8,
   },
   requestLinkCountText: {
@@ -2444,7 +2445,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   emptyVoucherText: {
-    color: mutedColor,
+    color: theme.colors.textMuted,
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 4,
@@ -2454,8 +2455,8 @@ const styles = StyleSheet.create({
   },
   voucherTabUnselected: {
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.13)',
-    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: theme.ink(0.13),
+    backgroundColor: theme.ink(0.035),
   },
   voucherTab: {
     minHeight: 40,
@@ -2465,7 +2466,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.12)',
     borderRadius: 999,
-    backgroundColor: premiumColors.surfaceSoft,
+    backgroundColor: theme.colors.surfaceSoft,
     paddingHorizontal: 12,
   },
   voucherTabSelected: {
@@ -2488,7 +2489,7 @@ const styles = StyleSheet.create({
   voucherTabCount: {
     overflow: 'hidden',
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: theme.ink(0.12),
     color: wineColor,
     fontSize: 11,
     fontWeight: '900',
@@ -2496,7 +2497,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   voucherTabCountSelected: {
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    backgroundColor: theme.ink(0.18),
     color: '#FFFFFF',
   },
   voucherCard: {
@@ -2505,10 +2506,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: theme.ink(0.12),
     borderRadius: 24,
     backgroundColor: 'rgba(18, 20, 28, 0.74)',
-    ...premiumShadow,
+    ...theme.shadow,
   },
   voucherTear: {
     width: 9,
@@ -2520,19 +2521,19 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   voucherType: {
-    color: textColor,
+    color: theme.colors.text,
     fontSize: 15,
     fontWeight: '900',
   },
   voucherDescription: {
-    color: mutedColor,
+    color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '700',
     lineHeight: 17,
     marginTop: 5,
   },
   voucherMeta: {
-    color: premiumColors.textFaint,
+    color: theme.colors.textFaint,
     fontSize: 11,
     fontWeight: '800',
     marginTop: 7,
@@ -2543,7 +2544,7 @@ const styles = StyleSheet.create({
     paddingRight: 14,
   },
   voucherAmount: {
-    color: textColor,
+    color: theme.colors.text,
     fontSize: 17,
     fontWeight: '900',
   },
@@ -2561,7 +2562,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.2)',
     borderRadius: 999,
-    backgroundColor: premiumColors.surfaceSoft,
+    backgroundColor: theme.colors.surfaceSoft,
     marginTop: 10,
     paddingHorizontal: 12,
   },
@@ -2581,23 +2582,28 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: theme.ink(0.12),
     borderRadius: 24,
     backgroundColor: 'rgba(18, 20, 28, 0.74)',
     padding: 18,
-    ...premiumShadow,
+    ...theme.shadow,
   },
   infoTitle: {
-    color: textColor,
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: '900',
     marginBottom: 6,
   },
   infoBody: {
-    color: mutedColor,
+    color: theme.colors.textMuted,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
+  },
+  infoEmpty: {
+    color: theme.colors.textMuted,
+    fontSize: 14,
+    fontWeight: '700',
   },
   buttonPressed: {
     opacity: 0.76,
@@ -2610,12 +2616,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: theme.ink(0.2),
     borderRadius: 18,
     backgroundColor: 'rgba(38, 41, 50, 0.94)',
     paddingHorizontal: 16,
     paddingVertical: 13,
-    ...premiumShadow,
+    ...theme.shadow,
   },
   toastText: {
     color: '#FFFFFF',
@@ -2642,8 +2648,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    backgroundColor: premiumColors.surface,
+    borderColor: theme.ink(0.12),
+    backgroundColor: theme.colors.surface,
     paddingHorizontal: 22,
     paddingTop: 14,
     paddingBottom: 30,
@@ -2660,9 +2666,9 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     maxHeight: '92%',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderColor: theme.ink(0.18),
     borderRadius: 28,
-    backgroundColor: premiumColors.surface,
+    backgroundColor: theme.colors.surface,
     padding: 22,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 18 },
@@ -2680,7 +2686,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 17,
-    backgroundColor: premiumColors.surfaceSoft,
+    backgroundColor: theme.colors.surfaceSoft,
   },
   qrCloseText: {
     color: wineColor,
@@ -2692,7 +2698,7 @@ const styles = StyleSheet.create({
     height: 6,
     alignSelf: 'center',
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+    backgroundColor: theme.ink(0.28),
     marginBottom: 16,
   },
   modalHandle: {
@@ -2700,7 +2706,7 @@ const styles = StyleSheet.create({
     height: 6,
     alignSelf: 'center',
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+    backgroundColor: theme.ink(0.28),
   },
   modalDragZone: {
     alignItems: 'center',
@@ -2751,22 +2757,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 17,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: theme.ink(0.06),
   },
   modalCloseText: {
-    color: premiumColors.textMuted,
+    color: theme.colors.textMuted,
     fontSize: 18,
     fontWeight: '900',
     lineHeight: 18,
   },
   modalTitle: {
-    color: textColor,
+    color: theme.colors.text,
     fontSize: 26,
     fontWeight: '900',
     lineHeight: 31,
   },
   modalBody: {
-    color: mutedColor,
+    color: theme.colors.textMuted,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
@@ -2777,7 +2783,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: theme.ink(0.04),
     marginTop: 18,
     padding: 16,
   },
@@ -2788,19 +2794,19 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   modalHeroLabel: {
-    color: premiumColors.textMuted,
+    color: theme.colors.textMuted,
     fontSize: 11,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
   modalHeroValue: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 28,
     fontWeight: '900',
     marginTop: 3,
   },
   modalHeroUnit: {
-    color: premiumColors.textMuted,
+    color: theme.colors.textMuted,
     fontSize: 14,
     fontWeight: '800',
   },
@@ -2832,26 +2838,26 @@ const styles = StyleSheet.create({
   modalStatCard: {
     flex: 1,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: theme.ink(0.1),
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    backgroundColor: theme.ink(0.035),
     paddingHorizontal: 14,
     paddingVertical: 13,
   },
   modalStatLabel: {
-    color: premiumColors.textFaint,
+    color: theme.colors.textFaint,
     fontSize: 10,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
   modalStatValue: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 24,
     fontWeight: '900',
     marginTop: 4,
   },
   modalStatCaption: {
-    color: premiumColors.textMuted,
+    color: theme.colors.textMuted,
     fontSize: 11,
     fontWeight: '800',
     marginTop: 2,
@@ -2861,9 +2867,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: theme.ink(0.1),
     borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    backgroundColor: theme.ink(0.035),
     marginTop: 18,
     padding: 10,
   },
@@ -2873,7 +2879,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: theme.ink(0.08),
   },
   stepperButtonText: {
     color: accentColor,
@@ -2885,16 +2891,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 0,
     borderRadius: 20,
-    backgroundColor: 'rgba(8, 10, 16, 0.72)',
+    backgroundColor:
+      theme.scheme === 'light' ? theme.colors.surfaceSoft : 'rgba(8, 10, 16, 0.72)',
     paddingVertical: 12,
   },
   stepperValue: {
-    color: textColor,
+    color: theme.colors.text,
     fontSize: 30,
     fontWeight: '900',
   },
   stepperLabel: {
-    color: mutedColor,
+    color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase',
@@ -2903,7 +2910,7 @@ const styles = StyleSheet.create({
     height: 8,
     overflow: 'hidden',
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: theme.ink(0.12),
     marginTop: 16,
   },
   durationFill: {
@@ -2919,13 +2926,13 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   modalFooterLabel: {
-    color: premiumColors.textMuted,
+    color: theme.colors.textMuted,
     fontSize: 11,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
   modalTotal: {
-    color: textColor,
+    color: theme.colors.text,
     fontSize: 26,
     fontWeight: '900',
     marginTop: 3,
@@ -2941,12 +2948,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderColor: theme.ink(0.14),
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: theme.ink(0.05),
   },
   modalSecondaryText: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 13,
     fontWeight: '900',
   },
@@ -2987,7 +2994,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(177, 18, 38, 0.16)',
     borderRadius: 24,
-    backgroundColor: premiumColors.surfaceSoft,
+    backgroundColor: theme.colors.surfaceSoft,
     marginVertical: 18,
     padding: 18,
   },
@@ -2997,11 +3004,14 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   qrCodeValue: {
-    color: mutedColor,
+    color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '800',
     lineHeight: 18,
     marginTop: 10,
     textAlign: 'center',
   },
-});
+      }),
+    [theme],
+  );
+}

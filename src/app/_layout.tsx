@@ -1,13 +1,15 @@
-import { DarkTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-import { premiumColors } from '@/constants/premiumTheme';
+import { useAppTheme } from '@/theme/useAppTheme';
 
-const accentColor = premiumColors.redBright;
+// Brand accent is identical in both themes.
+const accentColor = '#E11D2E';
 
 function BackHeaderButton() {
   const router = useRouter();
+  const theme = useAppTheme();
 
   return (
     <Pressable
@@ -22,28 +24,31 @@ function BackHeaderButton() {
         router.replace('/(tabs)');
       }}
       style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}>
-      <Text style={styles.backArrow}>‹</Text>
+      <Text style={[styles.backArrow, { color: theme.colors.text }]}>‹</Text>
     </Pressable>
   );
 }
 
-// Dark navigation theme so the navigator container, cards, and scene
-// backgrounds are always the Marvel Gym charcoal — never white during a load
-// or a screen transition.
-const marvelNavTheme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    primary: premiumColors.redBright,
-    background: premiumColors.background,
-    card: premiumColors.background,
-    text: premiumColors.text,
-    border: 'transparent',
-    notification: premiumColors.redBright,
-  },
-};
-
 export default function RootLayout() {
+  const theme = useAppTheme();
+
+  // Navigation theme follows the device scheme so the navigator container,
+  // cards, and scene backgrounds match the app — never a white flash in dark
+  // mode, never a dark flash in light mode.
+  const base = theme.scheme === 'dark' ? DarkTheme : DefaultTheme;
+  const marvelNavTheme = {
+    ...base,
+    colors: {
+      ...base.colors,
+      primary: theme.colors.redBright,
+      background: theme.colors.background,
+      card: theme.colors.background,
+      text: theme.colors.text,
+      border: 'transparent',
+      notification: theme.colors.redBright,
+    },
+  };
+
   return (
     <ThemeProvider value={marvelNavTheme}>
     <Stack
@@ -53,7 +58,7 @@ export default function RootLayout() {
         headerShown: false,
         headerTitle: '',
         title: '',
-        contentStyle: { backgroundColor: premiumColors.background },
+        contentStyle: { backgroundColor: theme.colors.background },
       }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="welcome" />
@@ -133,7 +138,7 @@ export default function RootLayout() {
           headerStyle: { backgroundColor: 'transparent' },
           headerTintColor: accentColor,
           headerTitleStyle: {
-            color: premiumColors.text,
+            color: theme.colors.text,
             fontSize: 18,
             fontWeight: '900',
           },
@@ -155,7 +160,7 @@ export default function RootLayout() {
           headerStyle: { backgroundColor: 'transparent' },
           headerTintColor: accentColor,
           headerTitleStyle: {
-            color: premiumColors.text,
+            color: theme.colors.text,
             fontSize: 18,
             fontWeight: '900',
           },
@@ -177,7 +182,7 @@ export default function RootLayout() {
           headerStyle: { backgroundColor: 'transparent' },
           headerTintColor: accentColor,
           headerTitleStyle: {
-            color: premiumColors.text,
+            color: theme.colors.text,
             fontSize: 18,
             fontWeight: '900',
           },

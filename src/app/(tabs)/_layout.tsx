@@ -26,9 +26,11 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 
 import { premiumColors } from '@/constants/premiumTheme';
 import { memberService } from '@/services';
+import { useAppTheme } from '@/theme/useAppTheme';
 import type { Member } from '@/types';
 
 const accentColor = premiumColors.redBright;
@@ -63,6 +65,35 @@ function TabIcon({
       weight={focused ? 'semibold' : 'regular'}
       fallback={<Text style={[styles.tabFallbackIcon, { color }]}>{fallback}</Text>}
     />
+  );
+}
+
+// Custom home glyph — arched roof with an open arched doorway. Single outline
+// so the doorway breaks the baseline (no stray line under the door). Stroked
+// when unselected, filled from the inside when selected.
+const HOME_PATH =
+  'M4 21 L4 11 Q12 3 20 11 L20 21 L14.7 21 L14.7 15.8 Q14.7 13.6 12 13.6 Q9.3 13.6 9.3 15.8 L9.3 21 Z';
+
+function HomeIcon({
+  focused,
+  color,
+  size = TAB_ICON_SIZE,
+}: {
+  focused: boolean;
+  color: string;
+  size?: number;
+}) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path
+        d={HOME_PATH}
+        fill={focused ? color : 'none'}
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
   );
 }
 
@@ -380,6 +411,8 @@ function HalfCircleFABBar({ state, descriptors, navigation }: BottomTabBarProps)
 // falling back to a frosted blur on older iOS.
 function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const theme = useAppTheme();
+  const isLight = theme.scheme === 'light';
   const [barWidth, setBarWidth] = useState(0);
 
   const visibleRoutes = state.routes.filter(
@@ -576,10 +609,15 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     ],
   }));
 
-  // Fade only the pill's glass fill while dragging, leaving the white
-  // circular outline visible so the moving pill reads as a transparent ring.
+  // Keep the pill's glass fill solid at all times (including while dragging).
   const pillFillStyle = useAnimatedStyle(() => ({
-    opacity: 1 - 0.92 * barFloat.value,
+    opacity: 1,
+  }));
+
+  // Light-mode grey tint over the blur: solid-grey at rest, fading down while
+  // dragging so the bar reads blurry as the pill moves between icons.
+  const greyTintStyle = useAnimatedStyle(() => ({
+    opacity: 0.55 - 0.4 * barFloat.value,
   }));
 
   const barStyle = useAnimatedStyle(() => ({
@@ -587,7 +625,9 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
       { translateY: barDrop.value },
       { scale: barScale.value },
     ],
-    opacity: 0.62 + (barScale.value - 0.82) * 2.65,
+    // Keep the bar fully opaque so the shrunk (idle) state stays the same
+    // dark grey as the resting / just-released state instead of fading lighter.
+    opacity: 1,
   }));
 
   const hasLiquidGlass = isLiquidGlassAvailable();
@@ -612,6 +652,14 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             style={StyleSheet.absoluteFill}
           />
         )}
+        {/* Light mode: the blur reads too white — lay a dark-grey tint over it.
+            Fades while dragging so the moving pill reveals the blur underneath. */}
+        {isLight ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, { backgroundColor: '#2F3137' }, greyTintStyle]}
+          />
+        ) : null}
 
         {/* top water-reflection sheen */}
         <LinearGradient
@@ -748,12 +796,10 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ focused, size }) => (
-            <TabIcon
-              activeIcon="house.fill"
-              fallback="H"
+          tabBarIcon: ({ focused, color, size }) => (
+            <HomeIcon
               focused={focused}
-              icon="house"
+              color={color ?? (focused ? '#FFFFFF' : inactiveColor)}
               size={size}
             />
           ),
@@ -792,7 +838,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="journey"
         options={{
-          title: 'Journey',
+          title: 'My Journey',
           tabBarIcon: ({ focused, size }) => (
             <TabIcon
               activeIcon="chart.bar.fill"

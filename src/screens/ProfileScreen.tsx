@@ -20,6 +20,7 @@ import {
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
+import { useAppTheme } from '@/theme/useAppTheme';
 import {
   authService,
   avatarService,
@@ -102,6 +103,9 @@ function createProfileForm(member: Member): ProfileForm {
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const theme = useAppTheme();
+  const isLight = theme.scheme === 'light';
+  const mutedTextStyle = isLight ? { color: theme.colors.textMuted } : undefined;
   const [member, setMember] = useState<Member>();
   const [initialForm, setInitialForm] = useState<ProfileForm>();
   const [form, setForm] = useState<ProfileForm>();
@@ -452,14 +456,14 @@ export default function ProfileScreen() {
               styles.photoButton,
               pressed && styles.buttonPressed,
             ]}>
-            <Text style={styles.photoButtonText}>
+            <Text style={[styles.photoButtonText, mutedTextStyle]}>
               {draftProfileImageUri ? 'Change' : 'Add'}
             </Text>
           </Pressable>
-          <Text style={styles.nameText}>
+          <Text style={[styles.nameText, mutedTextStyle]}>
             {member.firstName} {member.lastName}
           </Text>
-          <Text style={styles.phoneText}>{member.phone || 'Member profile'}</Text>
+          <Text style={[styles.phoneText, mutedTextStyle]}>{member.phone || 'Member profile'}</Text>
         </View>
 
         <View style={styles.card}>
@@ -627,7 +631,7 @@ export default function ProfileScreen() {
             <Text style={styles.sheetKicker}>Profile</Text>
             <Text style={styles.sheetTitle}>Sign out?</Text>
             <Text style={styles.sheetBody}>
-              You will return to the Entry Page.
+              Are you sure you want to sign out?
             </Text>
             <View style={styles.confirmRow}>
               <Pressable
