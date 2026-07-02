@@ -447,6 +447,7 @@ export default function ClassesScreen() {
   const theme = useAppTheme();
   const isLight = theme.scheme === 'light';
   const surfaceTextStyle = isLight ? { color: theme.colors.text } : undefined;
+  const instructorNameTextStyle = { color: theme.colors.text };
   const mutedTextStyle = isLight ? { color: theme.colors.textMuted } : undefined;
   const themedSurfaceStyle = isLight
     ? {
@@ -1250,7 +1251,9 @@ export default function ClassesScreen() {
                           </View>
                         )}
                       </Pressable>
-                      <Text style={styles.instructorName} numberOfLines={1}>
+                      <Text
+                        style={[styles.instructorName, instructorNameTextStyle]}
+                        numberOfLines={1}>
                         {shortName}
                       </Text>
                       <HeartButton

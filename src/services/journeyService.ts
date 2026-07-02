@@ -30,7 +30,51 @@ let resetSnapshots: {
   previousStarts: Partial<Record<JourneyStatKey, string>>;
   statKeys: JourneyStatKey[];
 }[] = [];
+const timerTrackerRetentionMs = 3 * 24 * 60 * 60 * 1000;
+let timerWorkoutSessionIds = new Set<string>();
 let workoutSessions: WorkoutSession[] = [
+  {
+    id: 'workout-2026-04-02',
+    startedAt: '2026-04-02T17:45:00.000Z',
+    endedAt: '2026-04-02T18:42:00.000Z',
+    durationSeconds: 3420,
+    estimatedCaloriesBurned: 456,
+  },
+  {
+    id: 'workout-2026-04-10',
+    startedAt: '2026-04-10T18:05:00.000Z',
+    endedAt: '2026-04-10T19:18:00.000Z',
+    durationSeconds: 4380,
+    estimatedCaloriesBurned: 584,
+  },
+  {
+    id: 'workout-2026-04-22',
+    startedAt: '2026-04-22T17:30:00.000Z',
+    endedAt: '2026-04-22T18:38:00.000Z',
+    durationSeconds: 4080,
+    estimatedCaloriesBurned: 544,
+  },
+  {
+    id: 'workout-2026-05-05',
+    startedAt: '2026-05-05T18:00:00.000Z',
+    endedAt: '2026-05-05T19:05:00.000Z',
+    durationSeconds: 3900,
+    estimatedCaloriesBurned: 520,
+  },
+  {
+    id: 'workout-2026-05-14',
+    startedAt: '2026-05-14T18:20:00.000Z',
+    endedAt: '2026-05-14T19:35:00.000Z',
+    durationSeconds: 4500,
+    estimatedCaloriesBurned: 600,
+  },
+  {
+    id: 'workout-2026-05-28',
+    startedAt: '2026-05-28T10:15:00.000Z',
+    endedAt: '2026-05-28T11:08:00.000Z',
+    durationSeconds: 3180,
+    estimatedCaloriesBurned: 424,
+  },
   {
     id: 'workout-001',
     startedAt: '2026-06-01T17:30:00.000Z',
@@ -44,6 +88,27 @@ let workoutSessions: WorkoutSession[] = [
     endedAt: '2026-06-04T19:18:00.000Z',
     durationSeconds: 3480,
     estimatedCaloriesBurned: 464,
+  },
+  {
+    id: 'workout-2026-06-12',
+    startedAt: '2026-06-12T17:55:00.000Z',
+    endedAt: '2026-06-12T19:03:00.000Z',
+    durationSeconds: 4080,
+    estimatedCaloriesBurned: 544,
+  },
+  {
+    id: 'workout-2026-07-01',
+    startedAt: '2026-07-01T18:15:00.000Z',
+    endedAt: '2026-07-01T19:10:00.000Z',
+    durationSeconds: 3300,
+    estimatedCaloriesBurned: 440,
+  },
+  {
+    id: 'workout-2026-07-02',
+    startedAt: '2026-07-02T07:30:00.000Z',
+    endedAt: '2026-07-02T08:22:00.000Z',
+    durationSeconds: 3120,
+    estimatedCaloriesBurned: 416,
   },
 ];
 
@@ -102,8 +167,88 @@ function calculateStreak(days: AttendanceDay[]) {
   return streak;
 }
 
-function estimateCalories(durationSeconds: number) {
-  return Math.max(0, Math.round((durationSeconds / 60) * 8));
+const profileNumberWords: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+};
+
+function parseProfileNumber(value?: string) {
+  if (!value) return undefined;
+  const normalizedValue = value.toLowerCase();
+  if (profileNumberWords[normalizedValue] !== undefined) {
+    return profileNumberWords[normalizedValue];
+  }
+  const numericValue = Number.parseInt(value, 10);
+  return Number.isNaN(numericValue) ? undefined : numericValue;
+}
+
+function estimateProfileCalories(durationSeconds: number) {
+  const bio = profileRecord.biography.toLowerCase();
+  const durationMinutes = Math.max(0, durationSeconds / 60);
+  const weightKgMatch = bio.match(/(\d{2,3})\s?(kg|kgs|kilograms?)/);
+  const weightLbMatch = bio.match(/(\d{2,3})\s?(lb|lbs|pounds?)/);
+  const heightCmMatch = bio.match(/(\d{3})\s?(cm|centimeters?)/);
+  const frequencyMatch = bio.match(
+    /(\d+|one|two|three|four|five|six|seven)\s+(?:days?|times?)\s+(?:a|per)\s+week/,
+  );
+  const weightKg = weightKgMatch
+    ? Number.parseInt(weightKgMatch[1], 10)
+    : weightLbMatch
+      ? Math.round(Number.parseInt(weightLbMatch[1], 10) * 0.453592)
+      : undefined;
+  const heightCm = heightCmMatch ? Number.parseInt(heightCmMatch[1], 10) : undefined;
+  const sessionsPerWeek = parseProfileNumber(frequencyMatch?.[1]);
+  let caloriesPerMinute = 6.6;
+
+  if (weightKg) {
+    caloriesPerMinute += (weightKg - 70) * 0.025;
+  }
+  if (heightCm) {
+    caloriesPerMinute += (heightCm - 170) * 0.004;
+  }
+  if (sessionsPerWeek) {
+    caloriesPerMinute += sessionsPerWeek >= 5 ? 0.25 : -0.12;
+  }
+  if (bio.includes('fat loss') || bio.includes('lose weight') || bio.includes('weight loss')) {
+    caloriesPerMinute += 0.35;
+  } else if (bio.includes('endurance') || bio.includes('cardio')) {
+    caloriesPerMinute += 0.5;
+  } else if (bio.includes('strength') || bio.includes('muscle') || bio.includes('lean')) {
+    caloriesPerMinute += 0.12;
+  }
+
+  const clampedCaloriesPerMinute = Math.min(9.2, Math.max(5, caloriesPerMinute));
+  return Math.round(durationMinutes * clampedCaloriesPerMinute);
+}
+
+function buildLocalDateTime(date: string, time: string) {
+  return new Date(`${date.slice(0, 10)}T${time}:00`);
+}
+
+function pruneTimerWorkoutTracker(now = Date.now()) {
+  const trackedIds = new Set<string>();
+
+  workoutSessions.forEach((session) => {
+    if (!timerWorkoutSessionIds.has(session.id)) return;
+    const endedAt = new Date(session.endedAt).getTime();
+    if (!Number.isNaN(endedAt) && now - endedAt <= timerTrackerRetentionMs) {
+      trackedIds.add(session.id);
+    }
+  });
+
+  timerWorkoutSessionIds = trackedIds;
+}
+
+function sessionOverlapsRange(session: WorkoutSession, startedAt: Date, endedAt: Date) {
+  const sessionStartedAt = new Date(session.startedAt).getTime();
+  const sessionEndedAt = new Date(session.endedAt).getTime();
+
+  return sessionStartedAt < endedAt.getTime() && sessionEndedAt > startedAt.getTime();
 }
 
 function isOnOrAfter(value: string, baseline: string) {
@@ -193,12 +338,14 @@ export const markAttendanceDay = async (
 };
 
 export const getWorkoutSessions = async (): Promise<WorkoutSession[]> => {
+  pruneTimerWorkoutTracker();
   return workoutSessions;
 };
 
 export const completeWorkoutSession = async (
   durationSeconds: number,
 ): Promise<WorkoutSession> => {
+  pruneTimerWorkoutTracker();
   const endedAt = new Date();
   const startedAt = new Date(endedAt.getTime() - durationSeconds * 1000);
   const session: WorkoutSession = {
@@ -206,10 +353,62 @@ export const completeWorkoutSession = async (
     startedAt: startedAt.toISOString(),
     endedAt: endedAt.toISOString(),
     durationSeconds,
-    estimatedCaloriesBurned: estimateCalories(durationSeconds),
+    estimatedCaloriesBurned: estimateProfileCalories(durationSeconds),
   };
 
   workoutSessions = [session, ...workoutSessions];
+  timerWorkoutSessionIds.add(session.id);
+
+  return session;
+};
+
+export const logWorkoutSessionForDay = async (input: {
+  date: string;
+  endTime: string;
+  startTime: string;
+}): Promise<WorkoutSession> => {
+  pruneTimerWorkoutTracker();
+  const dateKey = input.date.slice(0, 10);
+  const startedAt = buildLocalDateTime(input.date, input.startTime);
+  const endedAt = buildLocalDateTime(input.date, input.endTime);
+
+  if (
+    Number.isNaN(startedAt.getTime()) ||
+    Number.isNaN(endedAt.getTime()) ||
+    endedAt.getTime() <= startedAt.getTime()
+  ) {
+    throw new Error('Invalid workout session time range.');
+  }
+
+  const durationSeconds = Math.round((endedAt.getTime() - startedAt.getTime()) / 1000);
+  const session: WorkoutSession = {
+    id: `workout-${Date.now().toString(36)}`,
+    startedAt: startedAt.toISOString(),
+    endedAt: endedAt.toISOString(),
+    durationSeconds,
+    estimatedCaloriesBurned: estimateProfileCalories(durationSeconds),
+  };
+  const overlappingTimerIds = new Set(
+    workoutSessions
+      .filter(
+        (existingSession) =>
+          timerWorkoutSessionIds.has(existingSession.id) &&
+          existingSession.startedAt.slice(0, 10) === dateKey &&
+          sessionOverlapsRange(existingSession, startedAt, endedAt),
+      )
+      .map((existingSession) => existingSession.id),
+  );
+
+  workoutSessions = [
+    session,
+    ...workoutSessions.filter((existingSession) => !overlappingTimerIds.has(existingSession.id)),
+  ];
+  timerWorkoutSessionIds = new Set(
+    [...timerWorkoutSessionIds].filter((sessionId) => !overlappingTimerIds.has(sessionId)),
+  );
+  attendanceRecords = attendanceRecords.map((day) =>
+    day.date.slice(0, 10) === dateKey ? { ...day, hasVisit: true } : day,
+  );
 
   return session;
 };
@@ -334,6 +533,11 @@ export const saveAllJourneyReset = async (): Promise<JourneyHistoryRecord[]> => 
 };
 
 export const getJourneyHistory = async (): Promise<JourneyHistoryRecord[]> => {
+  return historyRecords;
+};
+
+export const clearJourneyHistory = async (): Promise<JourneyHistoryRecord[]> => {
+  historyRecords = [];
   return historyRecords;
 };
 
@@ -618,6 +822,7 @@ export const journeyService = {
   markAttendanceDay,
   getWorkoutSessions,
   completeWorkoutSession,
+  logWorkoutSessionForDay,
   resetJourneyStat,
   resetAllJourneyStats,
   undoResetJourneyStat,
@@ -625,6 +830,7 @@ export const journeyService = {
   saveJourneyReset,
   saveAllJourneyReset,
   getJourneyHistory,
+  clearJourneyHistory,
   formatJourneyHistoryRange,
   getJourneyStats,
   getJourneyMetrics,

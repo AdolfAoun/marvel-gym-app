@@ -248,6 +248,9 @@ export default function ShopScreen() {
   const theme = useAppTheme();
   const isLight = theme.scheme === 'light';
   const surfaceTextStyle = isLight ? { color: theme.colors.text } : undefined;
+  const priceTextStyle = { color: theme.colors.text };
+  const searchIconColor = theme.colors.text;
+  const orderButtonIconColor = '#FFFFFF';
   const mutedTextStyle = isLight ? { color: theme.colors.textMuted } : undefined;
   const themedSurfaceStyle = isLight
     ? {
@@ -709,8 +712,8 @@ export default function ShopScreen() {
                 <SymbolView
                   name="magnifyingglass"
                   size={17}
-                  tintColor="#000000"
-                  fallback={<Text style={[styles.iconGlyph, { color: '#000000' }]}>⌕</Text>}
+                  tintColor={searchIconColor}
+                  fallback={<Text style={[styles.iconGlyph, { color: searchIconColor }]}>⌕</Text>}
                 />
               </Pressable>
             )}
@@ -793,7 +796,9 @@ export default function ShopScreen() {
                       </View>
                     ) : null}
                     <View style={styles.priceRow}>
-                      <Text style={styles.price}>{formatPrice(product.price)}</Text>
+                      <Text style={[styles.price, priceTextStyle]}>
+                        {formatPrice(product.price)}
+                      </Text>
                       {product.compareAtPrice ? (
                         <Text style={styles.compareAtPrice}>
                           {formatPrice(product.compareAtPrice)}
@@ -812,8 +817,12 @@ export default function ShopScreen() {
                       <SymbolView
                         name="bag.fill"
                         size={15}
-                        tintColor={premiumColors.redBright}
-                        fallback={<Text style={styles.voucherButtonGlyph}>{'▤'}</Text>}
+                        tintColor={orderButtonIconColor}
+                        fallback={
+                          <Text style={[styles.voucherButtonGlyph, { color: orderButtonIconColor }]}>
+                            {'▤'}
+                          </Text>
+                        }
                       />
                       <Text style={styles.voucherButtonText}>Order</Text>
                     </Pressable>

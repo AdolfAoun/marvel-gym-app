@@ -20,6 +20,7 @@ type StoredAccount = {
 
 const now = () => new Date().toISOString();
 const seedTimestamp = now();
+const demoMemberCreatedAt = '2026-04-01T09:00:00.000Z';
 const activeMemberStorageKey = 'marvel-gym.activeMemberId';
 
 let guestMember: Member = {
@@ -30,8 +31,8 @@ let guestMember: Member = {
   email: '',
   phone: '',
   location: '',
-  createdAt: now(),
-  updatedAt: now(),
+  createdAt: demoMemberCreatedAt,
+  updatedAt: demoMemberCreatedAt,
 };
 let accounts: StoredAccount[] = [
   {
@@ -61,7 +62,7 @@ let accounts: StoredAccount[] = [
       dateOfBirth: '1985-05-29',
       emergencyContactName: 'Pepper Potts',
       emergencyContactPhone: '+961 70 654 321',
-      createdAt: seedTimestamp,
+      createdAt: demoMemberCreatedAt,
       updatedAt: seedTimestamp,
     },
     password: 'member@1',

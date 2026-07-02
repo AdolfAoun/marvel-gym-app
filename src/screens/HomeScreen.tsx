@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { Href } from 'expo-router';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -214,6 +215,155 @@ function formatVoucherDate(value: string) {
     day: 'numeric',
   }).format(new Date(value));
 }
+
+// A swipeable slider used to pick the voucher duration — drag (or tap) the track
+// to set the value, no plus/minus buttons.
+type DurationSliderProps = {
+  value: number;
+  min: number;
+  max: number;
+  accent: string;
+  trackColor: string;
+  onChange: (value: number) => void;
+};
+
+const THUMB_SIZE = 30;
+
+// While dragging fast across many values, a buzz-per-week feels like a buzz saw.
+// A value only gets a haptic once the finger has rested on it for this long —
+// i.e. the drag has slowed down or stopped there. The final value on release
+// always gets a haptic immediately, even if it hasn't "rested" yet.
+const HAPTIC_SETTLE_MS = 70;
+
+function DurationSlider({ value, min, max, accent, trackColor, onChange }: DurationSliderProps) {
+  const [trackW, setTrackW] = useState(0);
+  const trackWRef = useRef(0);
+  const rangeRef = useRef({ min, max });
+  rangeRef.current = { min, max };
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const lastValueRef = useRef(value);
+  lastValueRef.current = value;
+  const lastHapticValueRef = useRef(value);
+  const hapticTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Continuous 0..1 thumb position while dragging (null → follow `value`). This is
+  // what makes the drag feel smooth: the thumb tracks the finger exactly, while the
+  // whole-week value only steps as it crosses a boundary.
+  const [dragRatio, setDragRatio] = useState<number | null>(null);
+  const startRatioRef = useRef(0);
+
+  const buzzFor = (next: number) => {
+    if (next === lastHapticValueRef.current) return;
+    lastHapticValueRef.current = next;
+    Haptics.selectionAsync();
+  };
+
+  const emitFromRatio = (ratio: number, settle: boolean) => {
+    const { min: lo, max: hi } = rangeRef.current;
+    const clamped = Math.max(0, Math.min(1, ratio));
+    const next = Math.round(lo + clamped * (hi - lo));
+
+    if (hapticTimerRef.current) clearTimeout(hapticTimerRef.current);
+
+    if (next !== lastValueRef.current) {
+      lastValueRef.current = next;
+      onChangeRef.current(next);
+    }
+
+    if (settle) {
+      buzzFor(next);
+    } else {
+      hapticTimerRef.current = setTimeout(() => buzzFor(next), HAPTIC_SETTLE_MS);
+    }
+  };
+
+  const responder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (event) => {
+        const w = trackWRef.current;
+        if (w <= 0) return;
+        const ratio = Math.max(0, Math.min(1, event.nativeEvent.locationX / w));
+        startRatioRef.current = ratio;
+        setDragRatio(ratio);
+        emitFromRatio(ratio, false);
+      },
+      onPanResponderMove: (_event, gesture) => {
+        const w = trackWRef.current;
+        if (w <= 0) return;
+        const ratio = Math.max(0, Math.min(1, startRatioRef.current + gesture.dx / w));
+        setDragRatio(ratio);
+        emitFromRatio(ratio, false);
+      },
+      onPanResponderRelease: (_event, gesture) => {
+        const w = trackWRef.current;
+        if (w > 0) {
+          const ratio = Math.max(0, Math.min(1, startRatioRef.current + gesture.dx / w));
+          emitFromRatio(ratio, true);
+        }
+        setDragRatio(null);
+      },
+      onPanResponderTerminate: () => setDragRatio(null),
+    }),
+  ).current;
+
+  const valueRatio = max > min ? (value - min) / (max - min) : 0;
+  const activeRatio = dragRatio ?? valueRatio;
+  const thumbLeft = trackW > 0 ? activeRatio * (trackW - THUMB_SIZE) : 0;
+
+  return (
+    <View
+      {...responder.panHandlers}
+      onLayout={(event) => {
+        const w = event.nativeEvent.layout.width;
+        trackWRef.current = w;
+        setTrackW(w);
+      }}
+      style={sliderStyles.hit}>
+      <View style={[sliderStyles.track, { backgroundColor: trackColor }]}>
+        <View
+          style={[sliderStyles.fill, { width: thumbLeft + THUMB_SIZE / 2, backgroundColor: accent }]}
+        />
+      </View>
+      <View style={[sliderStyles.thumb, { left: thumbLeft, backgroundColor: accent }]} />
+    </View>
+  );
+}
+
+const sliderStyles = StyleSheet.create({
+  hit: {
+    height: 44,
+    justifyContent: 'center',
+  },
+  track: {
+    height: 8,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  fill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: 999,
+  },
+  thumb: {
+    position: 'absolute',
+    top: (44 - THUMB_SIZE) / 2,
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: THUMB_SIZE / 2,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.28,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+});
 
 export default function HomeScreen() {
   const theme = useAppTheme();
@@ -450,12 +600,6 @@ export default function HomeScreen() {
     activitySchedule[0];
   const selectedRenewAmount = selectedRenewMonths * monthlyRenewalPrice;
   const selectedFreezeAmount = selectedFreezeWeeks * weeklyFreezePrice;
-  const renewalPricingNote =
-    studentVerificationStatus === 'Confirmed'
-      ? 'Student pricing applied: $70/month.'
-      : studentVerificationStatus === 'Pending Verification'
-        ? 'Student verification pending. Student pricing applies after approval.'
-        : '';
   const paymentVouchers = vouchers.filter(
     (voucher) =>
       voucher.type === 'Membership Renewal' ||
@@ -617,19 +761,11 @@ export default function HomeScreen() {
   const sheetAccentBorder =
     isFreezeSheet ? 'rgba(96, 165, 250, 0.34)' : 'rgba(192, 132, 252, 0.34)';
   const sheetKicker = isFreezeSheet ? (isFrozen ? 'Extend Freeze' : 'Freeze Membership') : 'Renew Membership';
-  const sheetCaption = isFreezeSheet ? 'Pause plan' : 'Increase validity';
-  const sheetTitle = isFreezeSheet
-    ? (isFrozen ? 'Keep your break going.' : 'Pause your membership with a cleaner request flow.')
-    : 'Choose how long you want to extend your plan.';
-  const sheetBody = isFreezeSheet
-    ? 'Freeze requests stay pending until cash confirmation at the counter.'
-    : 'Renewal requests stay pending until cash confirmation at the counter.';
   const sheetUnitValue = isFreezeSheet ? selectedFreezeWeeks : selectedRenewMonths;
   const sheetUnitLabel = isFreezeSheet
     ? `week${selectedFreezeWeeks > 1 ? 's' : ''}`
     : `month${selectedRenewMonths > 1 ? 's' : ''}`;
   const sheetTotal = isFreezeSheet ? selectedFreezeAmount : selectedRenewAmount;
-  const sheetUnitPrice = isFreezeSheet ? weeklyFreezePrice : monthlyRenewalPrice;
   const sheetPrimaryAction = isFreezeSheet ? handleCreateFreezeVoucher : handleCreateRenewVoucher;
   const sheetPrimaryLabel = isCreatingVoucher ? 'Creating...' : 'Create voucher';
   const sheetSymbolName = isFreezeSheet ? 'snowflake' : 'sparkles';
@@ -643,53 +779,12 @@ export default function HomeScreen() {
         <View style={styles.heroCard}>
           <LinearGradient
             pointerEvents="none"
-            colors={['rgba(8,9,13,0.34)', 'rgba(3,4,7,0.82)', 'rgba(5,6,10,0.6)']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
+            colors={[theme.ink(0.12), theme.ink(0.055), 'rgba(177, 18, 38, 0.1)']}
+            start={{ x: 0.08, y: 0 }}
+            end={{ x: 0.92, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
           />
-          <LinearGradient
-            pointerEvents="none"
-            colors={[
-              'rgba(30,64,175,0.24)',
-              'rgba(37,99,235,0.08)',
-              'rgba(168,85,247,0.14)',
-              theme.ink(0),
-            ]}
-            locations={[0, 0.32, 0.66, 1]}
-            start={{ x: 0.1, y: 0 }}
-            end={{ x: 0.95, y: 0.85 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <LinearGradient
-            pointerEvents="none"
-            colors={['rgba(99,102,241,0)', 'rgba(139,92,246,0.12)', 'rgba(99,102,241,0)']}
-            start={{ x: 1, y: 0.1 }}
-            end={{ x: 0.2, y: 0.9 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <LinearGradient
-            pointerEvents="none"
-            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.42)']}
-            start={{ x: 0, y: 0.4 }}
-            end={{ x: 0, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <LinearGradient
-            pointerEvents="none"
-            colors={[theme.ink(0), theme.ink(0.14), theme.ink(0)]}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={[styles.daysCrystalFacet, styles.daysCrystalFacetTop]}
-          />
-          <LinearGradient
-            pointerEvents="none"
-            colors={[theme.ink(0), theme.ink(0.07), theme.ink(0)]}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={[styles.daysCrystalFacet, styles.daysCrystalFacetBottom]}
-          />
-          <View style={styles.daysLeftEdge} />
+          <View pointerEvents="none" style={styles.heroGloss} />
           <View style={styles.heroTopRow}>
             <View style={styles.heroTextBlock}>
               <Text style={styles.kicker}>Welcome Back</Text>
@@ -840,12 +935,9 @@ export default function HomeScreen() {
           <View style={styles.daysGlassCard}>
             <LinearGradient
               pointerEvents="none"
-              colors={[theme.ink(0.12), theme.ink(0.055), 'rgba(177, 18, 38, 0.1)']}
-              start={{ x: 0.08, y: 0 }}
-              end={{ x: 0.92, y: 1 }}
+              colors={['rgba(177,18,38,0.10)', 'rgba(255,255,255,0.03)']}
               style={StyleSheet.absoluteFill}
             />
-            <View pointerEvents="none" style={styles.heroGloss} />
             <View style={styles.daysTopRow}>
               <View>
                 <Text style={[styles.daysNumber, { color: countdownColor }]}>
@@ -1345,7 +1437,6 @@ export default function HomeScreen() {
               </View>
               <View style={styles.modalHeaderText}>
                 <Text style={[styles.modalKicker, { color: sheetAccent }]}>{sheetKicker}</Text>
-                <Text style={styles.modalTitle}>{sheetTitle}</Text>
               </View>
               <Pressable
                 onPress={closeMembershipModal}
@@ -1356,109 +1447,62 @@ export default function HomeScreen() {
               </Pressable>
             </View>
 
-            <Text style={styles.modalBody}>{sheetBody}</Text>
-
-            <View style={[styles.modalHeroCard, { borderColor: sheetAccentBorder }]}>
-              <LinearGradient
-                pointerEvents="none"
-                colors={[theme.ink(0.08), theme.ink(0), 'rgba(0,0,0,0.08)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFillObject}
-              />
-              <View style={styles.modalHeroTopRow}>
+            <View style={[styles.selectorCard, { borderColor: sheetAccentBorder }]}>
+              <View style={styles.selectorTopRow}>
                 <View>
-                  <Text style={styles.modalHeroLabel}>{sheetCaption}</Text>
-                  <Text style={styles.modalHeroValue}>
-                    ${sheetUnitPrice}
-                    <Text style={styles.modalHeroUnit}> / {isFreezeSheet ? 'week' : 'month'}</Text>
+                  <Text style={styles.selectorLabel}>{isFreezeSheet ? 'Duration' : 'Extension'}</Text>
+                  <Text style={styles.selectorValue}>
+                    {sheetUnitValue}
+                    <Text style={styles.selectorUnit}> {sheetUnitLabel}</Text>
                   </Text>
                 </View>
-                <View style={[styles.modalMiniPill, { borderColor: sheetAccentBorder, backgroundColor: sheetAccentSoft }]}>
-                  <Text style={[styles.modalMiniPillText, { color: sheetAccent }]}>{status ?? 'Pending'}</Text>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={styles.selectorLabel}>Total</Text>
+                  <Text style={[styles.selectorTotal, { color: sheetAccent }]}>
+                    ${sheetTotal.toFixed(0)}
+                  </Text>
                 </View>
               </View>
-              {renewalPricingNote && !isFreezeSheet ? (
-                <Text style={[styles.modalNote, { color: sheetAccent }]}>{renewalPricingNote}</Text>
-              ) : null}
-            </View>
 
-            <View style={styles.modalStatsRow}>
-              <View style={styles.modalStatCard}>
-                <Text style={styles.modalStatLabel}>{isFreezeSheet ? 'Duration' : 'Extension'}</Text>
-                <Text style={styles.modalStatValue}>{sheetUnitValue}</Text>
-                <Text style={styles.modalStatCaption}>{sheetUnitLabel}</Text>
-              </View>
-              <View style={styles.modalStatCard}>
-                <Text style={styles.modalStatLabel}>Total</Text>
-                <Text style={styles.modalStatValue}>${sheetTotal.toFixed(0)}</Text>
-                <Text style={styles.modalStatCaption}>cash voucher</Text>
-              </View>
-            </View>
-
-            <View style={styles.stepperRow}>
-              <Pressable
-                onPress={() =>
-                  isFreezeSheet
-                    ? setSelectedFreezeWeeks((value) => Math.max(1, value - 1))
-                    : setSelectedRenewMonths((value) => Math.max(minRenewMonths, value - 1))
+              <DurationSlider
+                value={sheetUnitValue}
+                min={isFreezeSheet ? 1 : minRenewMonths}
+                max={isFreezeSheet ? 12 : maxRenewMonths}
+                accent={sheetAccent}
+                trackColor={theme.ink(0.12)}
+                onChange={(next) =>
+                  isFreezeSheet ? setSelectedFreezeWeeks(next) : setSelectedRenewMonths(next)
                 }
-                style={styles.stepperButton}>
-                <Text style={[styles.stepperButtonText, { color: sheetAccent }]}>-</Text>
-              </Pressable>
-              <View style={styles.stepperValueCard}>
-                <Text style={styles.stepperValue}>{sheetUnitValue}</Text>
-                <Text style={styles.stepperLabel}>{sheetUnitLabel}</Text>
-              </View>
-              <Pressable
-                onPress={() =>
-                  isFreezeSheet
-                    ? setSelectedFreezeWeeks((value) => Math.min(12, value + 1))
-                    : setSelectedRenewMonths((value) => Math.min(maxRenewMonths, value + 1))
-                }
-                style={styles.stepperButton}>
-                <Text style={[styles.stepperButtonText, { color: sheetAccent }]}>+</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.durationTrack}>
-              <View
-                style={[
-                  styles.durationFill,
-                  {
-                    backgroundColor: sheetAccent,
-                    width: `${(sheetUnitValue / (isFreezeSheet ? 12 : maxRenewMonths)) * 100}%`,
-                  },
-                ]}
               />
+
+              <View style={styles.selectorScaleRow}>
+                <Text style={styles.selectorScaleText}>1 {isFreezeSheet ? 'wk' : 'mo'}</Text>
+                <Text style={styles.selectorScaleText}>
+                  {isFreezeSheet ? 12 : maxRenewMonths} {isFreezeSheet ? 'wks' : 'mos'}
+                </Text>
+              </View>
             </View>
 
-            <View style={styles.modalFooterRow}>
-              <View>
-                <Text style={styles.modalFooterLabel}>Ready to request</Text>
-                <Text style={styles.modalTotal}>${sheetTotal.toFixed(2)}</Text>
-              </View>
-              <View style={styles.modalActionRow}>
-                <Pressable
-                  disabled={isCreatingVoucher}
-                  onPress={closeMembershipModal}
-                  style={({ pressed }) => [
-                    styles.modalSecondaryButton,
-                    pressed && styles.buttonPressed,
-                  ]}>
-                  <Text style={styles.modalSecondaryText}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  disabled={isCreatingVoucher}
-                  onPress={sheetPrimaryAction}
-                  style={({ pressed }) => [
-                    styles.modalPrimaryButton,
-                    { backgroundColor: sheetAccent, shadowColor: sheetAccent },
-                    pressed && styles.buttonPressed,
-                  ]}>
-                  <Text style={styles.modalPrimaryText}>{sheetPrimaryLabel}</Text>
-                </Pressable>
-              </View>
+            <View style={[styles.modalActionRow, styles.sheetActionRow]}>
+              <Pressable
+                disabled={isCreatingVoucher}
+                onPress={closeMembershipModal}
+                style={({ pressed }) => [
+                  styles.modalSecondaryButton,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.modalSecondaryText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                disabled={isCreatingVoucher}
+                onPress={sheetPrimaryAction}
+                style={({ pressed }) => [
+                  styles.modalPrimaryButton,
+                  { backgroundColor: sheetAccent, shadowColor: sheetAccent },
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.modalPrimaryText}>{sheetPrimaryLabel}</Text>
+              </Pressable>
             </View>
           </Animated.View>
         </Animated.View>
@@ -1575,15 +1619,16 @@ function useStyles(theme: AppTheme) {
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: theme.ink(0.18),
-    borderRadius: 28,
-    padding: 18,
+    borderColor: theme.ink(0.14),
+    borderRadius: 26,
+    width: '100%',
+    padding: 20,
     marginBottom: 22,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.60,
-    shadowRadius: 32,
-    elevation: 12,
+    shadowColor: '#E11D2E',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.12,
+    shadowRadius: 28,
+    elevation: 6,
   },
   guestHeroFade: {
     ...StyleSheet.absoluteFillObject,
@@ -1850,15 +1895,16 @@ function useStyles(theme: AppTheme) {
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: theme.ink(0.14),
+    borderColor: 'rgba(255,255,255,0.12)',
     borderRadius: 26,
+    backgroundColor: 'rgba(18,20,28,0.86)',
     width: '100%',
-    padding: 20,
-    shadowColor: '#E11D2E',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.12,
-    shadowRadius: 28,
-    elevation: 6,
+    padding: 18,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.60,
+    shadowRadius: 32,
+    elevation: 12,
   },
   daysCrystalFacet: {
     position: 'absolute',
@@ -2778,169 +2824,60 @@ function useStyles(theme: AppTheme) {
     lineHeight: 20,
     marginTop: 12,
   },
-  modalHeroCard: {
-    position: 'relative',
-    overflow: 'hidden',
+  selectorCard: {
     borderWidth: 1,
     borderRadius: 24,
-    backgroundColor: theme.ink(0.04),
+    backgroundColor: theme.ink(0.035),
     marginTop: 18,
-    padding: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
   },
-  modalHeroTopRow: {
+  selectorTopRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: 12,
+    marginBottom: 14,
   },
-  modalHeroLabel: {
-    color: theme.colors.textMuted,
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  modalHeroValue: {
-    color: theme.colors.text,
-    fontSize: 28,
-    fontWeight: '900',
-    marginTop: 3,
-  },
-  modalHeroUnit: {
-    color: theme.colors.textMuted,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  modalMiniPill: {
-    minHeight: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 11,
-  },
-  modalMiniPillText: {
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  modalNote: {
-    color: '#9B7FF0',
-    fontSize: 12,
-    fontWeight: '900',
-    lineHeight: 18,
-    marginTop: 10,
-  },
-  modalStatsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 14,
-  },
-  modalStatCard: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: theme.ink(0.1),
-    borderRadius: 20,
-    backgroundColor: theme.ink(0.035),
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-  },
-  modalStatLabel: {
+  selectorLabel: {
     color: theme.colors.textFaint,
     fontSize: 10,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
-  modalStatValue: {
+  selectorValue: {
     color: theme.colors.text,
+    fontSize: 30,
+    fontWeight: '900',
+    marginTop: 4,
+  },
+  selectorUnit: {
+    color: theme.colors.textMuted,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  selectorTotal: {
     fontSize: 24,
     fontWeight: '900',
     marginTop: 4,
   },
-  modalStatCaption: {
-    color: theme.colors.textMuted,
+  selectorScaleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  selectorScaleText: {
+    color: theme.colors.textFaint,
     fontSize: 11,
     fontWeight: '800',
-    marginTop: 2,
-  },
-  stepperRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: theme.ink(0.1),
-    borderRadius: 24,
-    backgroundColor: theme.ink(0.035),
-    marginTop: 18,
-    padding: 10,
-  },
-  stepperButton: {
-    width: 50,
-    height: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
-    backgroundColor: theme.ink(0.08),
-  },
-  stepperButtonText: {
-    color: accentColor,
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  stepperValueCard: {
-    flex: 1,
-    alignItems: 'center',
-    borderWidth: 0,
-    borderRadius: 20,
-    backgroundColor:
-      theme.scheme === 'light' ? theme.colors.surfaceSoft : 'rgba(8, 10, 16, 0.72)',
-    paddingVertical: 12,
-  },
-  stepperValue: {
-    color: theme.colors.text,
-    fontSize: 30,
-    fontWeight: '900',
-  },
-  stepperLabel: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  durationTrack: {
-    height: 8,
-    overflow: 'hidden',
-    borderRadius: 999,
-    backgroundColor: theme.ink(0.12),
-    marginTop: 16,
-  },
-  durationFill: {
-    height: '100%',
-    borderRadius: 999,
-    backgroundColor: accentColor,
-  },
-  modalFooterRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: 14,
-    marginTop: 18,
-  },
-  modalFooterLabel: {
-    color: theme.colors.textMuted,
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  modalTotal: {
-    color: theme.colors.text,
-    fontSize: 26,
-    fontWeight: '900',
-    marginTop: 3,
   },
   modalActionRow: {
     flex: 1,
     flexDirection: 'row',
     gap: 10,
+  },
+  sheetActionRow: {
+    flex: 0,
+    marginTop: 20,
   },
   modalSecondaryButton: {
     minHeight: 54,

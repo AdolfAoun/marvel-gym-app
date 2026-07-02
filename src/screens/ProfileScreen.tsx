@@ -645,10 +645,18 @@ export default function ProfileScreen() {
               <Pressable
                 onPress={handleSignOut}
                 style={({ pressed }) => [
-                  styles.confirmPrimary,
+                  styles.confirmPrimaryWrap,
                   pressed && styles.buttonPressed,
                 ]}>
-                <Text style={styles.confirmPrimaryText}>Sign Out</Text>
+                <LinearGradient
+                  colors={['#FF2638', '#B11226', '#2A0308']}
+                  locations={[0, 0.58, 1]}
+                  start={{ x: 0.08, y: 0 }}
+                  end={{ x: 0.92, y: 1 }}
+                  style={styles.confirmPrimary}>
+                  <View pointerEvents="none" style={styles.confirmPrimaryGloss} />
+                  <Text style={styles.confirmPrimaryText}>Sign Out</Text>
+                </LinearGradient>
               </Pressable>
             </View>
           </View>
@@ -1030,26 +1038,37 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
   },
+  confirmPrimaryWrap: {
+    flex: 1,
+    borderRadius: 999,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
   confirmPrimary: {
     minHeight: 52,
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
     borderWidth: 1.2,
     borderColor: 'rgba(255,91,106,0.72)',
     borderRadius: 999,
-    backgroundColor: accentColor,
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.40,
-    shadowRadius: 18,
-    elevation: 7,
+  },
+  confirmPrimaryGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '42%',
+    backgroundColor: 'rgba(255,255,255,0.075)',
   },
   confirmPrimaryText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
+    letterSpacing: 0.3,
   },
   buttonPressed: {
     opacity: 0.78,

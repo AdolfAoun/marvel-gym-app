@@ -24,6 +24,7 @@ import Svg, {
   LinearGradient as SvgLinearGradient,
   Path,
   Stop,
+  Text as SvgText,
 } from 'react-native-svg';
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
@@ -32,7 +33,6 @@ import { useAppTheme, type AppTheme } from '@/theme/useAppTheme';
 import type {
   Achievement,
   AttendanceDay,
-  JourneyHistoryRecord,
   JourneyMetricKey,
   JourneyMetrics,
   JourneyProfile,
@@ -46,11 +46,22 @@ type TimerState = 'idle' | 'running' | 'paused';
 const journeyTimerStorageKey = 'marvel-gym:journey-workout-timer';
 const accentColor = '#B11226';
 const accentBright = '#E11D2E';
+const neonRed = '#FF3048';
+const neonOrange = '#F97316';
 const neonGreen = '#4ADE80';
 const neonBlue = '#3B82F6';
+const midnightPurple = '#6D4AB8';
 const neonYellow = '#FDE68A';
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const monthRailItemWidth = 116;
+const journeyMonthRailWidth = 84;
+const calendarTimeOptionHeight = 38;
+const calendarTimeWheelPadding = 0;
+const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, index) => {
+  const hours = Math.floor(index / 4);
+  const minutes = (index % 4) * 15;
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+});
 
 type RingMetric = {
   accent: string;
@@ -86,10 +97,32 @@ function formatMonth(value: string) {
   return new Intl.DateTimeFormat('en', { month: 'long' }).format(new Date(value));
 }
 
+function getMonthKey(value: string | Date) {
+  return (value instanceof Date ? value : new Date(value)).toISOString().slice(0, 7);
+}
+
+function formatCalendarDate(value: string) {
+  return new Intl.DateTimeFormat('en', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(value));
+}
+
+function formatTimeOptionLabel(value: string) {
+  const [hoursText, minutesText] = value.split(':');
+  const hours = Number.parseInt(hoursText, 10);
+  const minutes = Number.parseInt(minutesText, 10);
+  const suffix = hours >= 12 ? 'PM' : 'AM';
+  const normalizedHour = hours % 12 || 12;
+  return `${normalizedHour}:${minutes.toString().padStart(2, '0')} ${suffix}`;
+}
+
 function formatDuration(seconds: number) {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const remainingSeconds = seconds % 60;
+  const safeSeconds = Math.max(0, Math.round(seconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const remainingSeconds = safeSeconds % 60;
 
   if (hours > 0) {
     return `${hours.toString().padStart(2, '0')}:${minutes
@@ -102,25 +135,130 @@ function formatDuration(seconds: number) {
     .padStart(2, '0')}`;
 }
 
-function estimateCalories(durationSeconds: number) {
-  return Math.max(0, Math.round((durationSeconds / 60) * 8));
+function formatLiveDuration(seconds: number) {
+  const safeSeconds = Math.max(0, seconds);
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const remainingSeconds = Math.floor(safeSeconds % 60);
+  const centiseconds = Math.floor((safeSeconds % 1) * 100);
+
+  if (hours > 0) {
+    return `${hours.toString().padStart(2, '0')}:${minutes
+      .toString()
+      .padStart(2, '0')}:${remainingSeconds
+      .toString()
+      .padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}`;
+  }
+
+  return `${minutes.toString().padStart(2, '0')}:${remainingSeconds
+    .toString()
+    .padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}`;
 }
 
-function formatHistoryRange(historyRecord: JourneyHistoryRecord) {
-  const formatter = new Intl.DateTimeFormat('en', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-  return `${formatter.format(new Date(historyRecord.startedAt))} - ${formatter.format(
-    new Date(historyRecord.endedAt),
-  )}`;
+function estimateCalories(durationSeconds: number) {
+  return Math.max(0, Math.round((durationSeconds / 60) * 8));
 }
 
 function parseDurationMinutes(value?: string) {
   if (!value) return 0;
   const numericValue = Number.parseInt(value, 10);
   return Number.isNaN(numericValue) ? 0 : numericValue;
+}
+
+const NUMBER_WORDS: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+};
+
+function parseWordNumber(value?: string) {
+  if (!value) return undefined;
+  const lowerValue = value.toLowerCase();
+  if (NUMBER_WORDS[lowerValue] !== undefined) {
+    return NUMBER_WORDS[lowerValue];
+  }
+  const numericValue = Number.parseInt(value, 10);
+  return Number.isNaN(numericValue) ? undefined : numericValue;
+}
+
+function extractPlannerProfileInsights(biography?: string) {
+  const bio = biography?.toLowerCase() ?? '';
+  const weightKgMatch = bio.match(/(\d{2,3})\s?(kg|kgs|kilograms?)/);
+  const weightLbMatch = bio.match(/(\d{2,3})\s?(lb|lbs|pounds?)/);
+  const heightCmMatch = bio.match(/(\d{3})\s?(cm|centimeters?)/);
+  const heightFeetMatch = bio.match(/(\d)\s?(?:ft|feet|')\s?(\d{1,2})?/);
+  const frequencyMatch = bio.match(
+    /(\d+|one|two|three|four|five|six|seven)\s+(?:days?|times?)\s+(?:a|per)\s+week/,
+  );
+
+  const weightKg = weightKgMatch
+    ? Number.parseInt(weightKgMatch[1], 10)
+    : weightLbMatch
+      ? Math.round(Number.parseInt(weightLbMatch[1], 10) * 0.453592)
+      : undefined;
+  const heightCm = heightCmMatch
+    ? Number.parseInt(heightCmMatch[1], 10)
+    : heightFeetMatch
+      ? Math.round(
+          Number.parseInt(heightFeetMatch[1], 10) * 30.48 +
+            Number.parseInt(heightFeetMatch[2] ?? '0', 10) * 2.54,
+        )
+      : undefined;
+  const sessionsPerWeek = parseWordNumber(frequencyMatch?.[1]);
+  const goal =
+    bio.includes('fat loss') || bio.includes('lose weight') || bio.includes('weight loss')
+      ? 'fat-loss'
+      : bio.includes('endurance') || bio.includes('cardio')
+        ? 'endurance'
+        : bio.includes('strength') || bio.includes('muscle') || bio.includes('lean')
+          ? 'strength'
+          : 'general';
+
+  return {
+    goal,
+    heightCm,
+    sessionsPerWeek,
+    weightKg,
+  };
+}
+
+function estimatePersonalizedCalories(durationMinutes: number, biography?: string) {
+  const profileInsights = extractPlannerProfileInsights(biography);
+  let caloriesPerMinute = 7.2;
+
+  if (profileInsights.weightKg) {
+    caloriesPerMinute += (profileInsights.weightKg - 70) * 0.035;
+  }
+  if (profileInsights.heightCm) {
+    caloriesPerMinute += (profileInsights.heightCm - 170) * 0.006;
+  }
+  if (profileInsights.sessionsPerWeek) {
+    caloriesPerMinute += profileInsights.sessionsPerWeek >= 5 ? 0.35 : -0.15;
+  }
+
+  switch (profileInsights.goal) {
+    case 'fat-loss':
+      caloriesPerMinute += 0.45;
+      break;
+    case 'endurance':
+      caloriesPerMinute += 0.65;
+      break;
+    case 'strength':
+      caloriesPerMinute += 0.15;
+      break;
+    default:
+      break;
+  }
+
+  const clampedCaloriesPerMinute = Math.min(14, Math.max(5.5, caloriesPerMinute));
+  return Math.round(durationMinutes * clampedCaloriesPerMinute);
 }
 
 async function saveStoredTimerState(timer: StoredTimerState) {
@@ -247,92 +385,195 @@ function MetricRing({ metric, size = 138 }: { metric: RingMetric; size?: number 
 }
 
 function TrendChart({ points }: { points: ChartPoint[] }) {
-  const width = 310;
-  const height = 126;
-  const maxDuration = 30;
+  // Reference scale: at these baseline domains the plot exactly fills the visible
+  // box (no scrolling). Sessions inside these ranges look identical to before;
+  // anything beyond just extends the scrollable content, never the box itself.
+  const defaultDuration = 120;
+  const baseWidth = 310;
+  const viewportHeight = 126;
+  const baseCalorieRange = 400;
+  const calorieStep = 100;
+  // Always keep at least this much room to scroll into, even for short/light
+  // sessions, so there's headroom for a 4-hour workout or an 800+ kcal burn.
+  const minDurationDomain = 240;
+
   const sortedPoints = [
     { calories: 0, duration: 0, label: 'Start' },
     ...[...points].sort((left, right) => left.duration - right.duration),
   ];
-  const maxCalories = Math.max(
-    100,
-    Math.ceil(Math.max(...sortedPoints.map((point) => point.calories), 100) / 100) * 100,
+  const longestDuration = Math.max(...sortedPoints.map((point) => point.duration), minDurationDomain);
+  const maxDuration = Math.ceil(longestDuration / 30) * 30;
+  const width = baseWidth * (maxDuration / defaultDuration);
+
+  const maxCaloriesInData = Math.max(...sortedPoints.map((point) => point.calories), 0);
+  const plotMaxCalories = Math.max(
+    baseCalorieRange,
+    Math.ceil(maxCaloriesInData / calorieStep) * calorieStep,
   );
+  // The plot's own content height grows past the visible box once calories go
+  // past the baseline range — that extra height is what makes it scrollable.
+  const plotHeight = viewportHeight * (plotMaxCalories / baseCalorieRange);
+
   const caloriePoints = buildDurationPlotPoints(
     sortedPoints,
     width,
-    height,
+    plotHeight,
     maxDuration,
-    maxCalories,
+    plotMaxCalories,
   );
   const caloriePath = buildCurvePath(caloriePoints);
-  const areaPath = buildAreaPath(caloriePoints, height);
+  const areaPath = buildAreaPath(caloriePoints, plotHeight);
   const durationTicks = Array.from({ length: maxDuration / 30 + 1 }, (_, index) => index * 30);
-  const calorieTicks = [maxCalories, Math.round(maxCalories / 2), 0];
+  // Checkpoints only, descending — the shared "0" is drawn once, separately, at
+  // the corner where both axes meet.
+  const calorieCheckpoints = Array.from(
+    { length: plotMaxCalories / calorieStep },
+    (_, index) => plotMaxCalories - index * calorieStep,
+  );
+  const svgHeight = plotHeight + 28;
+  const viewportSvgHeight = viewportHeight + 28;
+  const axisLabelWidth = 30;
+  const calorieTickY = (tick: number) => plotHeight - (tick / plotMaxCalories) * plotHeight;
+  // Open scrolled to the bottom so the familiar 0–400 kcal range is what shows by
+  // default; scrolling up reveals whatever lies beyond it.
+  const initialCalorieScrollY = Math.max(0, svgHeight - viewportSvgHeight);
+  const formatDurationTick = (tick: number) => {
+    if (tick % 60 === 0) return `${tick / 60}h`;
+    if (tick < 60) return `${tick}m`;
+    return `${Math.floor(tick / 60)}h30`;
+  };
 
   return (
     <View style={styles.chartRow}>
       <View style={styles.chartYAxisTitleCol}>
-        <Text style={styles.chartYAxisTitle}>Calories burned</Text>
+        <Text style={styles.chartYAxisTitle}>Avg calories</Text>
       </View>
-      <View style={styles.chartCanvas}>
-        <View pointerEvents="none" style={styles.chartGrid}>
-          {[0, 1, 2, 3].map((line) => (
-            <View key={line} style={styles.chartGridLine} />
-          ))}
-        </View>
-        <View style={styles.chartYAxisLabels}>
-          {calorieTicks.map((tick) => (
-            <Text key={tick} style={styles.chartAxisLabel}>
-              {tick}
-            </Text>
-          ))}
-        </View>
-        <Svg width="100%" height={156} viewBox={`0 0 ${width} ${height + 28}`}>
-          <Defs>
-            <SvgLinearGradient id="journey-area" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={accentBright} stopOpacity="0.34" />
-              <Stop offset="1" stopColor={accentBright} stopOpacity="0" />
-            </SvgLinearGradient>
-          </Defs>
-          <Path d={`M 0 ${height} H ${width}`} stroke="rgba(255,255,255,0.24)" strokeWidth="1.4" />
-          <Path d={`M 0 0 V ${height}`} stroke="rgba(255,255,255,0.24)" strokeWidth="1.4" />
-          {durationTicks.map((tick) => {
-            const x = (tick / maxDuration) * width;
-            return (
-              <Path
-                key={tick}
-                d={`M ${x.toFixed(1)} 0 V ${height}`}
-                stroke="rgba(255,255,255,0.07)"
-                strokeWidth="1"
-              />
-            );
-          })}
-          <Path d={areaPath} fill="url(#journey-area)" />
-          <Path
-            d={caloriePath}
-            fill="none"
-            stroke={accentBright}
-            strokeWidth="4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          {caloriePoints.map((point, index) => (
-            <Circle key={`calorie-${index}`} cx={point.x} cy={point.y} r={3.5} fill={accentBright} />
-          ))}
-        </Svg>
-        <View style={styles.chartXAxis}>
-          {durationTicks.map((tick) => (
-            <Text key={tick} style={styles.chartXAxisLabel} numberOfLines={1}>
-              {tick}m
-            </Text>
-          ))}
-        </View>
-        <Text style={styles.chartXAxisTitle}>Time duration</Text>
-        <View style={styles.chartLegendRow}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: accentBright }]} />
-            <Text style={styles.legendText}>Calories</Text>
+      <View style={styles.chartCanvasGlow}>
+        <View style={styles.chartCanvas}>
+          {/* Vertical scroll wraps the whole plot row (calorie axis + duration
+              plot together, exactly like the duration axis already rides along
+              inside the horizontal scroll) — that's what keeps the calorie
+              labels and their checkpoint lines in sync while scrolling, and
+              what lets the visible box stay the original size while the
+              content behind it can run past 400 kcal. */}
+          <ScrollView
+            style={{ height: viewportSvgHeight }}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+            nestedScrollEnabled
+            contentOffset={{ x: 0, y: initialCalorieScrollY }}>
+            <View style={styles.chartPlotRow}>
+              <Svg width={axisLabelWidth} height={svgHeight} viewBox={`0 0 ${axisLabelWidth} ${svgHeight}`}>
+                {calorieCheckpoints.map((tick) => (
+                  <SvgText
+                    key={tick}
+                    x={axisLabelWidth - 6}
+                    y={calorieTickY(tick) + 3}
+                    fontSize={9}
+                    fontWeight="900"
+                    fill="rgba(255,255,255,0.46)"
+                    textAnchor="end">
+                    {tick}
+                  </SvgText>
+                ))}
+                {/* The single, shared "0" — sits diagonally right on the corner
+                    where the calorie axis and duration axis intersect. */}
+                <SvgText
+                  x={axisLabelWidth - 2}
+                  y={plotHeight + 3}
+                  fontSize={9}
+                  fontWeight="900"
+                  fill="rgba(255,255,255,0.46)"
+                  textAnchor="end"
+                  rotation="-40"
+                  originX={axisLabelWidth - 2}
+                  originY={plotHeight + 3}>
+                  0
+                </SvgText>
+              </Svg>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                bounces={false}
+                style={styles.chartPlotScroll}
+                contentContainerStyle={[styles.chartPlotScrollContent, { width }]}>
+                <View style={[styles.chartPlotInner, { width }]}>
+                  <Svg width={width} height={svgHeight} viewBox={`0 0 ${width} ${svgHeight}`}>
+                    <Defs>
+                      <SvgLinearGradient id="journey-area" x1="0" y1="0" x2="0" y2="1">
+                        <Stop offset="0" stopColor={midnightPurple} stopOpacity="0.42" />
+                        <Stop offset="1" stopColor={midnightPurple} stopOpacity="0" />
+                      </SvgLinearGradient>
+                      <SvgLinearGradient id="journey-line" x1="0" y1="0" x2="1" y2="0">
+                        <Stop offset="0" stopColor="#9B7FF0" stopOpacity="1" />
+                        <Stop offset="1" stopColor={midnightPurple} stopOpacity="1" />
+                      </SvgLinearGradient>
+                    </Defs>
+                    {/* Checkpoint grid lines — one per calorie tick, always starting
+                        right at the y-axis (x=0) and drawn at the tick's exact
+                        pixel height, so they never float free of the axis. */}
+                    {calorieCheckpoints.map((tick) => (
+                      <Path
+                        key={tick}
+                        d={`M 0 ${calorieTickY(tick).toFixed(1)} H ${width}`}
+                        stroke="rgba(255,255,255,0.07)"
+                        strokeWidth="1"
+                      />
+                    ))}
+                    <Path d={`M 0 ${plotHeight} H ${width}`} stroke="rgba(255,255,255,0.24)" strokeWidth="1.4" />
+                    <Path d={`M 0 0 V ${plotHeight}`} stroke="rgba(255,255,255,0.24)" strokeWidth="1.4" />
+                    {durationTicks.map((tick) => {
+                      const x = (tick / maxDuration) * width;
+                      return (
+                        <Path
+                          key={tick}
+                          d={`M ${x.toFixed(1)} 0 V ${plotHeight}`}
+                          stroke="rgba(255,255,255,0.07)"
+                          strokeWidth="1"
+                        />
+                      );
+                    })}
+                    <Path d={areaPath} fill="url(#journey-area)" />
+                    <Path
+                      d={caloriePath}
+                      fill="none"
+                      stroke={midnightPurple}
+                      strokeOpacity={0.45}
+                      strokeWidth="9"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <Path
+                      d={caloriePath}
+                      fill="none"
+                      stroke="url(#journey-line)"
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    {caloriePoints.map((point, index) => (
+                      <Circle key={`calorie-${index}`} cx={point.x} cy={point.y} r={3.5} fill="#9B7FF0" />
+                    ))}
+                  </Svg>
+                  <View style={styles.chartXAxis}>
+                    {durationTicks
+                      .filter((tick) => tick > 0)
+                      .map((tick) => (
+                        <Text key={tick} style={styles.chartXAxisLabel} numberOfLines={1}>
+                          {formatDurationTick(tick)}
+                        </Text>
+                      ))}
+                  </View>
+                </View>
+              </ScrollView>
+            </View>
+          </ScrollView>
+          <Text style={styles.chartXAxisTitle}>Avg session duration</Text>
+          <View style={styles.chartLegendRow}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: midnightPurple }]} />
+              <Text style={styles.legendText}>Monthly average</Text>
+            </View>
           </View>
         </View>
       </View>
@@ -347,29 +588,33 @@ export default function JourneyScreen() {
 
   const [attendanceDays, setAttendanceDays] = useState<AttendanceDay[]>([]);
   const [workoutSessions, setWorkoutSessions] = useState<WorkoutSession[]>([]);
-  const [historyRecords, setHistoryRecords] = useState<JourneyHistoryRecord[]>([]);
   const [stats, setStats] = useState<JourneyStats>();
   const [achievements, setAchievements] = useState<Achievement[]>([]);
 
   const [isCalendarEditorOpen, setIsCalendarEditorOpen] = useState(false);
-  const [selectedMonthIndex, setSelectedMonthIndex] = useState(new Date().getMonth());
+  const [ringMonthIndex, setRingMonthIndex] = useState(new Date().getMonth());
+  const [attendanceMonthIndex, setAttendanceMonthIndex] = useState(new Date().getMonth());
+  const [analyticsMonthIndex, setAnalyticsMonthIndex] = useState(new Date().getMonth());
   const [timerState, setTimerState] = useState<TimerState>('idle');
   const stylesForTheme = useStyles(theme, timerState);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [lastCalories, setLastCalories] = useState(0);
   const [pendingVisitDate, setPendingVisitDate] = useState('');
   const [metrics, setMetrics] = useState<JourneyMetrics>();
-  const [pendingMetricResetKey, setPendingMetricResetKey] = useState<JourneyMetricKey>();
-  const [isPendingMetricResetAll, setIsPendingMetricResetAll] = useState(false);
-  const [undoableMetricKeys, setUndoableMetricKeys] = useState<JourneyMetricKey[]>([]);
-  const [isAllMetricResetUndoable, setIsAllMetricResetUndoable] = useState(false);
   const [pendingTimerSeconds, setPendingTimerSeconds] = useState(0);
-  const [isHistoryVisible, setIsHistoryVisible] = useState(false);
+  const [isCalendarTimeEnabled, setIsCalendarTimeEnabled] = useState(false);
+  const [calendarStartTime, setCalendarStartTime] = useState('17:00');
+  const [calendarEndTime, setCalendarEndTime] = useState('18:00');
   const [isLoading, setIsLoading] = useState(true);
+  const [ringAnimationSeed, setRingAnimationSeed] = useState(0);
   const timerStartedAtRef = useRef<number | undefined>(undefined);
   const pausedElapsedRef = useRef(0);
   const breathe = useRef(new Animated.Value(0)).current;
-  const monthRailRef = useRef<ScrollView>(null);
+  const analyticsMonthRailRef = useRef<ScrollView>(null);
+  const journeyMonthRailRef = useRef<ScrollView>(null);
+  const attendanceMonthRailRef = useRef<ScrollView>(null);
+  const calendarStartTimeRef = useRef<ScrollView>(null);
+  const calendarEndTimeRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -397,7 +642,6 @@ export default function JourneyScreen() {
         journeyProfile,
         attendance,
         sessions,
-        history,
         journeyStats,
         journeyMetrics,
         nextAchievements,
@@ -407,7 +651,6 @@ export default function JourneyScreen() {
         journeyService.getJourneyProfile(),
         journeyService.getAttendanceDays(),
         journeyService.getWorkoutSessions(),
-        journeyService.getJourneyHistory(),
         journeyService.getJourneyStats(),
         journeyService.getJourneyMetrics(),
         journeyService.getAchievements(),
@@ -418,7 +661,6 @@ export default function JourneyScreen() {
       setProfile(journeyProfile);
       setAttendanceDays(attendance);
       setWorkoutSessions(sessions);
-      setHistoryRecords(history);
       setStats(journeyStats);
       setMetrics(journeyMetrics);
       setAchievements(nextAchievements);
@@ -428,7 +670,7 @@ export default function JourneyScreen() {
         pausedElapsedRef.current = storedTimer.elapsedSeconds;
         setElapsedSeconds(
           storedTimer.elapsedSeconds +
-            Math.max(0, Math.floor((Date.now() - storedTimer.startedAt) / 1000)),
+            Math.max(0, (Date.now() - storedTimer.startedAt) / 1000),
         );
         setTimerState('running');
       } else if (storedTimer?.state === 'paused') {
@@ -446,13 +688,13 @@ export default function JourneyScreen() {
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
+      setRingAnimationSeed((current) => current + 1);
 
       const syncJourney = async () => {
-        const [attendance, sessions, history, journeyStats, journeyMetrics] =
+        const [attendance, sessions, journeyStats, journeyMetrics] =
           await Promise.all([
             journeyService.getAttendanceDays(),
             journeyService.getWorkoutSessions(),
-            journeyService.getJourneyHistory(),
             journeyService.getJourneyStats(),
             journeyService.getJourneyMetrics(),
           ]);
@@ -461,10 +703,12 @@ export default function JourneyScreen() {
 
         setAttendanceDays(attendance);
         setWorkoutSessions(sessions);
-        setHistoryRecords(history);
         setStats(journeyStats);
         setMetrics(journeyMetrics);
-        setSelectedMonthIndex(new Date().getMonth());
+        const currentMonthIndex = new Date().getMonth();
+        setRingMonthIndex(currentMonthIndex);
+        setAttendanceMonthIndex(currentMonthIndex);
+        setAnalyticsMonthIndex(currentMonthIndex);
       };
 
       syncJourney();
@@ -480,9 +724,9 @@ export default function JourneyScreen() {
 
     const interval = setInterval(() => {
       if (!timerStartedAtRef.current) return;
-      const liveSeconds = Math.floor((Date.now() - timerStartedAtRef.current) / 1000);
+      const liveSeconds = (Date.now() - timerStartedAtRef.current) / 1000;
       setElapsedSeconds(pausedElapsedRef.current + liveSeconds);
-    }, 250);
+    }, 50);
 
     return () => clearInterval(interval);
   }, [timerState]);
@@ -507,63 +751,152 @@ export default function JourneyScreen() {
   }, [attendanceDays]);
 
   const activeMonthIndex = Math.min(
-    Math.max(0, selectedMonthIndex),
+    Math.max(0, attendanceMonthIndex),
+    Math.max(0, attendanceByMonth.length - 1),
+  );
+  const activeRingMonthIndex = Math.min(
+    Math.max(0, ringMonthIndex),
+    Math.max(0, attendanceByMonth.length - 1),
+  );
+  const activeAnalyticsMonthIndex = Math.min(
+    Math.max(0, analyticsMonthIndex),
     Math.max(0, attendanceByMonth.length - 1),
   );
   const selectedMonth = attendanceByMonth[activeMonthIndex];
-  const selectedMonthKey = selectedMonth?.days[0]?.date.slice(0, 7) ?? '';
+  const ringMonth = attendanceByMonth[activeRingMonthIndex];
+  const analyticsMonth = attendanceByMonth[activeAnalyticsMonthIndex];
+  const analyticsMonthKey = analyticsMonth?.days[0]?.date.slice(0, 7) ?? '';
+  const monthBounds = useMemo(() => {
+    const firstAllowedKey = getMonthKey(member?.createdAt ?? new Date());
+    const lastAllowedKey = getMonthKey(new Date());
+    const firstAllowedIndex = attendanceByMonth.findIndex(
+      (month) => month.days[0]?.date.slice(0, 7) >= firstAllowedKey,
+    );
+    const lastAllowedIndex = attendanceByMonth.findLastIndex(
+      (month) => month.days[0]?.date.slice(0, 7) <= lastAllowedKey,
+    );
+
+    return {
+      first: firstAllowedIndex >= 0 ? firstAllowedIndex : 0,
+      last: lastAllowedIndex >= 0 ? lastAllowedIndex : Math.max(0, attendanceByMonth.length - 1),
+    };
+  }, [attendanceByMonth, member?.createdAt]);
+  const canShowPreviousMonth = activeRingMonthIndex > monthBounds.first;
+  const canShowNextMonth = activeRingMonthIndex < monthBounds.last;
+  const canShowPreviousAttendanceMonth = activeMonthIndex > monthBounds.first;
+  const canShowNextAttendanceMonth = activeMonthIndex < monthBounds.last;
+  const canShowPreviousAnalyticsMonth = activeAnalyticsMonthIndex > monthBounds.first;
+  const canShowNextAnalyticsMonth = activeAnalyticsMonthIndex < monthBounds.last;
+  const journeyMonthItems = useMemo(
+    () => attendanceByMonth.slice(monthBounds.first, monthBounds.last + 1),
+    [attendanceByMonth, monthBounds.first, monthBounds.last],
+  );
+  useEffect(() => {
+    setRingMonthIndex((value) =>
+      Math.min(monthBounds.last, Math.max(monthBounds.first, value)),
+    );
+    setAttendanceMonthIndex((value) =>
+      Math.min(monthBounds.last, Math.max(monthBounds.first, value)),
+    );
+    setAnalyticsMonthIndex((value) =>
+      Math.min(monthBounds.last, Math.max(monthBounds.first, value)),
+    );
+  }, [monthBounds.first, monthBounds.last]);
   const selectedMonthVisitCount = selectedMonth?.days.filter((day) => day.hasVisit).length ?? 0;
-  const selectedMonthSessions = useMemo(
+  const ringMonthVisitCount = ringMonth?.days.filter((day) => day.hasVisit).length ?? 0;
+  const ringMonthCompletionRate = ringMonth
+    ? Math.round((ringMonthVisitCount / Math.max(1, ringMonth.days.length)) * 100)
+    : 0;
+  const analyticsMonthSessions = useMemo(
     () =>
       workoutSessions
-        .filter((session) => session.endedAt.startsWith(selectedMonthKey))
+        .filter((session) => session.endedAt.startsWith(analyticsMonthKey))
         .sort((left, right) => left.endedAt.localeCompare(right.endedAt)),
-    [selectedMonthKey, workoutSessions],
+    [analyticsMonthKey, workoutSessions],
   );
-  const selectedMonthCompletionRate = selectedMonth
-    ? Math.round((selectedMonthVisitCount / Math.max(1, selectedMonth.days.length)) * 100)
-    : 0;
   const selectedMonthVisitedDays = useMemo(
     () => selectedMonth?.days.filter((day) => day.hasVisit) ?? [],
     [selectedMonth],
   );
+  const selectedCalendarDay = useMemo(
+    () => attendanceDays.find((day) => day.date === pendingVisitDate),
+    [attendanceDays, pendingVisitDate],
+  );
+  const selectedCalendarDurationMinutes = useMemo(() => {
+    const [startHour, startMinute] = calendarStartTime.split(':').map(Number);
+    const [endHour, endMinute] = calendarEndTime.split(':').map(Number);
+    return endHour * 60 + endMinute - (startHour * 60 + startMinute);
+  }, [calendarEndTime, calendarStartTime]);
 
   const timerCalories = estimateCalories(elapsedSeconds);
 
-  const chartPoints = useMemo<ChartPoint[]>(() => {
-    if (selectedMonthSessions.length === 0) {
-      return [
-        { calories: 190, duration: 24, label: 'W1' },
-        { calories: 280, duration: 34, label: 'W2' },
-        { calories: 230, duration: 29, label: 'W3' },
-        { calories: 350, duration: 43, label: 'W4' },
-      ];
+  const analyticsAverageDurationMinutes = useMemo(() => {
+    if (analyticsMonthSessions.length === 0) {
+      return 75;
     }
 
-    return selectedMonthSessions.map((session) => ({
-      calories: Math.max(1, session.estimatedCaloriesBurned),
-      duration: Math.max(1, Math.round(session.durationSeconds / 60)),
-      label: formatDay(session.endedAt),
-    }));
-  }, [selectedMonthSessions]);
+    const totalDurationMinutes = analyticsMonthSessions.reduce(
+      (sum, session) => sum + session.durationSeconds / 60,
+      0,
+    );
+
+    return Math.max(30, Math.round(totalDurationMinutes / analyticsMonthSessions.length));
+  }, [analyticsMonthSessions]);
+
+  const analyticsAverageCalories = useMemo(() => {
+    return estimatePersonalizedCalories(
+      analyticsAverageDurationMinutes,
+      profile?.biography,
+    );
+  }, [analyticsAverageDurationMinutes, profile?.biography]);
+
+  const chartPoints = useMemo<ChartPoint[]>(() => {
+    const averageDuration = analyticsAverageDurationMinutes;
+    const averageCalories = analyticsAverageCalories;
+    const intervalCount = Math.max(1, Math.ceil(averageDuration / 30));
+    const basePoints = Array.from({ length: intervalCount }, (_, index) => {
+      const duration = Math.min(averageDuration, (index + 1) * 30);
+      const progress = duration / averageDuration;
+      const easedCalories = Math.round(averageCalories * Math.pow(progress, 0.92));
+
+      return {
+        calories: Math.max(1, easedCalories),
+        duration,
+        label: `${duration}m`,
+      };
+    });
+
+    const finalPoint = {
+      calories: averageCalories,
+      duration: averageDuration,
+      label: `${averageDuration}m`,
+    };
+
+    if (basePoints[basePoints.length - 1]?.duration === averageDuration) {
+      basePoints[basePoints.length - 1] = finalPoint;
+      return basePoints;
+    }
+
+    return [...basePoints, finalPoint];
+  }, [analyticsAverageCalories, analyticsAverageDurationMinutes]);
 
   const metricCards: { accent: string; key: JourneyMetricKey; label: string; value: string | number }[] =
     [
       { accent: accentBright, key: 'totalVisits', label: 'Total visits', value: metrics?.totalVisits ?? 0 },
       {
-        accent: neonBlue,
+        accent: accentBright,
         key: 'averageMonthlyVisits',
         label: 'Monthly avg',
         value: metrics?.averageMonthlyVisits ?? '0',
       },
       {
-        accent: neonYellow,
+        accent: accentBright,
         key: 'averageCaloriesBurned',
         label: 'Avg calories burned per session',
         value: metrics?.averageCaloriesBurned ?? 0,
       },
       {
-        accent: neonGreen,
+        accent: accentBright,
         key: 'averageWorkoutDuration',
         label: 'Avg duration',
         value: metrics?.averageWorkoutDuration ?? '0 min',
@@ -572,12 +905,12 @@ export default function JourneyScreen() {
 
   const ringMetrics: RingMetric[] = [
     {
-      accent: accentBright,
+      accent: neonRed,
       detail: 'visits',
       label: 'Visits',
-      progress: selectedMonthCompletionRate / 100,
+      progress: ringMonthCompletionRate / 100,
       symbol: 'calendar',
-      value: `${selectedMonthVisitCount}`,
+      value: `${ringMonthVisitCount}`,
     },
     {
       accent: neonGreen,
@@ -615,17 +948,90 @@ export default function JourneyScreen() {
     setStats(nextStats);
   };
 
-  const refreshJourneyHistory = async () => {
-    const nextHistory = await journeyService.getJourneyHistory();
-    setHistoryRecords(nextHistory);
+  const handleSelectCalendarDay = (date: string) => {
+    setPendingVisitDate(date);
+    setIsCalendarTimeEnabled(false);
+    setCalendarStartTime('17:00');
+    setCalendarEndTime('18:00');
   };
 
-  const confirmToggleVisit = async () => {
+  const scrollCalendarTimeWheel = useCallback(
+    (ref: { current: ScrollView | null }, value: string, animated: boolean) => {
+      const nextIndex = Math.max(0, TIME_OPTIONS.indexOf(value));
+      ref.current?.scrollTo({
+        animated,
+        y: nextIndex * calendarTimeOptionHeight,
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!pendingVisitDate || !isCalendarTimeEnabled) return;
+    scrollCalendarTimeWheel(calendarStartTimeRef, calendarStartTime, false);
+    scrollCalendarTimeWheel(calendarEndTimeRef, calendarEndTime, false);
+  }, [
+    calendarEndTime,
+    calendarStartTime,
+    isCalendarTimeEnabled,
+    pendingVisitDate,
+    scrollCalendarTimeWheel,
+  ]);
+
+  const handleCalendarTimeMomentumEnd = useCallback(
+    (
+      event: NativeSyntheticEvent<NativeScrollEvent>,
+      kind: 'start' | 'end',
+    ) => {
+      const nextIndex = Math.min(
+        TIME_OPTIONS.length - 1,
+        Math.max(
+          0,
+          Math.round(event.nativeEvent.contentOffset.y / calendarTimeOptionHeight),
+        ),
+      );
+      const nextValue = TIME_OPTIONS[nextIndex];
+      if (!nextValue) return;
+      if (kind === 'start') {
+        setCalendarStartTime(nextValue);
+        return;
+      }
+      setCalendarEndTime(nextValue);
+    },
+    [],
+  );
+
+  const handleSaveCalendarEntry = async () => {
     if (!pendingVisitDate) return;
     await Haptics.selectionAsync();
-    const nextAttendance = await journeyService.toggleAttendanceDay(pendingVisitDate);
+    if (isCalendarTimeEnabled) {
+      await journeyService.logWorkoutSessionForDay({
+        date: pendingVisitDate,
+        startTime: calendarStartTime,
+        endTime: calendarEndTime,
+      });
+    } else {
+      await journeyService.markAttendanceDay(pendingVisitDate, true);
+    }
+    const [nextAttendance, nextSessions] = await Promise.all([
+      journeyService.getAttendanceDays(),
+      journeyService.getWorkoutSessions(),
+    ]);
+    setAttendanceDays(nextAttendance);
+    setWorkoutSessions(nextSessions);
+    setPendingVisitDate('');
+    setIsCalendarTimeEnabled(false);
+    await refreshStats();
+    await refreshMetrics();
+  };
+
+  const handleClearCalendarEntry = async () => {
+    if (!pendingVisitDate) return;
+    await Haptics.selectionAsync();
+    const nextAttendance = await journeyService.markAttendanceDay(pendingVisitDate, false);
     setAttendanceDays(nextAttendance);
     setPendingVisitDate('');
+    setIsCalendarTimeEnabled(false);
     await refreshStats();
     await refreshMetrics();
   };
@@ -647,7 +1053,7 @@ export default function JourneyScreen() {
   const handlePauseTimer = () => {
     if (!timerStartedAtRef.current) return;
     Haptics.selectionAsync();
-    const liveSeconds = Math.floor((Date.now() - timerStartedAtRef.current) / 1000);
+    const liveSeconds = (Date.now() - timerStartedAtRef.current) / 1000;
     pausedElapsedRef.current += liveSeconds;
     setElapsedSeconds(pausedElapsedRef.current);
     timerStartedAtRef.current = undefined;
@@ -655,14 +1061,15 @@ export default function JourneyScreen() {
     saveStoredTimerState({ elapsedSeconds: pausedElapsedRef.current, state: 'paused' });
   };
 
-  const handleEndWorkout = async () => {
+  const handleResetTimer = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     const liveElapsedSeconds = timerStartedAtRef.current
       ? pausedElapsedRef.current +
-        Math.max(0, Math.round((Date.now() - timerStartedAtRef.current) / 1000))
+        Math.max(0, (Date.now() - timerStartedAtRef.current) / 1000)
       : elapsedSeconds;
+    const roundedElapsedSeconds = Math.max(0, Math.round(liveElapsedSeconds));
 
-    if (liveElapsedSeconds <= 0) {
+    if (roundedElapsedSeconds <= 0) {
       setTimerState('idle');
       timerStartedAtRef.current = undefined;
       pausedElapsedRef.current = 0;
@@ -671,7 +1078,7 @@ export default function JourneyScreen() {
     }
 
     setElapsedSeconds(liveElapsedSeconds);
-    setPendingTimerSeconds(liveElapsedSeconds);
+    setPendingTimerSeconds(roundedElapsedSeconds);
     setTimerState('paused');
     timerStartedAtRef.current = undefined;
     pausedElapsedRef.current = liveElapsedSeconds;
@@ -703,59 +1110,6 @@ export default function JourneyScreen() {
     clearStoredTimerState();
   };
 
-  const confirmResetMetric = async () => {
-    if (!pendingMetricResetKey && !isPendingMetricResetAll) return;
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-
-    const nextMetrics = isPendingMetricResetAll
-      ? await journeyService.resetAllJourneyMetrics()
-      : await journeyService.resetJourneyMetric(pendingMetricResetKey as JourneyMetricKey);
-
-    setMetrics(nextMetrics);
-    if (isPendingMetricResetAll) {
-      setIsAllMetricResetUndoable(true);
-      setUndoableMetricKeys([]);
-    } else if (pendingMetricResetKey) {
-      setIsAllMetricResetUndoable(false);
-      setUndoableMetricKeys((current) => [
-        pendingMetricResetKey,
-        ...current.filter((key) => key !== pendingMetricResetKey),
-      ]);
-    }
-    setPendingMetricResetKey(undefined);
-    setIsPendingMetricResetAll(false);
-  };
-
-  const handleUndoMetric = async (metricKey: JourneyMetricKey) => {
-    await Haptics.selectionAsync();
-    const nextMetrics = await journeyService.undoResetJourneyMetric(metricKey);
-    setMetrics(nextMetrics);
-    setUndoableMetricKeys((current) => current.filter((key) => key !== metricKey));
-    await refreshJourneyHistory();
-  };
-
-  const handleUndoMetricAll = async () => {
-    await Haptics.selectionAsync();
-    const nextMetrics = await journeyService.undoResetAllJourneyMetrics();
-    setMetrics(nextMetrics);
-    setIsAllMetricResetUndoable(false);
-    await refreshJourneyHistory();
-  };
-
-  const handleSaveMetric = async (metricKey: JourneyMetricKey) => {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const nextHistory = await journeyService.saveJourneyMetricReset(metricKey);
-    setHistoryRecords(nextHistory);
-    setUndoableMetricKeys((current) => current.filter((key) => key !== metricKey));
-  };
-
-  const handleSaveMetricAll = async () => {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const nextHistory = await journeyService.saveAllJourneyMetricReset();
-    setHistoryRecords(nextHistory);
-    setIsAllMetricResetUndoable(false);
-  };
-
   const timerBreathStyle = {
     transform: [
       {
@@ -772,22 +1126,96 @@ export default function JourneyScreen() {
   };
 
   useEffect(() => {
-    monthRailRef.current?.scrollTo({
+    journeyMonthRailRef.current?.scrollTo({
       animated: true,
-      x: activeMonthIndex * monthRailItemWidth,
+      x: (activeRingMonthIndex - monthBounds.first) * journeyMonthRailWidth,
     });
-  }, [activeMonthIndex]);
+    attendanceMonthRailRef.current?.scrollTo({
+      animated: true,
+      x: (activeMonthIndex - monthBounds.first) * journeyMonthRailWidth,
+    });
+    analyticsMonthRailRef.current?.scrollTo({
+      animated: true,
+      x: (activeAnalyticsMonthIndex - monthBounds.first) * journeyMonthRailWidth,
+    });
+  }, [activeAnalyticsMonthIndex, activeMonthIndex, activeRingMonthIndex, monthBounds.first]);
 
-  const handleMonthRailMomentumEnd = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (attendanceByMonth.length === 0) return;
-      const nextIndex = Math.min(
-        attendanceByMonth.length - 1,
-        Math.max(0, Math.round(event.nativeEvent.contentOffset.x / monthRailItemWidth)),
-      );
-      setSelectedMonthIndex(nextIndex);
+  const selectJourneyMonth = useCallback(
+    (nextIndex: number) => {
+      if (nextIndex !== activeRingMonthIndex) {
+        Haptics.selectionAsync();
+      }
+      setRingMonthIndex(nextIndex);
     },
-    [attendanceByMonth.length],
+    [activeRingMonthIndex],
+  );
+
+  const selectAttendanceMonth = useCallback(
+    (nextIndex: number) => {
+      if (nextIndex !== activeMonthIndex) {
+        Haptics.selectionAsync();
+      }
+      setAttendanceMonthIndex(nextIndex);
+    },
+    [activeMonthIndex],
+  );
+
+  const selectAnalyticsMonth = useCallback(
+    (nextIndex: number) => {
+      if (nextIndex !== activeAnalyticsMonthIndex) {
+        Haptics.selectionAsync();
+      }
+      setAnalyticsMonthIndex(nextIndex);
+    },
+    [activeAnalyticsMonthIndex],
+  );
+
+  const handleJourneyMonthMomentumEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (journeyMonthItems.length === 0) return;
+      const nextIndex = Math.min(
+        monthBounds.last,
+        Math.max(
+          monthBounds.first,
+          monthBounds.first +
+            Math.round(event.nativeEvent.contentOffset.x / journeyMonthRailWidth),
+        ),
+      );
+      selectJourneyMonth(nextIndex);
+    },
+    [journeyMonthItems.length, monthBounds.first, monthBounds.last, selectJourneyMonth],
+  );
+
+  const handleAttendanceMonthMomentumEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (journeyMonthItems.length === 0) return;
+      const nextIndex = Math.min(
+        monthBounds.last,
+        Math.max(
+          monthBounds.first,
+          monthBounds.first +
+            Math.round(event.nativeEvent.contentOffset.x / journeyMonthRailWidth),
+        ),
+      );
+      selectAttendanceMonth(nextIndex);
+    },
+    [journeyMonthItems.length, monthBounds.first, monthBounds.last, selectAttendanceMonth],
+  );
+
+  const handleAnalyticsMonthMomentumEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (journeyMonthItems.length === 0) return;
+      const nextIndex = Math.min(
+        monthBounds.last,
+        Math.max(
+          monthBounds.first,
+          monthBounds.first +
+            Math.round(event.nativeEvent.contentOffset.x / journeyMonthRailWidth),
+        ),
+      );
+      selectAnalyticsMonth(nextIndex);
+    },
+    [journeyMonthItems.length, monthBounds.first, monthBounds.last, selectAnalyticsMonth],
   );
 
   if (isLoading || !profile || !stats || !metrics) {
@@ -810,7 +1238,10 @@ export default function JourneyScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         <View style={stylesForTheme.header}>
-          <Text style={stylesForTheme.headerTitle}>My Journey</Text>
+          <View style={stylesForTheme.headerTitleRow}>
+            <Text style={[stylesForTheme.headerTitle, stylesForTheme.headerTitleAccent]}>My</Text>
+            <Text style={stylesForTheme.headerTitle}> Journey</Text>
+          </View>
           <Text style={stylesForTheme.headerTagline}>Track your progress</Text>
         </View>
 
@@ -818,7 +1249,78 @@ export default function JourneyScreen() {
           <View style={stylesForTheme.panelTopRow}>
             <View>
               <Text style={stylesForTheme.panelKicker}>Attendance</Text>
-              <Text style={stylesForTheme.panelTitle}>{selectedMonth?.month ?? 'Calendar'}</Text>
+              <View style={stylesForTheme.attendanceMonthHeader}>
+                {canShowPreviousAttendanceMonth ? (
+                  <Pressable
+                    onPress={() => selectAttendanceMonth(activeMonthIndex - 1)}
+                    style={({ pressed }) => [
+                      stylesForTheme.journeyMonthArrow,
+                      stylesForTheme.attendanceMonthArrowLeft,
+                      pressed && stylesForTheme.buttonPressed,
+                    ]}
+                    hitSlop={8}>
+                    <Text style={stylesForTheme.journeyMonthArrowText}>{'‹'}</Text>
+                  </Pressable>
+                ) : (
+                  <View
+                    style={[
+                      stylesForTheme.journeyMonthArrowSpacer,
+                      stylesForTheme.attendanceMonthArrowLeft,
+                    ]}
+                  />
+                )}
+                <View
+                  style={[
+                    stylesForTheme.journeyMonthMask,
+                    stylesForTheme.attendanceMonthMask,
+                  ]}>
+                  <ScrollView
+                    ref={attendanceMonthRailRef}
+                    horizontal
+                    decelerationRate="fast"
+                    onMomentumScrollEnd={handleAttendanceMonthMomentumEnd}
+                    showsHorizontalScrollIndicator={false}
+                    snapToOffsets={journeyMonthItems.map(
+                      (_, index) => index * journeyMonthRailWidth,
+                    )}
+                    style={stylesForTheme.journeyMonthRail}
+                    contentContainerStyle={stylesForTheme.journeyMonthRailContent}>
+                    {journeyMonthItems.map((month, index) => (
+                      <Pressable
+                        key={`attendance-month-${month.month}`}
+                        onPress={() => selectAttendanceMonth(monthBounds.first + index)}
+                        style={stylesForTheme.journeyMonthRailItem}>
+                        <Text
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.72}
+                          numberOfLines={1}
+                          style={stylesForTheme.panelTitle}>
+                          {month.month}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+                {canShowNextAttendanceMonth ? (
+                  <Pressable
+                    onPress={() => selectAttendanceMonth(activeMonthIndex + 1)}
+                    style={({ pressed }) => [
+                      stylesForTheme.journeyMonthArrow,
+                      stylesForTheme.attendanceMonthArrowRight,
+                      pressed && stylesForTheme.buttonPressed,
+                    ]}
+                    hitSlop={8}>
+                    <Text style={stylesForTheme.journeyMonthArrowText}>{'›'}</Text>
+                  </Pressable>
+                ) : (
+                  <View
+                    style={[
+                      stylesForTheme.journeyMonthArrowSpacer,
+                      stylesForTheme.attendanceMonthArrowRight,
+                    ]}
+                  />
+                )}
+              </View>
             </View>
             <Pressable
               onPress={() => setIsCalendarEditorOpen((value) => !value)}
@@ -834,37 +1336,12 @@ export default function JourneyScreen() {
               />
             </Pressable>
           </View>
-          <View style={stylesForTheme.monthSwitcher}>
-            <Pressable
-              disabled={activeMonthIndex === 0}
-              onPress={() => setSelectedMonthIndex((value) => Math.max(0, value - 1))}
-              style={[
-                stylesForTheme.monthArrowButton,
-                activeMonthIndex === 0 && stylesForTheme.disabledButton,
-              ]}>
-              <Text style={stylesForTheme.monthArrowText}>{'<'}</Text>
-            </Pressable>
-            <Text style={stylesForTheme.monthTitle}>{selectedMonth?.month ?? 'Month'}</Text>
-            <Pressable
-              disabled={activeMonthIndex === attendanceByMonth.length - 1}
-              onPress={() =>
-                setSelectedMonthIndex((value) =>
-                  Math.min(attendanceByMonth.length - 1, value + 1),
-                )
-              }
-              style={[
-                stylesForTheme.monthArrowButton,
-                activeMonthIndex === attendanceByMonth.length - 1 && stylesForTheme.disabledButton,
-              ]}>
-              <Text style={stylesForTheme.monthArrowText}>{'>'}</Text>
-            </Pressable>
-          </View>
           {isCalendarEditorOpen ? (
             <View style={stylesForTheme.calendarGrid}>
               {selectedMonth?.days.map((day) => (
                 <Pressable
                   key={day.id}
-                  onPress={() => setPendingVisitDate(day.date)}
+                  onPress={() => handleSelectCalendarDay(day.date)}
                   style={({ pressed }) => [
                     stylesForTheme.calendarDay,
                     day.hasVisit && stylesForTheme.calendarDayActive,
@@ -892,14 +1369,14 @@ export default function JourneyScreen() {
                 <Text style={stylesForTheme.calendarSummaryTitle}>Active days</Text>
                 {selectedMonthVisitedDays.length > 0 ? (
                   <View style={stylesForTheme.visitDayChips}>
-                    {selectedMonthVisitedDays.slice(0, 6).map((day) => (
+                    {selectedMonthVisitedDays.slice(0, 4).map((day) => (
                       <View key={day.id} style={stylesForTheme.visitDayChip}>
                         <Text style={stylesForTheme.visitDayChipText}>{formatDay(day.date)}</Text>
                       </View>
                     ))}
-                    {selectedMonthVisitedDays.length > 6 ? (
+                    {selectedMonthVisitedDays.length > 4 ? (
                       <Text style={stylesForTheme.visitMoreText}>
-                        +{selectedMonthVisitedDays.length - 6}
+                        +{selectedMonthVisitedDays.length - 4} others
                       </Text>
                     ) : null}
                   </View>
@@ -929,10 +1406,25 @@ export default function JourneyScreen() {
               style={StyleSheet.absoluteFill}
             />
             <View style={stylesForTheme.timerReadout}>
-              <Text style={stylesForTheme.timerValue}>{formatDuration(elapsedSeconds)}</Text>
+              <Text style={stylesForTheme.timerValue}>{formatLiveDuration(elapsedSeconds)}</Text>
               <Text style={stylesForTheme.timerMeta}>{timerCalories} kcal live</Text>
             </View>
             <View style={stylesForTheme.timerControls}>
+              {timerState !== 'idle' ? (
+                <Pressable
+                  onPress={handleResetTimer}
+                  style={({ pressed }) => [
+                    stylesForTheme.timerResetButton,
+                    pressed && stylesForTheme.buttonPressed,
+                  ]}>
+                  <SymbolView
+                    name="xmark"
+                    size={16}
+                    tintColor={theme.colors.text}
+                    fallback={<Text style={stylesForTheme.iconFallback}>X</Text>}
+                  />
+                </Pressable>
+              ) : null}
               <Pressable
                 onPress={timerState === 'running' ? handlePauseTimer : handleStartTimer}
                 style={({ pressed }) => [
@@ -941,31 +1433,16 @@ export default function JourneyScreen() {
                   pressed && stylesForTheme.buttonPressed,
                 ]}>
                 <SymbolView
-                  name={timerState === 'running' ? 'pause.fill' : 'play.fill'}
+                  name={timerState === 'running' ? 'pause' : 'play.fill'}
                   size={18}
                   tintColor="#FFFFFF"
                   fallback={
                     <Text style={stylesForTheme.timerButtonFallback}>
-                      {timerState === 'running' ? 'II' : '>'}
+                      {timerState === 'running' ? '||' : '>'}
                     </Text>
                   }
                 />
               </Pressable>
-              {timerState !== 'idle' ? (
-                <Pressable
-                  onPress={handleEndWorkout}
-                  style={({ pressed }) => [
-                    stylesForTheme.timerStopButton,
-                    pressed && stylesForTheme.buttonPressed,
-                  ]}>
-                  <SymbolView
-                    name="checkmark"
-                    size={16}
-                    tintColor={theme.colors.text}
-                    fallback={<Text style={stylesForTheme.iconFallback}>✓</Text>}
-                  />
-                </Pressable>
-              ) : null}
             </View>
           </BlurView>
           {lastCalories > 0 ? (
@@ -974,24 +1451,71 @@ export default function JourneyScreen() {
         </View>
 
         <View style={stylesForTheme.dashboardShell}>
-          {theme.scheme === 'dark' ? (
-            <BlurView
-              intensity={40}
-              tint="systemThinMaterialDark"
-              style={StyleSheet.absoluteFill}
-            />
-          ) : null}
-          <View pointerEvents="none" style={stylesForTheme.shellGlowRed} />
-          <View pointerEvents="none" style={stylesForTheme.shellGlowBlue} />
-
           <View style={stylesForTheme.journeyTitleWrap}>
-            <Text style={stylesForTheme.journeyTitle}>Guest Journey</Text>
+            <View style={stylesForTheme.journeyMonthHeader}>
+              {canShowPreviousMonth ? (
+                <Pressable
+                  onPress={() => selectJourneyMonth(activeRingMonthIndex - 1)}
+                  style={({ pressed }) => [
+                    stylesForTheme.journeyMonthArrow,
+                    pressed && stylesForTheme.buttonPressed,
+                  ]}
+                  hitSlop={8}>
+                  <Text style={stylesForTheme.journeyMonthArrowText}>{'‹'}</Text>
+                </Pressable>
+              ) : (
+                <View style={stylesForTheme.journeyMonthArrowSpacer} />
+              )}
+              <View style={stylesForTheme.journeyMonthMask}>
+                <ScrollView
+                  ref={journeyMonthRailRef}
+                  horizontal
+                  decelerationRate="fast"
+                  onMomentumScrollEnd={handleJourneyMonthMomentumEnd}
+                  showsHorizontalScrollIndicator={false}
+                  snapToOffsets={journeyMonthItems.map(
+                    (_, index) => index * journeyMonthRailWidth,
+                  )}
+                  style={stylesForTheme.journeyMonthRail}
+                  contentContainerStyle={stylesForTheme.journeyMonthRailContent}>
+                  {journeyMonthItems.map((month, index) => {
+                    return (
+                      <Pressable
+                        key={`journey-month-${month.month}`}
+                        onPress={() => selectJourneyMonth(monthBounds.first + index)}
+                        style={stylesForTheme.journeyMonthRailItem}>
+                        <Text
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.72}
+                          numberOfLines={1}
+                          style={stylesForTheme.journeyTitle}>
+                          {month.month}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+              {canShowNextMonth ? (
+                <Pressable
+                  onPress={() => selectJourneyMonth(activeRingMonthIndex + 1)}
+                  style={({ pressed }) => [
+                    stylesForTheme.journeyMonthArrow,
+                    pressed && stylesForTheme.buttonPressed,
+                  ]}
+                  hitSlop={8}>
+                  <Text style={stylesForTheme.journeyMonthArrowText}>{'›'}</Text>
+                </Pressable>
+              ) : (
+                <View style={stylesForTheme.journeyMonthArrowSpacer} />
+              )}
+            </View>
             <View style={stylesForTheme.journeyTitleUnderline} />
           </View>
 
           <View style={stylesForTheme.ringsGrid}>
             {ringMetrics.map((metric) => (
-              <MetricRing key={metric.label} metric={metric} />
+              <MetricRing key={`${metric.label}-${ringAnimationSeed}`} metric={metric} />
             ))}
           </View>
         </View>
@@ -1000,136 +1524,97 @@ export default function JourneyScreen() {
           <View style={stylesForTheme.panelTopRow}>
             <View>
               <Text style={stylesForTheme.panelKicker}>Analytics</Text>
-              <Text style={stylesForTheme.panelTitle}>Calories / duration</Text>
+              <Text style={stylesForTheme.panelTitle}>Average calories / duration</Text>
             </View>
-            <ScrollView
-              ref={monthRailRef}
-              horizontal
-              decelerationRate="fast"
-              onMomentumScrollEnd={handleMonthRailMomentumEnd}
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={monthRailItemWidth}
-              style={stylesForTheme.chartMonthRail}
-              contentContainerStyle={stylesForTheme.chartMonthRailContent}>
-              {attendanceByMonth.map((month, index) => {
-                const isActive = index === activeMonthIndex;
-                return (
-                  <Pressable
-                    key={month.month}
-                    onPress={() => setSelectedMonthIndex(index)}
-                    style={[
-                      stylesForTheme.chartMonthChip,
-                      isActive && stylesForTheme.chartMonthChipActive,
-                    ]}>
-                    <Text
-                      style={[
-                        stylesForTheme.chartMonthChipText,
-                        isActive && stylesForTheme.chartMonthChipTextActive,
-                      ]}>
-                      {month.month}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+            <View style={stylesForTheme.journeyMonthHeader}>
+              {canShowPreviousAnalyticsMonth ? (
+                <Pressable
+                  onPress={() => selectAnalyticsMonth(activeAnalyticsMonthIndex - 1)}
+                  style={({ pressed }) => [
+                    stylesForTheme.journeyMonthArrow,
+                    pressed && stylesForTheme.buttonPressed,
+                  ]}
+                  hitSlop={8}>
+                  <Text style={stylesForTheme.journeyMonthArrowText}>{'‹'}</Text>
+                </Pressable>
+              ) : (
+                <View style={stylesForTheme.journeyMonthArrowSpacer} />
+              )}
+              <View style={stylesForTheme.journeyMonthMask}>
+                <ScrollView
+                  ref={analyticsMonthRailRef}
+                  horizontal
+                  decelerationRate="fast"
+                  onMomentumScrollEnd={handleAnalyticsMonthMomentumEnd}
+                  showsHorizontalScrollIndicator={false}
+                  snapToOffsets={journeyMonthItems.map(
+                    (_, index) => index * journeyMonthRailWidth,
+                  )}
+                  style={stylesForTheme.journeyMonthRail}
+                  contentContainerStyle={stylesForTheme.journeyMonthRailContent}>
+                  {journeyMonthItems.map((month, index) => (
+                    <Pressable
+                      key={`analytics-month-${month.month}`}
+                      onPress={() => selectAnalyticsMonth(monthBounds.first + index)}
+                      style={stylesForTheme.journeyMonthRailItem}>
+                      <Text
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.72}
+                        numberOfLines={1}
+                        style={stylesForTheme.chartMonthTitle}>
+                        {month.month}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+              {canShowNextAnalyticsMonth ? (
+                <Pressable
+                  onPress={() => selectAnalyticsMonth(activeAnalyticsMonthIndex + 1)}
+                  style={({ pressed }) => [
+                    stylesForTheme.journeyMonthArrow,
+                    pressed && stylesForTheme.buttonPressed,
+                  ]}
+                  hitSlop={8}>
+                  <Text style={stylesForTheme.journeyMonthArrowText}>{'›'}</Text>
+                </Pressable>
+              ) : (
+                <View style={stylesForTheme.journeyMonthArrowSpacer} />
+              )}
+            </View>
           </View>
           <TrendChart points={chartPoints} />
         </View>
 
         <View style={stylesForTheme.metricHeader}>
-          <View>
-            <Text style={stylesForTheme.panelKicker}>All-time</Text>
-            <Text style={stylesForTheme.panelTitle}>Metrics</Text>
-          </View>
-          <View style={stylesForTheme.metricHeaderActions}>
-            {isAllMetricResetUndoable ? (
-              <>
-                <Pressable
-                  onPress={handleSaveMetricAll}
-                  style={({ pressed }) => [
-                    stylesForTheme.tinyGreenButton,
-                    pressed && stylesForTheme.buttonPressed,
-                  ]}>
-                  <Text style={stylesForTheme.tinyGreenText}>Save</Text>
-                </Pressable>
-                <Pressable
-                  onPress={handleUndoMetricAll}
-                  style={({ pressed }) => [
-                    stylesForTheme.tinyUndoButton,
-                    pressed && stylesForTheme.buttonPressed,
-                  ]}>
-                  <Text style={stylesForTheme.tinyUndoText}>Undo</Text>
-                </Pressable>
-              </>
-            ) : (
-              <Pressable
-                onPress={() => setIsPendingMetricResetAll(true)}
-                style={({ pressed }) => [
-                  stylesForTheme.tinyResetButton,
-                  pressed && stylesForTheme.buttonPressed,
-                ]}>
-                <Text style={stylesForTheme.tinyResetText}>Reset</Text>
-              </Pressable>
-            )}
-            <Pressable
-              onPress={() => setIsHistoryVisible(true)}
-              style={({ pressed }) => [
-                stylesForTheme.historyButton,
-                pressed && stylesForTheme.buttonPressed,
-              ]}>
-              <Text style={stylesForTheme.historyButtonText}>History</Text>
-            </Pressable>
+          <View style={stylesForTheme.panelHeadingRow}>
+            <View style={stylesForTheme.panelAccentBar} />
+            <View>
+              <Text style={stylesForTheme.panelKicker}>All-time</Text>
+              <Text style={stylesForTheme.panelTitle}>Metrics</Text>
+            </View>
           </View>
         </View>
 
         <View style={stylesForTheme.metricsGrid}>
-          {metricCards.map((metric) => {
-            const canUndo = undoableMetricKeys.includes(metric.key);
-            return (
-              <View key={metric.key} style={stylesForTheme.metricModule}>
-                <View style={[stylesForTheme.metricModuleAccent, { backgroundColor: metric.accent }]} />
-                <Text style={[stylesForTheme.metricModuleValue, { color: metric.accent }]}>
-                  {metric.value}
-                </Text>
-                <Text style={stylesForTheme.metricModuleLabel}>{metric.label}</Text>
-                <View style={stylesForTheme.metricActions}>
-                  <Pressable
-                    onPress={() =>
-                      canUndo ? handleUndoMetric(metric.key) : setPendingMetricResetKey(metric.key)
-                    }
-                    style={({ pressed }) => [
-                      stylesForTheme.metricGhostButton,
-                      canUndo && stylesForTheme.metricUndoButton,
-                      pressed && stylesForTheme.buttonPressed,
-                    ]}>
-                    <Text
-                      style={[
-                        stylesForTheme.metricGhostText,
-                        canUndo && stylesForTheme.metricUndoText,
-                      ]}>
-                      {canUndo ? 'Undo' : 'Reset'}
-                    </Text>
-                  </Pressable>
-                  {canUndo ? (
-                    <Pressable
-                      onPress={() => handleSaveMetric(metric.key)}
-                      style={({ pressed }) => [
-                        stylesForTheme.metricSaveButton,
-                        pressed && stylesForTheme.buttonPressed,
-                      ]}>
-                      <Text style={stylesForTheme.metricSaveText}>Save</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              </View>
-            );
-          })}
+          {metricCards.map((metric) => (
+            <View key={metric.key} style={stylesForTheme.metricModule}>
+              <View style={[stylesForTheme.metricModuleAccent, { backgroundColor: metric.accent }]} />
+              <Text style={[stylesForTheme.metricModuleValue, { color: '#FFFFFF' }]}>
+                {metric.value}
+              </Text>
+              <Text style={stylesForTheme.metricModuleLabel}>{metric.label}</Text>
+            </View>
+          ))}
         </View>
 
         <View style={stylesForTheme.achievementHeader}>
-          <View>
-            <Text style={stylesForTheme.panelKicker}>Milestones</Text>
-            <Text style={stylesForTheme.panelTitle}>Achievements</Text>
+          <View style={stylesForTheme.panelHeadingRow}>
+            <View style={stylesForTheme.panelAccentBar} />
+            <View>
+              <Text style={stylesForTheme.panelKicker}>Milestones</Text>
+              <Text style={stylesForTheme.panelTitle}>Achievements</Text>
+            </View>
           </View>
           <Text style={stylesForTheme.achievementCount}>
             {unlockedCount}/{achievements.length}
@@ -1178,61 +1663,181 @@ export default function JourneyScreen() {
 
       <Modal transparent visible={Boolean(pendingVisitDate)} animationType="fade">
         <View style={stylesForTheme.centerModalOverlay}>
-          <Pressable style={stylesForTheme.modalBackdrop} onPress={() => setPendingVisitDate('')} />
-          <View style={stylesForTheme.confirmCard}>
-            <Text style={stylesForTheme.modalKicker}>Attendance</Text>
-            <Text style={stylesForTheme.confirmTitle}>Update this day?</Text>
-            <Text style={stylesForTheme.confirmBody}>
-              This toggles the selected date in your attendance matrix.
-            </Text>
-            <View style={stylesForTheme.confirmRow}>
-              <Pressable
-                onPress={() => setPendingVisitDate('')}
-                style={({ pressed }) => [
-                  stylesForTheme.confirmSecondary,
-                  pressed && stylesForTheme.buttonPressed,
-                ]}>
-                <Text style={stylesForTheme.confirmSecondaryText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                onPress={confirmToggleVisit}
-                style={({ pressed }) => [
-                  stylesForTheme.confirmPrimary,
-                  pressed && stylesForTheme.buttonPressed,
-                ]}>
-                <Text style={stylesForTheme.confirmPrimaryText}>Confirm</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        transparent
-        visible={Boolean(pendingMetricResetKey) || isPendingMetricResetAll}
-        animationType="fade">
-        <View style={stylesForTheme.centerModalOverlay}>
           <Pressable
             style={stylesForTheme.modalBackdrop}
             onPress={() => {
-              setPendingMetricResetKey(undefined);
-              setIsPendingMetricResetAll(false);
+              setPendingVisitDate('');
+              setIsCalendarTimeEnabled(false);
             }}
           />
-          <View style={stylesForTheme.confirmCard}>
-            <Text style={stylesForTheme.modalKicker}>Journey</Text>
-            <Text style={stylesForTheme.confirmTitle}>
-              {isPendingMetricResetAll ? 'Reset all metrics?' : 'Reset this metric?'}
-            </Text>
-            <Text style={stylesForTheme.confirmBody}>
-              Resetting starts a fresh count from now. Your previous total can still be
-              saved to history.
-            </Text>
+          <View style={[stylesForTheme.confirmCard, stylesForTheme.calendarConfirmCard]}>
+            <View style={stylesForTheme.calendarLoggerTopRow}>
+              <View style={stylesForTheme.calendarLoggerHeader}>
+                <Text style={stylesForTheme.modalKicker}>Attendance</Text>
+                <Text style={[stylesForTheme.confirmTitle, stylesForTheme.calendarConfirmTitle]}>
+                  Log this day?
+                </Text>
+                {pendingVisitDate ? (
+                  <Text style={[stylesForTheme.calendarLoggerDate, stylesForTheme.calendarLoggerDateCentered]}>
+                    {formatCalendarDate(pendingVisitDate)}
+                  </Text>
+                ) : null}
+              </View>
+              {selectedCalendarDay?.hasVisit ? (
+                <Text style={stylesForTheme.calendarLoggerBadge}>Visited</Text>
+              ) : null}
+            </View>
+            <Pressable
+              onPress={() => setIsCalendarTimeEnabled((value) => !value)}
+              style={({ pressed }) => [
+                stylesForTheme.calendarTimeToggle,
+                pressed && stylesForTheme.buttonPressed,
+              ]}>
+                <View
+                  style={[
+                    stylesForTheme.calendarCheckbox,
+                    isCalendarTimeEnabled && stylesForTheme.calendarCheckboxActive,
+                ]}>
+                {isCalendarTimeEnabled ? (
+                  <Text style={stylesForTheme.calendarCheckboxTick}>✓</Text>
+                ) : null}
+              </View>
+              <Text style={stylesForTheme.calendarTimeToggleTitle}>Add duration</Text>
+            </Pressable>
+            {isCalendarTimeEnabled ? (
+              <>
+                <View style={stylesForTheme.calendarTimePickers}>
+                  <View style={stylesForTheme.calendarTimeColumn}>
+                    <Text style={stylesForTheme.calendarTimeLabel}>Start time</Text>
+                    <View style={stylesForTheme.calendarTimeWheelFrame}>
+                      <SymbolView
+                        name="chevron.up"
+                        size={10}
+                        tintColor={theme.colors.textMuted}
+                        style={stylesForTheme.calendarTimeWheelArrowTop}
+                        fallback={<Text style={stylesForTheme.calendarTimeWheelArrowText}>^</Text>}
+                      />
+                      <View style={stylesForTheme.calendarTimeWheel}>
+                        <ScrollView
+                          ref={calendarStartTimeRef}
+                          nestedScrollEnabled
+                          showsVerticalScrollIndicator={false}
+                          snapToInterval={calendarTimeOptionHeight}
+                          decelerationRate="fast"
+                          onMomentumScrollEnd={(event) =>
+                            handleCalendarTimeMomentumEnd(event, 'start')
+                          }
+                          style={stylesForTheme.calendarTimeList}
+                          contentContainerStyle={stylesForTheme.calendarTimeListContent}>
+                          {TIME_OPTIONS.map((timeOption) => (
+                            <Pressable
+                              key={`start-${timeOption}`}
+                              onPress={() => {
+                                setCalendarStartTime(timeOption);
+                                scrollCalendarTimeWheel(calendarStartTimeRef, timeOption, true);
+                              }}
+                              style={({ pressed }) => [
+                                stylesForTheme.calendarTimeOption,
+                                pressed && stylesForTheme.buttonPressed,
+                              ]}>
+                              <Text
+                                style={[
+                                  stylesForTheme.calendarTimeOptionText,
+                                  calendarStartTime === timeOption &&
+                                    stylesForTheme.calendarTimeOptionTextActive,
+                                ]}>
+                                {formatTimeOptionLabel(timeOption)}
+                              </Text>
+                            </Pressable>
+                          ))}
+                        </ScrollView>
+                      </View>
+                      <SymbolView
+                        name="chevron.down"
+                        size={10}
+                        tintColor={theme.colors.textMuted}
+                        style={stylesForTheme.calendarTimeWheelArrowBottom}
+                        fallback={<Text style={stylesForTheme.calendarTimeWheelArrowText}>v</Text>}
+                      />
+                    </View>
+                  </View>
+                  <View style={stylesForTheme.calendarTimeColumn}>
+                    <Text style={stylesForTheme.calendarTimeLabel}>End time</Text>
+                    <View style={stylesForTheme.calendarTimeWheelFrame}>
+                      <SymbolView
+                        name="chevron.up"
+                        size={10}
+                        tintColor={theme.colors.textMuted}
+                        style={stylesForTheme.calendarTimeWheelArrowTop}
+                        fallback={<Text style={stylesForTheme.calendarTimeWheelArrowText}>^</Text>}
+                      />
+                      <View style={stylesForTheme.calendarTimeWheel}>
+                        <ScrollView
+                          ref={calendarEndTimeRef}
+                          nestedScrollEnabled
+                          showsVerticalScrollIndicator={false}
+                          snapToInterval={calendarTimeOptionHeight}
+                          decelerationRate="fast"
+                          onMomentumScrollEnd={(event) =>
+                            handleCalendarTimeMomentumEnd(event, 'end')
+                          }
+                          style={stylesForTheme.calendarTimeList}
+                          contentContainerStyle={stylesForTheme.calendarTimeListContent}>
+                          {TIME_OPTIONS.map((timeOption) => (
+                            <Pressable
+                              key={`end-${timeOption}`}
+                              onPress={() => {
+                                setCalendarEndTime(timeOption);
+                                scrollCalendarTimeWheel(calendarEndTimeRef, timeOption, true);
+                              }}
+                              style={({ pressed }) => [
+                                stylesForTheme.calendarTimeOption,
+                                pressed && stylesForTheme.buttonPressed,
+                              ]}>
+                              <Text
+                                style={[
+                                  stylesForTheme.calendarTimeOptionText,
+                                  calendarEndTime === timeOption &&
+                                    stylesForTheme.calendarTimeOptionTextActive,
+                                ]}>
+                                {formatTimeOptionLabel(timeOption)}
+                              </Text>
+                            </Pressable>
+                          ))}
+                        </ScrollView>
+                      </View>
+                      <SymbolView
+                        name="chevron.down"
+                        size={10}
+                        tintColor={theme.colors.textMuted}
+                        style={stylesForTheme.calendarTimeWheelArrowBottom}
+                        fallback={<Text style={stylesForTheme.calendarTimeWheelArrowText}>v</Text>}
+                      />
+                    </View>
+                  </View>
+                </View>
+                <Text style={[stylesForTheme.calendarLoggerHint, stylesForTheme.calendarLoggerHintCentered]}>
+                  {selectedCalendarDurationMinutes > 0
+                    ? `Duration: ${Math.floor(selectedCalendarDurationMinutes / 60)}h ${selectedCalendarDurationMinutes % 60}m`
+                    : 'End time must be later than start time.'}
+                </Text>
+              </>
+            ) : null}
             <View style={stylesForTheme.confirmRow}>
+              {selectedCalendarDay?.hasVisit ? (
+                <Pressable
+                  onPress={handleClearCalendarEntry}
+                  style={({ pressed }) => [
+                    stylesForTheme.confirmSecondary,
+                    pressed && stylesForTheme.buttonPressed,
+                  ]}>
+                  <Text style={stylesForTheme.confirmSecondaryText}>Clear</Text>
+                </Pressable>
+              ) : null}
               <Pressable
                 onPress={() => {
-                  setPendingMetricResetKey(undefined);
-                  setIsPendingMetricResetAll(false);
+                  setPendingVisitDate('');
+                  setIsCalendarTimeEnabled(false);
                 }}
                 style={({ pressed }) => [
                   stylesForTheme.confirmSecondary,
@@ -1241,60 +1846,26 @@ export default function JourneyScreen() {
                 <Text style={stylesForTheme.confirmSecondaryText}>Cancel</Text>
               </Pressable>
               <Pressable
-                onPress={confirmResetMetric}
+                disabled={isCalendarTimeEnabled && selectedCalendarDurationMinutes <= 0}
+                onPress={handleSaveCalendarEntry}
                 style={({ pressed }) => [
-                  stylesForTheme.confirmPrimary,
+                  stylesForTheme.confirmPrimaryWrap,
+                  isCalendarTimeEnabled &&
+                    selectedCalendarDurationMinutes <= 0 &&
+                    stylesForTheme.disabledButton,
                   pressed && stylesForTheme.buttonPressed,
                 ]}>
-                <Text style={stylesForTheme.confirmPrimaryText}>Reset</Text>
+                <LinearGradient
+                  colors={['#FF2638', '#B11226', '#2A0308']}
+                  locations={[0, 0.58, 1]}
+                  start={{ x: 0.08, y: 0 }}
+                  end={{ x: 0.92, y: 1 }}
+                  style={stylesForTheme.confirmPrimary}>
+                  <View pointerEvents="none" style={stylesForTheme.confirmPrimaryGloss} />
+                  <Text style={stylesForTheme.confirmPrimaryText}>Add</Text>
+                </LinearGradient>
               </Pressable>
             </View>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal transparent visible={isHistoryVisible} animationType="fade">
-        <View style={stylesForTheme.historyOverlay}>
-          <Pressable style={stylesForTheme.modalBackdrop} onPress={() => setIsHistoryVisible(false)} />
-          <View style={stylesForTheme.historyPanel}>
-            <View style={stylesForTheme.historyTopBar}>
-              <View>
-                <Text style={stylesForTheme.modalKicker}>Journey History</Text>
-                <Text style={stylesForTheme.historyPanelTitle}>Recorded periods</Text>
-              </View>
-              <Pressable
-                onPress={() => setIsHistoryVisible(false)}
-                style={({ pressed }) => [
-                  stylesForTheme.historyIconClose,
-                  pressed && stylesForTheme.buttonPressed,
-                ]}>
-                <Text style={stylesForTheme.historyIconCloseText}>X</Text>
-              </Pressable>
-            </View>
-
-            <ScrollView
-              style={stylesForTheme.historyList}
-              contentContainerStyle={stylesForTheme.historyListContent}
-              showsVerticalScrollIndicator={false}>
-              {historyRecords.length === 0 ? (
-                <View style={stylesForTheme.historyEmptyCard}>
-                  <Text style={stylesForTheme.historyEmptyTitle}>No history yet</Text>
-                  <Text style={stylesForTheme.historyEmptyBody}>
-                    Saved training periods will appear here.
-                  </Text>
-                </View>
-              ) : (
-                historyRecords.map((record) => (
-                  <View key={record.id} style={stylesForTheme.historyCard}>
-                    <View style={stylesForTheme.historyCardRail} />
-                    <View style={stylesForTheme.historyCardContent}>
-                      <Text style={stylesForTheme.historyRange}>{formatHistoryRange(record)}</Text>
-                      <Text style={stylesForTheme.historySummary}>{record.summary}</Text>
-                    </View>
-                  </View>
-                ))
-              )}
-            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1320,10 +1891,18 @@ export default function JourneyScreen() {
               <Pressable
                 onPress={confirmSaveWorkout}
                 style={({ pressed }) => [
-                  stylesForTheme.confirmPrimary,
+                  stylesForTheme.confirmPrimaryWrap,
                   pressed && stylesForTheme.buttonPressed,
                 ]}>
-                <Text style={stylesForTheme.confirmPrimaryText}>Save</Text>
+                <LinearGradient
+                  colors={['#FF2638', '#B11226', '#2A0308']}
+                  locations={[0, 0.58, 1]}
+                  start={{ x: 0.08, y: 0 }}
+                  end={{ x: 0.92, y: 1 }}
+                  style={stylesForTheme.confirmPrimary}>
+                  <View pointerEvents="none" style={stylesForTheme.confirmPrimaryGloss} />
+                  <Text style={stylesForTheme.confirmPrimaryText}>Save</Text>
+                </LinearGradient>
               </Pressable>
             </View>
           </View>
@@ -1339,10 +1918,6 @@ const styles = StyleSheet.create({
     minHeight: 196,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.11)',
-    borderRadius: 24,
-    backgroundColor: 'rgba(9, 10, 15, 0.62)',
     paddingVertical: 14,
   },
   ringCenter: {
@@ -1381,9 +1956,21 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
   },
   chartYAxisTitleCol: {
-    width: 20,
+    width: 14,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  chartCanvasGlow: {
+    flex: 1,
+    borderRadius: 22,
+    shadowColor: midnightPurple,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.36,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  chartPlotRow: {
+    flexDirection: 'row',
   },
   chartCanvas: {
     flex: 1,
@@ -1396,18 +1983,15 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingRight: 14,
     paddingBottom: 14,
-    paddingLeft: 36,
   },
-  chartGrid: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'space-evenly',
-    paddingHorizontal: 18,
-    paddingTop: 30,
-    paddingBottom: 78,
+  chartPlotScroll: {
+    flexGrow: 0,
   },
-  chartGridLine: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.07)',
+  chartPlotScrollContent: {
+    minWidth: '100%',
+  },
+  chartPlotInner: {
+    position: 'relative',
   },
   chartLegendRow: {
     flexDirection: 'row',
@@ -1415,21 +1999,8 @@ const styles = StyleSheet.create({
     gap: 18,
     marginTop: 8,
   },
-  chartYAxisLabels: {
-    position: 'absolute',
-    left: 9,
-    top: 30,
-    bottom: 70,
-    justifyContent: 'space-between',
-  },
-  chartAxisLabel: {
-    color: 'rgba(255,255,255,0.46)',
-    fontSize: 9,
-    fontWeight: '900',
-    textAlign: 'right',
-  },
   chartYAxisTitle: {
-    width: 130,
+    width: 120,
     color: 'rgba(255,255,255,0.42)',
     fontSize: 9,
     fontWeight: '900',
@@ -1488,6 +2059,10 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
         header: {
           marginBottom: 22,
         },
+        headerTitleRow: {
+          flexDirection: 'row',
+          alignItems: 'baseline',
+        },
         headerTitle: {
           color: theme.colors.text,
           fontSize: 52,
@@ -1495,6 +2070,9 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           fontStyle: 'italic',
           letterSpacing: -1,
           lineHeight: 56,
+        },
+        headerTitleAccent: {
+          color: accentBright,
         },
         headerTagline: {
           color: theme.colors.textMuted,
@@ -1550,6 +2128,75 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           marginBottom: 14,
           paddingTop: 3,
         },
+        journeyMonthHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 0,
+        },
+        attendanceMonthHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          marginLeft: -6,
+        },
+        journeyMonthArrow: {
+          width: 18,
+          height: 18,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 1,
+          borderColor: theme.scheme === 'dark' ? 'rgba(255,255,255,0.16)' : 'rgba(17,24,39,0.12)',
+          borderRadius: 9,
+          backgroundColor:
+            theme.scheme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.76)',
+          shadowColor: accentBright,
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: theme.scheme === 'dark' ? 0.18 : 0.1,
+          shadowRadius: 8,
+        },
+        journeyMonthArrowSpacer: {
+          width: 18,
+          height: 18,
+        },
+        journeyMonthArrowText: {
+          color: theme.colors.text,
+          fontSize: 16,
+          fontWeight: '900',
+          includeFontPadding: false,
+          lineHeight: 16,
+        },
+        journeyMonthMask: {
+          width: journeyMonthRailWidth,
+          height: 34,
+          overflow: 'hidden',
+        },
+        attendanceMonthMask: {
+          marginLeft: -2,
+          marginRight: -5,
+        },
+        attendanceMonthArrowLeft: {
+          marginRight: -3,
+        },
+        attendanceMonthArrowRight: {
+          marginLeft: -6,
+        },
+        journeyMonthRail: {
+          width: journeyMonthRailWidth,
+          height: 34,
+          overflow: 'hidden',
+        },
+        journeyMonthRailContent: {
+          alignItems: 'center',
+          flexGrow: 0,
+        },
+        journeyMonthRailItem: {
+          width: journeyMonthRailWidth,
+          height: 34,
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+        },
         journeyTitle: {
           color: theme.colors.text,
           fontSize: 25,
@@ -1590,6 +2237,17 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           justifyContent: 'space-between',
           gap: 12,
           marginBottom: 14,
+        },
+        panelHeadingRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+        },
+        panelAccentBar: {
+          width: 4,
+          height: 36,
+          borderRadius: 3,
+          backgroundColor: accentBright,
         },
         panelKicker: {
           color: accentBright,
@@ -1650,6 +2308,12 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
         chartMonthChipTextActive: {
           color: theme.colors.text,
         },
+        chartMonthTitle: {
+          color: theme.colors.text,
+          fontSize: 15,
+          fontWeight: '900',
+          textAlign: 'center',
+        },
         metricHeader: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -1668,13 +2332,13 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           alignItems: 'center',
           justifyContent: 'center',
           borderWidth: 1,
-          borderColor: 'rgba(177,18,38,0.24)',
+          borderColor: 'rgba(177,18,38,0.30)',
           borderRadius: 999,
-          backgroundColor: theme.colors.surfaceSoft,
+          backgroundColor: 'transparent',
           paddingHorizontal: 12,
         },
         historyButtonText: {
-          color: accentBright,
+          color: accentColor,
           fontSize: 11,
           fontWeight: '900',
         },
@@ -1699,13 +2363,13 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           alignItems: 'center',
           justifyContent: 'center',
           borderWidth: 1,
-          borderColor: 'rgba(245,158,11,0.35)',
+          borderColor: 'rgba(104, 16, 27, 0.72)',
           borderRadius: 999,
-          backgroundColor: 'rgba(245,158,11,0.10)',
+          backgroundColor: 'rgba(28, 10, 14, 0.72)',
           paddingHorizontal: 11,
         },
         tinyUndoText: {
-          color: '#F8C471',
+          color: '#F6D5DA',
           fontSize: 10,
           fontWeight: '900',
           textTransform: 'uppercase',
@@ -1715,8 +2379,13 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: 999,
-          backgroundColor: '#16A34A',
+          backgroundColor: '#22C55E',
           paddingHorizontal: 11,
+          shadowColor: '#22C55E',
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.24,
+          shadowRadius: 10,
+          elevation: 4,
         },
         tinyGreenText: {
           color: '#FFFFFF',
@@ -1737,7 +2406,7 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           borderWidth: 1,
           borderColor: theme.ink(0.1),
           borderRadius: 22,
-          backgroundColor: theme.colors.surface,
+          backgroundColor: 'transparent',
           padding: 14,
           ...theme.shadow,
         },
@@ -1781,19 +2450,24 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           textTransform: 'uppercase',
         },
         metricUndoButton: {
-          borderColor: 'rgba(245,158,11,0.34)',
-          backgroundColor: 'rgba(245,158,11,0.10)',
+          borderColor: 'rgba(104, 16, 27, 0.72)',
+          backgroundColor: 'rgba(28, 10, 14, 0.72)',
         },
         metricUndoText: {
-          color: '#F8C471',
+          color: '#F6D5DA',
         },
         metricSaveButton: {
           minHeight: 28,
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: 999,
-          backgroundColor: '#16A34A',
+          backgroundColor: '#22C55E',
           paddingHorizontal: 10,
+          shadowColor: '#22C55E',
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.22,
+          shadowRadius: 10,
+          elevation: 4,
         },
         metricSaveText: {
           color: '#FFFFFF',
@@ -1805,7 +2479,7 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           borderWidth: 1,
           borderColor: theme.ink(0.11),
           borderRadius: 28,
-          backgroundColor: theme.colors.surface,
+          backgroundColor: 'transparent',
           padding: 16,
           marginBottom: 16,
           ...theme.shadow,
@@ -1882,6 +2556,10 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           shadowRadius: 12,
           elevation: 4,
         },
+        calendarDaySelected: {
+          borderColor: theme.colors.text,
+          borderWidth: 1.5,
+        },
         calendarDayText: {
           color: theme.colors.textMuted,
           fontSize: 12,
@@ -1890,30 +2568,236 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
         calendarDayTextActive: {
           color: '#FFFFFF',
         },
-        calendarSummaryCard: {
-          minHeight: 92,
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 14,
+        calendarDaySelectedText: {
+          color: theme.colors.text,
+        },
+        calendarLoggerCard: {
           borderWidth: 1,
           borderColor: theme.ink(0.1),
           borderRadius: 22,
           backgroundColor: theme.ink(0.045),
+          marginTop: 12,
           padding: 14,
+          gap: 12,
+        },
+        calendarLoggerTopRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 12,
+          position: 'relative',
+          marginBottom: 8,
+          paddingTop: 6,
+        },
+        calendarLoggerHeader: {
+          flex: 1,
+          alignItems: 'center',
+        },
+        calendarLoggerTitle: {
+          color: theme.colors.text,
+          fontSize: 15,
+          fontWeight: '900',
+        },
+        calendarLoggerDate: {
+          color: theme.colors.textMuted,
+          fontSize: 12,
+          fontWeight: '800',
+          marginTop: 8,
+        },
+        calendarLoggerDateCentered: {
+          textAlign: 'center',
+        },
+        calendarLoggerBadge: {
+          position: 'absolute',
+          right: 0,
+          top: 10,
+          overflow: 'hidden',
+          borderWidth: 1,
+          borderColor: 'rgba(177,18,38,0.26)',
+          borderRadius: 999,
+          backgroundColor: 'rgba(177,18,38,0.10)',
+          color: accentBright,
+          fontSize: 10,
+          fontWeight: '900',
+          paddingHorizontal: 10,
+          paddingVertical: 5,
+        },
+        calendarTimeToggle: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          backgroundColor: 'transparent',
+          paddingTop: 8,
+          paddingBottom: 4,
+        },
+        calendarCheckbox: {
+          width: 18,
+          height: 18,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 1.2,
+          borderColor: theme.ink(0.2),
+          borderRadius: 6,
+          backgroundColor: 'transparent',
+        },
+        calendarCheckboxActive: {
+          borderColor: accentBright,
+          backgroundColor: accentColor,
+        },
+        calendarCheckboxTick: {
+          color: '#FFFFFF',
+          fontSize: 10,
+          fontWeight: '900',
+        },
+        calendarTimeToggleBody: {
+          flex: 1,
+        },
+        calendarTimeToggleTitle: {
+          color: theme.colors.text,
+          fontSize: 11,
+          fontWeight: '900',
+          textTransform: 'uppercase',
+        },
+        calendarTimeToggleHint: {
+          color: theme.colors.textMuted,
+          fontSize: 11,
+          fontWeight: '700',
+          lineHeight: 16,
+          marginTop: 2,
+        },
+        calendarTimePickers: {
+          flexDirection: 'row',
+          gap: 12,
+          marginTop: 8,
+        },
+        calendarTimeColumn: {
+          flex: 1,
+          alignItems: 'center',
+        },
+        calendarTimeLabel: {
+          color: theme.colors.text,
+          fontSize: 12,
+          fontWeight: '900',
+          marginBottom: 10,
+          textAlign: 'center',
+        },
+        calendarTimeWheelFrame: {
+          width: 104,
+          minHeight: 88,
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderWidth: 1,
+          borderColor: theme.ink(0.11),
+          borderRadius: 18,
+          backgroundColor: 'rgba(255,255,255,0.02)',
+          paddingVertical: 6,
+        },
+        calendarTimeWheel: {
+          height: calendarTimeOptionHeight,
+          width: 88,
+          overflow: 'hidden',
+          backgroundColor: 'transparent',
+        },
+        calendarTimeWheelArrowTop: {
+          marginBottom: 2,
+        },
+        calendarTimeWheelArrowBottom: {
+          marginTop: 2,
+        },
+        calendarTimeWheelArrowText: {
+          color: theme.colors.textMuted,
+          fontSize: 10,
+          fontWeight: '900',
+        },
+        calendarTimeList: {
+          height: calendarTimeOptionHeight,
+        },
+        calendarTimeListContent: {
+          paddingVertical: calendarTimeWheelPadding,
+          paddingHorizontal: 0,
+        },
+        calendarTimeOption: {
+          height: calendarTimeOptionHeight,
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 88,
+          paddingHorizontal: 4,
+        },
+        calendarTimeOptionText: {
+          color: theme.colors.text,
+          fontSize: 17,
+          fontWeight: '900',
+        },
+        calendarTimeOptionTextActive: {
+          color: theme.colors.text,
+        },
+        calendarLoggerHint: {
+          color: theme.colors.textMuted,
+          fontSize: 11,
+          fontWeight: '800',
+          marginTop: 12,
+        },
+        calendarLoggerHintCentered: {
+          textAlign: 'center',
+        },
+        calendarLoggerActions: {
+          flexDirection: 'row',
+          justifyContent: 'flex-end',
+          gap: 8,
+        },
+        calendarLoggerSecondary: {
+          minHeight: 38,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 1,
+          borderColor: theme.ink(0.11),
+          borderRadius: 14,
+          backgroundColor: theme.colors.surfaceSoft,
+          paddingHorizontal: 14,
+        },
+        calendarLoggerSecondaryText: {
+          color: theme.colors.text,
+          fontSize: 12,
+          fontWeight: '900',
+        },
+        calendarLoggerPrimary: {
+          minHeight: 38,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 14,
+          backgroundColor: accentColor,
+          paddingHorizontal: 16,
+        },
+        calendarLoggerPrimaryText: {
+          color: '#FFFFFF',
+          fontSize: 12,
+          fontWeight: '900',
+        },
+        calendarSummaryCard: {
+          minHeight: 70,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          borderWidth: 1,
+          borderColor: theme.ink(0.1),
+          borderRadius: 22,
+          backgroundColor: 'transparent',
+          paddingHorizontal: 12,
+          paddingVertical: 10,
         },
         calendarSummaryStat: {
-          width: 92,
+          width: 76,
           alignItems: 'center',
           justifyContent: 'center',
           borderRightWidth: 1,
           borderRightColor: theme.ink(0.1),
-          paddingRight: 14,
+          paddingRight: 12,
         },
         calendarSummaryValue: {
           color: accentBright,
-          fontSize: 32,
+          fontSize: 28,
           fontWeight: '900',
-          lineHeight: 36,
+          lineHeight: 31,
         },
         calendarSummaryLabel: {
           color: theme.colors.textMuted,
@@ -1927,34 +2811,36 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
         },
         calendarSummaryTitle: {
           color: theme.colors.text,
-          fontSize: 13,
+          fontSize: 12,
           fontWeight: '900',
-          marginBottom: 9,
+          marginBottom: 6,
         },
         visitDayChips: {
           flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: 7,
+          flexWrap: 'nowrap',
+          alignItems: 'center',
+          gap: 6,
+          overflow: 'hidden',
         },
         visitDayChip: {
           minWidth: 34,
-          minHeight: 28,
+          minHeight: 24,
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: 999,
           backgroundColor: 'rgba(177,18,38,0.12)',
-          paddingHorizontal: 9,
+          paddingHorizontal: 8,
         },
         visitDayChipText: {
           color: accentBright,
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '900',
         },
         visitMoreText: {
           color: theme.colors.textMuted,
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '900',
-          paddingTop: 6,
+          flexShrink: 1,
         },
         calendarEmptyText: {
           color: theme.colors.textMuted,
@@ -2025,7 +2911,7 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           backgroundColor: '#16A34A',
           shadowColor: '#16A34A',
         },
-        timerStopButton: {
+        timerResetButton: {
           width: 44,
           height: 44,
           alignItems: 'center',
@@ -2137,18 +3023,27 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           padding: 22,
           ...theme.shadow,
         },
+        calendarConfirmCard: {
+          paddingTop: 24,
+          paddingBottom: 24,
+        },
         modalKicker: {
           color: accentColor,
           fontSize: 12,
           fontWeight: '900',
           marginBottom: 6,
           textTransform: 'uppercase',
+          textAlign: 'center',
         },
         confirmTitle: {
           color: theme.colors.text,
           fontSize: 24,
           fontWeight: '900',
           lineHeight: 29,
+        },
+        calendarConfirmTitle: {
+          marginTop: 6,
+          textAlign: 'center',
         },
         confirmBody: {
           color: theme.colors.textMuted,
@@ -2167,28 +3062,47 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
-          borderWidth: 1,
-          borderColor: 'rgba(177,18,38,0.24)',
-          borderRadius: 18,
-          backgroundColor: theme.colors.surfaceSoft,
+          borderWidth: 1.4,
+          borderColor: 'rgba(225,29,46,0.55)',
+          borderRadius: 999,
+          backgroundColor: 'rgba(7,2,5,0.45)',
         },
         confirmSecondaryText: {
-          color: accentBright,
-          fontSize: 13,
-          fontWeight: '900',
-        },
-        confirmPrimary: {
-          minHeight: 52,
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: 18,
-          backgroundColor: accentColor,
-        },
-        confirmPrimaryText: {
           color: '#FFFFFF',
           fontSize: 13,
           fontWeight: '900',
+        },
+        confirmPrimaryWrap: {
+          flex: 1,
+          borderRadius: 999,
+          shadowColor: accentBright,
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.3,
+          shadowRadius: 12,
+          elevation: 6,
+        },
+        confirmPrimary: {
+          minHeight: 52,
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          borderWidth: 1.2,
+          borderColor: 'rgba(255,91,106,0.72)',
+          borderRadius: 999,
+        },
+        confirmPrimaryGloss: {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '42%',
+          backgroundColor: 'rgba(255,255,255,0.075)',
+        },
+        confirmPrimaryText: {
+          color: '#FFFFFF',
+          fontSize: 12,
+          fontWeight: '900',
+          letterSpacing: 0.3,
         },
         historyOverlay: {
           flex: 1,
@@ -2215,11 +3129,32 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           gap: 12,
           marginBottom: 12,
         },
+        historyTopActions: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+        },
         historyPanelTitle: {
           color: theme.colors.text,
           fontSize: 25,
           fontWeight: '900',
           lineHeight: 30,
+        },
+        historyClearButton: {
+          minHeight: 36,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 1,
+          borderColor: 'rgba(104, 16, 27, 0.72)',
+          borderRadius: 18,
+          backgroundColor: 'rgba(28, 10, 14, 0.72)',
+          paddingHorizontal: 12,
+        },
+        historyClearButtonText: {
+          color: '#F6D5DA',
+          fontSize: 10,
+          fontWeight: '900',
+          textTransform: 'uppercase',
         },
         historyIconClose: {
           width: 36,

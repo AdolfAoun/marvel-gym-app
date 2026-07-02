@@ -25,14 +25,20 @@ import { machineGuideService } from '@/services';
 import type { MachineGuide } from '@/types';
 
 // ─── Muscle taxonomy ─────────────────────────────────────────────────────────
-// Each head is drawn as its own region on the custom <MuscleMap />. `slug` is the
-// broad anatomical area it belongs to (kept for grouping / future use); `label`
-// is the gym-conventional display name; `key` stays the data identity.
+// The body figure is labelled with the *general* muscle name people actually say
+// at the gym ("Chest", "Shoulders", "Back", "Biceps"...) — that's the `region`.
+// Each region is then broken into its trainable parts in the boxes below the
+// figure, using common gym names ("Upper Chest", "Front Delts", "Long Head"...) —
+// that's `short` (the chip label) and `label` (the standalone/full name).
+// `slug` is the broad anatomical area the body highlighter fills; `key` stays the
+// data identity used to match machines.
 type MuscleGroupKey = MachineGuide['muscleGroup'];
 
 type MuscleDef = {
   key: MuscleGroupKey;
-  label: string;
+  region: string; // general name shown on the body figure
+  label: string; // full standalone name (machine cards, modal)
+  short: string; // compact name shown on the sub-part chips
   slug: string;
   side: 'front' | 'back' | 'both';
   color: string;
@@ -40,52 +46,55 @@ type MuscleDef = {
 
 const MUSCLES: MuscleDef[] = [
   // Chest
-  { key: 'Upper Chest',          label: 'Upper Chest',              slug: 'chest',      side: 'front', color: '#38BDF8' },
-  { key: 'Middle Chest',         label: 'Middle Chest',             slug: 'chest',      side: 'front', color: '#0EA5E9' },
-  { key: 'Lower Chest',          label: 'Lower Chest',              slug: 'chest',      side: 'front', color: '#0284C7' },
-  // Back
-  { key: 'Latissimus Dorsi',     label: 'Lats',                     slug: 'upper-back', side: 'back',  color: '#9B7FF0' },
-  { key: 'Upper Back',           label: 'Upper Back',               slug: 'upper-back', side: 'back',  color: '#6E4FCF' },
-  { key: 'Lower Back',           label: 'Lower Back',               slug: 'lower-back', side: 'back',  color: '#4C2A9E' },
+  { key: 'Upper Chest',          region: 'Chest',     label: 'Upper Chest',      short: 'Upper',          slug: 'chest',      side: 'front', color: '#38BDF8' },
+  { key: 'Middle Chest',         region: 'Chest',     label: 'Middle Chest',     short: 'Middle',         slug: 'chest',      side: 'front', color: '#0EA5E9' },
+  { key: 'Lower Chest',          region: 'Chest',     label: 'Lower Chest',      short: 'Lower',          slug: 'chest',      side: 'front', color: '#0284C7' },
+  // Back — Lats + Upper Back share one block on the figure, so they're boxed
+  // together. Lower Back has its own spot, so it stands alone.
+  { key: 'Latissimus Dorsi',     region: 'Back',       label: 'Lats',            short: 'Lats',           slug: 'upper-back', side: 'back',  color: '#9B7FF0' },
+  { key: 'Upper Back',           region: 'Back',       label: 'Upper Back',      short: 'Upper Back',     slug: 'upper-back', side: 'back',  color: '#6E4FCF' },
+  { key: 'Lower Back',           region: 'Lower Back', label: 'Lower Back',      short: 'Lower Back',     slug: 'lower-back', side: 'back',  color: '#4C2A9E' },
   // Traps
-  { key: 'Upper Traps',          label: 'Upper Traps',              slug: 'trapezius',  side: 'back',  color: '#C4B5FD' },
-  { key: 'Lower Traps',          label: 'Lower Traps',              slug: 'trapezius',  side: 'back',  color: '#DDD6FE' },
+  { key: 'Upper Traps',          region: 'Traps',     label: 'Upper Traps',      short: 'Upper',          slug: 'trapezius',  side: 'back',  color: '#C4B5FD' },
+  { key: 'Lower Traps',          region: 'Traps',     label: 'Lower Traps',      short: 'Lower',          slug: 'trapezius',  side: 'back',  color: '#DDD6FE' },
   // Shoulders
-  { key: 'Anterior Deltoid',     label: 'Front Delts',              slug: 'deltoids',   side: 'front', color: '#FB923C' },
-  { key: 'Lateral Deltoid',      label: 'Side Delts',               slug: 'deltoids',   side: 'both',  color: '#F97316' },
-  { key: 'Posterior Deltoid',    label: 'Rear Delts',               slug: 'deltoids',   side: 'back',  color: '#FDBA74' },
+  { key: 'Anterior Deltoid',     region: 'Shoulders', label: 'Front Delts',      short: 'Front Delts',    slug: 'deltoids',   side: 'front', color: '#FB923C' },
+  { key: 'Lateral Deltoid',      region: 'Shoulders', label: 'Side Delts',       short: 'Side Delts',     slug: 'deltoids',   side: 'both',  color: '#F97316' },
+  { key: 'Posterior Deltoid',    region: 'Shoulders', label: 'Rear Delts',       short: 'Rear Delts',     slug: 'deltoids',   side: 'back',  color: '#FDBA74' },
   // Biceps
-  { key: 'Bicep Long Head',      label: 'Biceps (Long Head)',       slug: 'biceps',     side: 'front', color: '#34D399' },
-  { key: 'Bicep Short Head',     label: 'Biceps (Short Head)',      slug: 'biceps',     side: 'front', color: '#10B981' },
-  { key: 'Brachialis',           label: 'Brachialis',               slug: 'biceps',     side: 'front', color: '#6EE7B7' },
+  { key: 'Bicep Long Head',      region: 'Biceps',    label: 'Biceps Long Head', short: 'Long Head',      slug: 'biceps',     side: 'front', color: '#34D399' },
+  { key: 'Bicep Short Head',     region: 'Biceps',    label: 'Biceps Short Head',short: 'Short Head',     slug: 'biceps',     side: 'front', color: '#10B981' },
+  { key: 'Brachialis',           region: 'Biceps',    label: 'Brachialis',       short: 'Brachialis',     slug: 'biceps',     side: 'front', color: '#6EE7B7' },
   // Triceps
-  { key: 'Tricep Long Head',     label: 'Triceps (Long Head)',      slug: 'triceps',    side: 'back',  color: '#2DD4BF' },
-  { key: 'Tricep Lateral Head',  label: 'Triceps (Lateral Head)',   slug: 'triceps',    side: 'back',  color: '#14B8A6' },
-  { key: 'Tricep Medial Head',   label: 'Triceps (Medial Head)',    slug: 'triceps',    side: 'back',  color: '#5EEAD4' },
+  { key: 'Tricep Long Head',     region: 'Triceps',   label: 'Triceps Long Head',    short: 'Long Head',    slug: 'triceps',    side: 'back',  color: '#2DD4BF' },
+  { key: 'Tricep Lateral Head',  region: 'Triceps',   label: 'Triceps Lateral Head', short: 'Lateral Head', slug: 'triceps',    side: 'back',  color: '#14B8A6' },
+  { key: 'Tricep Medial Head',   region: 'Triceps',   label: 'Triceps Medial Head',  short: 'Medial Head',  slug: 'triceps',    side: 'back',  color: '#5EEAD4' },
   // Forearms
-  { key: 'Forearm Extensors',    label: 'Forearm Extensors',        slug: 'forearm',    side: 'both',  color: '#A3E635' },
-  { key: 'Forearm Flexors',      label: 'Forearm Flexors',          slug: 'forearm',    side: 'both',  color: '#84CC16' },
+  { key: 'Forearm Extensors',    region: 'Forearms',  label: 'Forearm Extensors',short: 'Extensors',      slug: 'forearm',    side: 'both',  color: '#A3E635' },
+  { key: 'Forearm Flexors',      region: 'Forearms',  label: 'Forearm Flexors',  short: 'Flexors',        slug: 'forearm',    side: 'both',  color: '#84CC16' },
   // Quads
-  { key: 'Rectus Femoris',       label: 'Mid Quad (Rectus Femoris)',slug: 'quadriceps', side: 'front', color: '#FDE047' },
-  { key: 'Vastus Medialis',      label: 'Inner Quad (Teardrop)',    slug: 'quadriceps', side: 'front', color: '#FBBF24' },
-  { key: 'Vastus Lateralis',     label: 'Outer Quad (Sweep)',       slug: 'quadriceps', side: 'front', color: '#FCD34D' },
+  { key: 'Vastus Lateralis',     region: 'Quads',     label: 'Outer Quad (Sweep)',   short: 'Outer Sweep',   slug: 'quadriceps', side: 'front', color: '#FCD34D' },
+  { key: 'Rectus Femoris',       region: 'Quads',     label: 'Mid Quad',             short: 'Mid Quad',      slug: 'quadriceps', side: 'front', color: '#FDE047' },
+  { key: 'Vastus Medialis',      region: 'Quads',     label: 'Inner Quad (Teardrop)',short: 'Inner Teardrop',slug: 'quadriceps', side: 'front', color: '#FBBF24' },
   // Hamstrings
-  { key: 'Hamstrings',           label: 'Hamstrings',               slug: 'hamstring',  side: 'back',  color: '#F59E0B' },
+  { key: 'Hamstrings',           region: 'Hamstrings',label: 'Hamstrings',       short: 'Hamstrings',     slug: 'hamstring',  side: 'back',  color: '#F59E0B' },
   // Glutes
-  { key: 'Gluteus Maximus',      label: 'Glutes (Maximus)',         slug: 'gluteal',    side: 'back',  color: '#FB7185' },
-  { key: 'Gluteus Medius',       label: 'Glutes (Medius)',          slug: 'gluteal',    side: 'back',  color: '#F43F5E' },
-  { key: 'Gluteus Minimus',      label: 'Glutes (Minimus)',         slug: 'gluteal',    side: 'back',  color: '#FDA4AF' },
-  // Calves & shin
-  { key: 'Gastrocnemius',        label: 'Calves (Gastrocnemius)',   slug: 'calves',     side: 'both',  color: '#FCA5A5' },
-  { key: 'Soleus',               label: 'Calves (Soleus)',          slug: 'calves',     side: 'both',  color: '#F87171' },
-  { key: 'Tibialis Anterior',    label: 'Shins (Tibialis)',         slug: 'tibialis',   side: 'front', color: '#FECACA' },
-  // Core
-  { key: 'Upper Abs',            label: 'Upper Abs',                slug: 'abs',        side: 'front', color: '#F472B6' },
-  { key: 'Lower Abs',            label: 'Lower Abs',                slug: 'abs',        side: 'front', color: '#EC4899' },
-  { key: 'Transverse Abdominis', label: 'Deep Core (TVA)',          slug: 'abs',        side: 'front', color: '#F9A8D4' },
-  { key: 'Obliques',             label: 'Obliques',                 slug: 'obliques',   side: 'front', color: '#DB2777' },
+  { key: 'Gluteus Maximus',      region: 'Glutes',    label: 'Glute Max',        short: 'Glute Max',      slug: 'gluteal',    side: 'back',  color: '#FB7185' },
+  { key: 'Gluteus Medius',       region: 'Glutes',    label: 'Glute Med',        short: 'Glute Med',      slug: 'gluteal',    side: 'back',  color: '#F43F5E' },
+  { key: 'Gluteus Minimus',      region: 'Glutes',    label: 'Glute Min',        short: 'Glute Min',      slug: 'gluteal',    side: 'back',  color: '#FDA4AF' },
+  // Calves & shin — nobody at the gym says "gastroc / soleus", so both machines
+  // just live under one "Calves".
+  { key: 'Gastrocnemius',        region: 'Calves',    label: 'Calves',           short: 'Calves',         slug: 'calves',     side: 'both',  color: '#FCA5A5' },
+  { key: 'Soleus',               region: 'Calves',    label: 'Calves',           short: 'Calves',         slug: 'calves',     side: 'both',  color: '#FCA5A5' },
+  { key: 'Tibialis Anterior',    region: 'Shins',     label: 'Shins',            short: 'Shins',          slug: 'tibialis',   side: 'front', color: '#FECACA' },
+  // Core — Abs is one block on the figure, so its parts live in the boxes.
+  // Obliques have their own spot on the figure, so they stand alone.
+  { key: 'Upper Abs',            region: 'Abs',       label: 'Upper Abs',        short: 'Upper',          slug: 'abs',        side: 'front', color: '#F472B6' },
+  { key: 'Lower Abs',            region: 'Abs',       label: 'Lower Abs',        short: 'Lower',          slug: 'abs',        side: 'front', color: '#EC4899' },
+  { key: 'Transverse Abdominis', region: 'Abs',       label: 'Deep Core (TVA)',  short: 'Deep Core',      slug: 'abs',        side: 'front', color: '#F9A8D4' },
+  { key: 'Obliques',             region: 'Obliques',  label: 'Obliques',         short: 'Obliques',       slug: 'obliques',   side: 'front', color: '#DB2777' },
   // Inner thigh
-  { key: 'Adductors',            label: 'Inner Thighs (Adductors)', slug: 'adductors',  side: 'front', color: '#EF4444' },
+  { key: 'Adductors',            region: 'Inner Thighs', label: 'Inner Thighs',  short: 'Inner Thighs',   slug: 'adductors',  side: 'front', color: '#EF4444' },
 ];
 
 const MUSCLE_BY_KEY = Object.fromEntries(
@@ -93,6 +102,17 @@ const MUSCLE_BY_KEY = Object.fromEntries(
 ) as Record<MuscleGroupKey, MuscleDef>;
 
 const muscleOrder: MuscleGroupKey[] = MUSCLES.map((m) => m.key);
+
+// Region → its parts, in table order (used to build the sub-part chip boxes).
+const REGION_PARTS: Record<string, MuscleDef[]> = MUSCLES.reduce((acc, m) => {
+  (acc[m.region] ??= []).push(m);
+  return acc;
+}, {} as Record<string, MuscleDef[]>);
+
+// Regions that map to several data entries but are shown as a single unit (no
+// boxes) because people don't distinguish the parts by name — e.g. "Calves"
+// covers both the gastroc and soleus machines.
+const ATOMIC_REGIONS = new Set<string>(['Calves']);
 
 // Colour helpers — derive the tint / glow from each muscle's base colour.
 const hexToRgba = (hex: string, alpha: number): string => {
@@ -105,6 +125,8 @@ const hexToRgba = (hex: string, alpha: number): string => {
 
 const labelOf = (key: MuscleGroupKey): string =>
   MUSCLE_BY_KEY[key]?.label ?? key;
+const regionOf = (key: MuscleGroupKey): string =>
+  MUSCLE_BY_KEY[key]?.region ?? key;
 const colorOf = (key: MuscleGroupKey): string =>
   MUSCLE_BY_KEY[key]?.color ?? premiumColors.redBright;
 const tintOf = (key: MuscleGroupKey): string =>
@@ -249,10 +271,28 @@ export default function MachineGuideScreen() {
     [guides],
   );
 
+  // The parts (boxes) that belong to the currently selected region. A region with
+  // only one part (e.g. Hamstrings) — or an "atomic" region like Calves — has no
+  // meaningful sub-division, so we hide the boxes and show every machine in it.
+  const selectedRegion = regionOf(selectedGroup);
+  const regionParts = REGION_PARTS[selectedRegion] ?? [];
+  const showRegionParts = regionParts.length > 1 && !ATOMIC_REGIONS.has(selectedRegion);
+
   const selectedGuides = useMemo(
-    () => guides.filter((m) => m.muscleGroup === selectedGroup),
-    [guides, selectedGroup],
+    () =>
+      showRegionParts
+        ? guides.filter((m) => m.muscleGroup === selectedGroup)
+        : guides.filter((m) => regionOf(m.muscleGroup) === selectedRegion),
+    [guides, selectedGroup, selectedRegion, showRegionParts],
   );
+
+  // Count machines per head so the sub-part boxes can show a badge / disable
+  // parts that have nothing to train yet.
+  const countByGroup = useMemo(() => {
+    const counts = {} as Record<MuscleGroupKey, number>;
+    for (const g of guides) counts[g.muscleGroup] = (counts[g.muscleGroup] ?? 0) + 1;
+    return counts;
+  }, [guides]);
 
   // Build the highlighter data: the selected muscle's region = bright neon, every
   // other trained region = faded. Slugs are de-duped so heads that share a region
@@ -281,6 +321,13 @@ export default function MachineGuideScreen() {
     if (!group) return;
     setSelectedGroup(group);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    showMuscleSide(group);
+  };
+
+  // Tap a sub-part box → focus that specific head and glide to the side it shows on
+  const handlePartPress = (group: MuscleGroupKey) => {
+    setSelectedGroup(group);
+    Haptics.selectionAsync();
     showMuscleSide(group);
   };
 
@@ -336,9 +383,15 @@ export default function MachineGuideScreen() {
                 styles.viewToggleGlide,
                 { transform: [{ translateX: togglePillX }] },
               ]}>
+              {/* Red sits on the outer edge and fades to black toward the
+                  centre — so it mirrors when the pill is on the Back side. */}
               <LinearGradient
-                colors={['#FF2638', '#B11226', '#2A0308']}
-                locations={[0, 0.58, 1]}
+                colors={
+                  bodySide === 'front'
+                    ? ['#FF2638', '#B11226', '#2A0308']
+                    : ['#2A0308', '#B11226', '#FF2638']
+                }
+                locations={bodySide === 'front' ? [0, 0.58, 1] : [0, 0.42, 1]}
                 start={{ x: 0.08, y: 0 }}
                 end={{ x: 0.92, y: 1 }}
                 style={StyleSheet.absoluteFill}
@@ -368,11 +421,13 @@ export default function MachineGuideScreen() {
             <View style={styles.selectedMuscleRow}>
               <View style={[styles.selectedMuscleDot, { backgroundColor: activeColor }]} />
               <Text style={[styles.selectedMuscleName, { color: activeColor }]}>
-                {labelOf(selectedGroup)}
+                {selectedRegion}
               </Text>
             </View>
             <Text style={styles.selectedMuscleMeta}>
-              {selectedGuides.length} machine{selectedGuides.length === 1 ? '' : 's'}
+              {showRegionParts
+                ? `${labelOf(selectedGroup)} · ${selectedGuides.length} machine${selectedGuides.length === 1 ? '' : 's'}`
+                : `${selectedGuides.length} machine${selectedGuides.length === 1 ? '' : 's'}`}
             </Text>
           </View>
 
@@ -426,6 +481,56 @@ export default function MachineGuideScreen() {
             </Text>
           </Pressable>
         </View>
+
+        {/* ── Sub-part boxes ──────────────────────────────────────────────
+            The figure shows the general muscle (e.g. "Chest"); these boxes
+            break it into the parts people actually train (Upper / Middle /
+            Lower), using common gym names. */}
+        {showRegionParts && (
+          <View style={styles.partsSection}>
+            <Text style={styles.partsSectionTitle}>
+              {selectedRegion.toUpperCase()} · PICK A PART
+            </Text>
+            <View style={styles.partsRow}>
+              {regionParts.map((part) => {
+                const isActive = part.key === selectedGroup;
+                const count = countByGroup[part.key] ?? 0;
+                const disabled = count === 0;
+                return (
+                  <Pressable
+                    key={part.key}
+                    disabled={disabled}
+                    onPress={() => handlePartPress(part.key)}
+                    style={[
+                      styles.partChip,
+                      isActive
+                        ? { backgroundColor: hexToRgba(part.color, 0.16), borderColor: part.color }
+                        : styles.partChipInactive,
+                      disabled && styles.partChipDisabled,
+                    ]}>
+                    <View style={[styles.partChipDot, { backgroundColor: part.color }]} />
+                    <Text
+                      style={[
+                        styles.partChipLabel,
+                        { color: isActive ? part.color : premiumColors.textMuted },
+                      ]}>
+                      {part.short}
+                    </Text>
+                    {count > 0 && (
+                      <Text
+                        style={[
+                          styles.partChipCount,
+                          isActive && { color: part.color },
+                        ]}>
+                        {count}
+                      </Text>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         {/* ── Machines Section Header ──────────────────────────────────── */}
         <View
@@ -797,6 +902,62 @@ const styles = StyleSheet.create({
     color: premiumColors.textMuted,
     fontWeight: '800',
     textDecorationLine: 'underline',
+  },
+
+  // ── Sub-part boxes (region → parts)
+  partsSection: {
+    paddingHorizontal: 22,
+    marginBottom: 28,
+  },
+  partsSectionTitle: {
+    color: premiumColors.textFaint,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginBottom: 12,
+  },
+  partsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  partChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    borderRadius: 999,
+    borderWidth: 1.5,
+  },
+  partChipInactive: {
+    backgroundColor: premiumColors.surfaceSoft,
+    borderColor: premiumColors.border,
+  },
+  partChipDisabled: {
+    opacity: 0.4,
+  },
+  partChipDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  partChipLabel: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  partChipCount: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: premiumColors.textFaint,
+    minWidth: 14,
+    textAlign: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    overflow: 'hidden',
   },
 
   // ── Chips
