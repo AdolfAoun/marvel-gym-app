@@ -1220,7 +1220,7 @@ export default function JourneyScreen() {
 
   if (isLoading || !profile || !stats || !metrics) {
     return (
-      <PremiumScreenBackground>
+      <PremiumScreenBackground redHorizonHeight={400}>
         <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
         <View style={stylesForTheme.loadingState}>
           <ActivityIndicator color={accentBright} />
@@ -1231,7 +1231,7 @@ export default function JourneyScreen() {
   }
 
   return (
-    <PremiumScreenBackground>
+    <PremiumScreenBackground redHorizonHeight={400}>
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
       <ScrollView
         contentContainerStyle={stylesForTheme.content}
@@ -1524,23 +1524,37 @@ export default function JourneyScreen() {
           <View style={stylesForTheme.panelTopRow}>
             <View>
               <Text style={stylesForTheme.panelKicker}>Analytics</Text>
-              <Text style={stylesForTheme.panelTitle}>Average calories / duration</Text>
+              <Text style={stylesForTheme.panelTitle}>Avg Calories/Session</Text>
             </View>
-            <View style={stylesForTheme.journeyMonthHeader}>
+            <View
+              style={[
+                stylesForTheme.journeyMonthHeader,
+                stylesForTheme.analyticsMonthHeader,
+              ]}>
               {canShowPreviousAnalyticsMonth ? (
                 <Pressable
                   onPress={() => selectAnalyticsMonth(activeAnalyticsMonthIndex - 1)}
                   style={({ pressed }) => [
                     stylesForTheme.journeyMonthArrow,
+                    stylesForTheme.analyticsMonthArrowLeft,
                     pressed && stylesForTheme.buttonPressed,
                   ]}
                   hitSlop={8}>
                   <Text style={stylesForTheme.journeyMonthArrowText}>{'‹'}</Text>
                 </Pressable>
               ) : (
-                <View style={stylesForTheme.journeyMonthArrowSpacer} />
+                <View
+                  style={[
+                    stylesForTheme.journeyMonthArrowSpacer,
+                    stylesForTheme.analyticsMonthArrowLeft,
+                  ]}
+                />
               )}
-              <View style={stylesForTheme.journeyMonthMask}>
+              <View
+                style={[
+                  stylesForTheme.journeyMonthMask,
+                  stylesForTheme.analyticsMonthMask,
+                ]}>
                 <ScrollView
                   ref={analyticsMonthRailRef}
                   horizontal
@@ -1573,13 +1587,19 @@ export default function JourneyScreen() {
                   onPress={() => selectAnalyticsMonth(activeAnalyticsMonthIndex + 1)}
                   style={({ pressed }) => [
                     stylesForTheme.journeyMonthArrow,
+                    stylesForTheme.analyticsMonthArrowRight,
                     pressed && stylesForTheme.buttonPressed,
                   ]}
                   hitSlop={8}>
                   <Text style={stylesForTheme.journeyMonthArrowText}>{'›'}</Text>
                 </Pressable>
               ) : (
-                <View style={stylesForTheme.journeyMonthArrowSpacer} />
+                <View
+                  style={[
+                    stylesForTheme.journeyMonthArrowSpacer,
+                    stylesForTheme.analyticsMonthArrowRight,
+                  ]}
+                />
               )}
             </View>
           </View>
@@ -2140,20 +2160,16 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           justifyContent: 'flex-start',
           marginLeft: -6,
         },
+        analyticsMonthHeader: {
+          justifyContent: 'flex-start',
+          marginLeft: -12,
+          paddingRight: 4,
+        },
         journeyMonthArrow: {
           width: 18,
           height: 18,
           alignItems: 'center',
           justifyContent: 'center',
-          borderWidth: 1,
-          borderColor: theme.scheme === 'dark' ? 'rgba(255,255,255,0.16)' : 'rgba(17,24,39,0.12)',
-          borderRadius: 9,
-          backgroundColor:
-            theme.scheme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.76)',
-          shadowColor: accentBright,
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: theme.scheme === 'dark' ? 0.18 : 0.1,
-          shadowRadius: 8,
         },
         journeyMonthArrowSpacer: {
           width: 18,
@@ -2175,11 +2191,21 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           marginLeft: -2,
           marginRight: -5,
         },
+        analyticsMonthMask: {
+          marginLeft: -7,
+          marginRight: -7,
+        },
         attendanceMonthArrowLeft: {
           marginRight: -3,
         },
         attendanceMonthArrowRight: {
           marginLeft: -6,
+        },
+        analyticsMonthArrowLeft: {
+          marginRight: -7,
+        },
+        analyticsMonthArrowRight: {
+          marginLeft: -7,
         },
         journeyMonthRail: {
           width: journeyMonthRailWidth,

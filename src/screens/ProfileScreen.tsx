@@ -352,7 +352,7 @@ export default function ProfileScreen() {
 
   if (!member || !form) {
     return (
-      <PremiumScreenBackground>
+      <PremiumScreenBackground redHorizonHeight={400}>
         <StatusBar style="light" />
         <View style={styles.loadingState}>
           <ActivityIndicator color={accentColor} />
@@ -428,7 +428,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <PremiumScreenBackground>
+    <PremiumScreenBackground redHorizonHeight={400}>
       <StatusBar style="light" />
       <ScrollView
         contentContainerStyle={styles.content}

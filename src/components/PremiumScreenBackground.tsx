@@ -11,6 +11,8 @@ type PremiumScreenBackgroundProps = {
   bottomInset?: boolean;
   /** Show the static Marvel sign watermarks behind the content. */
   signs?: boolean;
+  /** Height of the red horizon glow rising from the bottom (px). */
+  redHorizonHeight?: number;
 };
 
 const signDot = require('@/assets/images/marvel-logo-startup-sign-dot.png');
@@ -43,6 +45,7 @@ export function PremiumScreenBackground({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   bottomInset = true,
   signs = true,
+  redHorizonHeight = 360,
 }: PremiumScreenBackgroundProps) {
   const theme = useAppTheme();
   const styles = useStyles(theme);
@@ -104,7 +107,7 @@ export function PremiumScreenBackground({
         }
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
-        style={styles.redHorizon}
+        style={[styles.redHorizon, { height: redHorizonHeight }]}
       />
       <View pointerEvents="none" style={styles.vignette} />
       {children}

@@ -18,7 +18,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import type { ViewStyle } from 'react-native';
+import type { LayoutChangeEvent, ViewStyle } from 'react-native';
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import {
@@ -40,7 +40,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // inner content width rather than the full screen width.
 const accentColor = premiumColors.red;
 const mutedColor = premiumColors.textMuted;
-const shopHeartPurple = '#3B1D7A';
+const shopHeartPurple = '#A855F7';
 
 // Faint Marvel logo signs used as glow-box watermarks.
 const ORDERS_SIGN = require('@/assets/images/marvel-logo-startup-sign-dot.png');
@@ -244,6 +244,92 @@ const hStyles = StyleSheet.create({
 });
 // ─────────────────────────────────────────────────────────────────────────────
 
+function GlideSegmentedControl<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: readonly T[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  const glideX = useRef(new Animated.Value(0)).current;
+  const [controlWidth, setControlWidth] = useState(0);
+  const innerControlWidth = Math.max(0, controlWidth - 6);
+  const segmentWidth = innerControlWidth > 0 ? innerControlWidth / options.length : 0;
+  const selectedIndex = Math.max(0, options.indexOf(value));
+
+  useEffect(() => {
+    if (!segmentWidth) return;
+    Animated.spring(glideX, {
+      toValue: selectedIndex * segmentWidth,
+      useNativeDriver: false,
+      speed: 18,
+      bounciness: 5,
+    }).start();
+  }, [glideX, selectedIndex, segmentWidth]);
+
+  const handleLayout = ({ nativeEvent }: LayoutChangeEvent) => {
+    setControlWidth(nativeEvent.layout.width);
+  };
+
+  return (
+    <View onLayout={handleLayout} style={styles.segmentedControl}>
+      {segmentWidth > 0 ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.segmentedControlGlide,
+            {
+              width: segmentWidth,
+              transform: [{ translateX: glideX }],
+            },
+          ]}>
+          <LinearGradient
+            colors={
+              selectedIndex === 0
+                ? ['#FF2638', '#B11226', '#2A0308']
+                : ['#2A0308', '#B11226', '#FF2638']
+            }
+            locations={selectedIndex === 0 ? [0, 0.58, 1] : [0, 0.42, 1]}
+            start={{ x: 0.08, y: 0 }}
+            end={{ x: 0.92, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+      ) : null}
+      {options.map((option, index) => {
+        const isActive = option === value;
+        return (
+          <Pressable
+            key={option}
+            onPress={() => {
+              void Haptics.selectionAsync().catch(() => undefined);
+              onChange(option);
+            }}
+            style={({ pressed }) => [
+              styles.segmentedControlBtn,
+              index === 0
+                ? styles.segmentedControlBtnLeft
+                : index === options.length - 1
+                  ? styles.segmentedControlBtnRight
+                  : undefined,
+              pressed && styles.segmentedControlBtnPressed,
+            ]}>
+            <Text
+              style={[
+                styles.segmentedControlText,
+                isActive && styles.segmentedControlTextActive,
+              ]}>
+              {option}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function ShopScreen() {
   const theme = useAppTheme();
   const isLight = theme.scheme === 'light';
@@ -431,7 +517,7 @@ export default function ShopScreen() {
 
   if (isLoading) {
     return (
-      <PremiumScreenBackground>
+      <PremiumScreenBackground redHorizonHeight={400}>
         <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
         <View style={styles.loadingState}>
           <ActivityIndicator color={accentColor} />
@@ -442,7 +528,7 @@ export default function ShopScreen() {
   }
 
   return (
-    <PremiumScreenBackground>
+    <PremiumScreenBackground redHorizonHeight={400}>
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
       <ScrollView
         contentContainerStyle={styles.content}
@@ -452,8 +538,7 @@ export default function ShopScreen() {
           <View>
             <Text style={[styles.headerTitle, surfaceTextStyle]}>SHOP</Text>
             <Text style={[styles.headerTagline, mutedTextStyle]}>
-              Fuel your grind. Stay{' '}
-              <Text style={styles.headerAccent}>unstoppable.</Text>
+              <Text style={styles.headerAccent}>Fuel</Text> your grind.
             </Text>
           </View>
         </View>
@@ -838,11 +923,40 @@ export default function ShopScreen() {
           <View style={styles.accentBar} />
           <View style={styles.sectionHeadingText}>
             <Text style={styles.sectionEyebrow}>My activity</Text>
-            <Text style={[styles.sectionHeadingTitle, surfaceTextStyle]}>Orders &amp; Vouchers</Text>
+            <Text style={[styles.sectionHeadingTitle, surfaceTextStyle]}>Vouchers &amp; Orders</Text>
           </View>
         </View>
         <View style={styles.actBoxRow}>
-          {/* ORDERS (left): confirmed + canceled history log */}
+          {/* VOUCHERS (left): pending, awaiting counter — can be canceled */}
+          <Pressable
+            onPress={() => {
+              if (expandedBox !== 'vouchers') {
+                void Haptics.selectionAsync().catch(() => undefined);
+              }
+              setExpandedBox(expandedBox === 'vouchers' ? null : 'vouchers');
+            }}
+            style={[
+              styles.actBox,
+              themedSurfaceStyle,
+              expandedBox === 'vouchers' && styles.actBoxActive,
+            ]}>
+            <Image
+              source={VOUCHERS_SIGN}
+              style={styles.actBoxWatermark}
+              resizeMode="contain"
+            />
+            <SymbolView
+              name="ticket.fill"
+              size={24}
+              tintColor={premiumColors.redBright}
+              fallback={<Text style={styles.actBoxGlyph}>▤</Text>}
+            />
+            <Text style={[styles.actBoxCount, surfaceTextStyle]}>{pendingVouchers.length}</Text>
+            <Text style={[styles.actBoxLabel, surfaceTextStyle]}>Vouchers</Text>
+            <Text style={[styles.actBoxSub, mutedTextStyle]}>Pending</Text>
+          </Pressable>
+
+          {/* ORDERS (right): confirmed + canceled history log */}
           <Pressable
             onPress={() =>
               setExpandedBox(expandedBox === 'orders' ? null : 'orders')
@@ -866,32 +980,6 @@ export default function ShopScreen() {
             <Text style={[styles.actBoxCount, surfaceTextStyle]}>{historyVouchers.length}</Text>
             <Text style={[styles.actBoxLabel, surfaceTextStyle]}>Orders</Text>
             <Text style={[styles.actBoxSub, mutedTextStyle]}>History</Text>
-          </Pressable>
-
-          {/* VOUCHERS (right): pending, awaiting counter — can be canceled */}
-          <Pressable
-            onPress={() =>
-              setExpandedBox(expandedBox === 'vouchers' ? null : 'vouchers')
-            }
-            style={[
-              styles.actBox,
-              themedSurfaceStyle,
-              expandedBox === 'vouchers' && styles.actBoxActive,
-            ]}>
-            <Image
-              source={VOUCHERS_SIGN}
-              style={styles.actBoxWatermark}
-              resizeMode="contain"
-            />
-            <SymbolView
-              name="ticket.fill"
-              size={24}
-              tintColor={premiumColors.redBright}
-              fallback={<Text style={styles.actBoxGlyph}>▤</Text>}
-            />
-            <Text style={[styles.actBoxCount, surfaceTextStyle]}>{pendingVouchers.length}</Text>
-            <Text style={[styles.actBoxLabel, surfaceTextStyle]}>Vouchers</Text>
-            <Text style={[styles.actBoxSub, mutedTextStyle]}>Pending</Text>
           </Pressable>
         </View>
 
@@ -950,22 +1038,11 @@ export default function ShopScreen() {
             <Text style={[styles.expandedSub, mutedTextStyle]}>
               Confirmed and canceled shop orders.
             </Text>
-            <View style={styles.tabsRow}>
-              {(['Confirmed', 'Canceled'] as OrderTab[]).map((tab) => (
-                <Pressable
-                  key={tab}
-                  onPress={() => setOrderTab(tab)}
-                  style={[styles.tab, orderTab === tab && styles.tabActive]}>
-                  <Text
-                    style={[
-                      styles.tabText,
-                      orderTab === tab && styles.tabTextActive,
-                    ]}>
-                    {tab}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+            <GlideSegmentedControl
+              options={['Confirmed', 'Canceled'] as const}
+              value={orderTab}
+              onChange={setOrderTab}
+            />
             {orderedVouchers.length === 0 ? (
               <View style={[styles.emptyCard, themedSurfaceStyle]}>
                 <Text style={[styles.emptyTitle, surfaceTextStyle]}>
@@ -1585,37 +1662,54 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
   },
-  tabsRow: {
+  segmentedControl: {
     flexDirection: 'row',
     borderWidth: 1,
     borderColor: premiumColors.border,
-    borderRadius: 16,
+    borderRadius: 999,
     backgroundColor: premiumColors.surfaceSoft,
     marginBottom: 14,
-    padding: 4,
-    gap: 4,
+    padding: 3,
+    overflow: 'visible',
   },
-  tab: {
+  segmentedControlGlide: {
+    position: 'absolute',
+    top: 3,
+    bottom: 3,
+    left: 3,
+    overflow: 'hidden',
+    borderRadius: 999,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.32,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  segmentedControlBtn: {
     flex: 1,
     minHeight: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    paddingVertical: 9,
+    zIndex: 1,
   },
-  tabActive: {
-    backgroundColor: premiumColors.red,
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 4,
+  segmentedControlBtnLeft: {
+    borderTopLeftRadius: 999,
+    borderBottomLeftRadius: 999,
   },
-  tabText: {
+  segmentedControlBtnRight: {
+    borderTopRightRadius: 999,
+    borderBottomRightRadius: 999,
+  },
+  segmentedControlBtnPressed: {
+    opacity: 0.75,
+  },
+  segmentedControlText: {
     color: premiumColors.textMuted,
     fontSize: 13,
     fontWeight: '900',
   },
-  tabTextActive: {
+  segmentedControlTextActive: {
     color: '#FFFFFF',
   },
   voucherList: {

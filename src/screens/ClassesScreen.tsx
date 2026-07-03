@@ -4,7 +4,12 @@ import { useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { NativeScrollEvent, NativeSyntheticEvent, ViewStyle } from 'react-native';
+import type {
+  LayoutChangeEvent,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  ViewStyle,
+} from 'react-native';
 import {
   ActivityIndicator,
   Animated,
@@ -33,9 +38,9 @@ const DATE_CELL_W = Math.floor((DATE_PAGE_W - DATE_CELL_GAP * 4) / 5);
 const CELL_STEP = DATE_CELL_W + (DATE_PAGE_W - 5 * DATE_CELL_W) / 4;
 const accentColor = premiumColors.red;
 const mutedColor = premiumColors.textMuted;
-const classHeartPurple = '#3B1D7A';
-const classHeartPurpleBg = 'rgba(46,16,101,0.30)';
-const classHeartPurpleBorder = 'rgba(76,42,158,0.52)';
+const classHeartPurple = '#A855F7';
+const classHeartPurpleBg = 'rgba(168,85,247,0.22)';
+const classHeartPurpleBorder = 'rgba(196,120,255,0.56)';
 
 const SPA_CARD_W = SCREEN_WIDTH - 88;
 const FEAT_CARD_W = SCREEN_WIDTH - 40;
@@ -43,8 +48,6 @@ const FEAT_PAGE_W = FEAT_CARD_W - 2;
 const SPA_CARD_GAP = 12;
 
 const BOOKINGS_SIGN = require('@/assets/images/marvel-logo-startup-sign-dot.png');
-const VOUCHERS_SIGN = require('@/assets/images/marvel-logo-startup-sign-x.png');
-
 const CATEGORY_IMAGES: Record<ClassCategory, string> = {
   'Fitness Classes':
     'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=900&q=80',
@@ -375,6 +378,92 @@ const hStyles = StyleSheet.create({
 });
 // ─────────────────────────────────────────────────────────────────────────────
 
+function GlideSegmentedControl<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: readonly T[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  const glideX = useRef(new Animated.Value(0)).current;
+  const [controlWidth, setControlWidth] = useState(0);
+  const innerControlWidth = Math.max(0, controlWidth - 6);
+  const segmentWidth = innerControlWidth > 0 ? innerControlWidth / options.length : 0;
+  const selectedIndex = Math.max(0, options.indexOf(value));
+
+  useEffect(() => {
+    if (!segmentWidth) return;
+    Animated.spring(glideX, {
+      toValue: selectedIndex * segmentWidth,
+      useNativeDriver: false,
+      speed: 18,
+      bounciness: 5,
+    }).start();
+  }, [glideX, selectedIndex, segmentWidth]);
+
+  const handleLayout = ({ nativeEvent }: LayoutChangeEvent) => {
+    setControlWidth(nativeEvent.layout.width);
+  };
+
+  return (
+    <View onLayout={handleLayout} style={styles.segmentedControl}>
+      {segmentWidth > 0 ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.segmentedControlGlide,
+            {
+              width: segmentWidth,
+              transform: [{ translateX: glideX }],
+            },
+          ]}>
+          <LinearGradient
+            colors={
+              selectedIndex === 0
+                ? ['#FF2638', '#B11226', '#2A0308']
+                : ['#2A0308', '#B11226', '#FF2638']
+            }
+            locations={selectedIndex === 0 ? [0, 0.58, 1] : [0, 0.42, 1]}
+            start={{ x: 0.08, y: 0 }}
+            end={{ x: 0.92, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+      ) : null}
+      {options.map((option, index) => {
+        const isActive = option === value;
+        return (
+          <Pressable
+            key={option}
+            onPress={() => {
+              void Haptics.selectionAsync().catch(() => undefined);
+              onChange(option);
+            }}
+            style={({ pressed }) => [
+              styles.segmentedControlBtn,
+              index === 0
+                ? styles.segmentedControlBtnLeft
+                : index === options.length - 1
+                  ? styles.segmentedControlBtnRight
+                  : undefined,
+              pressed && styles.segmentedControlBtnPressed,
+            ]}>
+            <Text
+              style={[
+                styles.segmentedControlText,
+                isActive && styles.segmentedControlTextActive,
+              ]}>
+              {option}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 function WeekPageStrip({
   week,
   weekIdx,
@@ -471,7 +560,7 @@ export default function ClassesScreen() {
     gymClass: GymClass;
   }>();
   const [isLoading, setIsLoading] = useState(true);
-  const [expandedBox, setExpandedBox] = useState<'vouchers' | 'bookings' | null>(null);
+  const [expandedBox, setExpandedBox] = useState<'bookings' | null>(null);
   const [ordersTab, setOrdersTab] = useState<'Confirmed' | 'Canceled'>('Confirmed');
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -596,7 +685,6 @@ export default function ClassesScreen() {
     return counts;
   }, [classes, selectedDay]);
 
-  const pendingVouchers = classVouchers.filter((v) => v.status === 'Pending');
   const historyVouchers = classVouchers.filter((v) => v.status !== 'Pending');
   const ordersFiltered = historyVouchers.filter((v) => v.status === ordersTab);
 
@@ -614,11 +702,6 @@ export default function ClassesScreen() {
     await classService.cancelClassRegistration(classId);
     await loadData();
     setPendingAction(undefined);
-  };
-
-  const handleCancelVoucher = async (voucherId: string) => {
-    await voucherService.cancelVoucher(voucherId);
-    await loadData();
   };
 
   // The carousel renders [lastClone, ...items, firstClone] so it can loop
@@ -657,7 +740,7 @@ export default function ClassesScreen() {
 
   if (isLoading) {
     return (
-      <PremiumScreenBackground>
+      <PremiumScreenBackground redHorizonHeight={400}>
         <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
         <View style={styles.loadingState}>
           <ActivityIndicator color={accentColor} />
@@ -679,7 +762,7 @@ export default function ClassesScreen() {
   const featInitialOffset = hasLoop ? FEAT_PAGE_W : 0;
 
   return (
-    <PremiumScreenBackground>
+    <PremiumScreenBackground redHorizonHeight={400}>
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
       <ScrollView
         contentContainerStyle={styles.content}
@@ -746,7 +829,6 @@ export default function ClassesScreen() {
               {loopItems.map((gymClass, i) => {
                 const isReserved = Boolean(gymClass.isRegistered);
                 const isFull = gymClass.status === 'Full' && !isReserved;
-                const isFav = favorites.has(gymClass.id);
                 const imgUri = gymClass.coverImageUrl || CATEGORY_IMAGES[gymClass.category];
                 const pageScale = featuredScrollX.interpolate({
                   inputRange: [(i - 1) * FEAT_PAGE_W, i * FEAT_PAGE_W, (i + 1) * FEAT_PAGE_W],
@@ -770,9 +852,6 @@ export default function ClassesScreen() {
                         end={{ x: 1, y: 0.5 }}
                         style={StyleSheet.absoluteFillObject}
                       />
-                      <View style={styles.featuredTopRow}>
-                        <HeartButton isFav={isFav} onToggle={() => toggleFavorite(gymClass.id)} />
-                      </View>
                       <View style={styles.featuredBottom}>
                         <Text style={styles.featuredTitle}>{gymClass.title.toUpperCase()}</Text>
                         <Text style={styles.featuredDesc} numberOfLines={1}>
@@ -1396,14 +1475,17 @@ export default function ClassesScreen() {
           <View style={styles.accentBar} />
           <View>
             <Text style={styles.boxesEyebrow}>My activity</Text>
-            <Text style={[styles.boxesTitle, surfaceTextStyle]}>Bookings &amp; Vouchers</Text>
+            <Text style={[styles.boxesTitle, surfaceTextStyle]}>Bookings</Text>
           </View>
         </View>
         <View style={styles.boxesRow}>
           <Pressable
-            onPress={() =>
-              setExpandedBox(expandedBox === 'bookings' ? null : 'bookings')
-            }
+            onPress={() => {
+              if (expandedBox !== 'bookings') {
+                void Haptics.selectionAsync().catch(() => undefined);
+              }
+              setExpandedBox(expandedBox === 'bookings' ? null : 'bookings');
+            }}
             style={[
               styles.actBox,
               themedSurfaceStyle,
@@ -1420,77 +1502,17 @@ export default function ClassesScreen() {
             <Text style={[styles.actBoxLabel, surfaceTextStyle]}>Bookings</Text>
             <Text style={[styles.actBoxSub, mutedTextStyle]}>History</Text>
           </Pressable>
-
-          <Pressable
-            onPress={() =>
-              setExpandedBox(expandedBox === 'vouchers' ? null : 'vouchers')
-            }
-            style={[
-              styles.actBox,
-              themedSurfaceStyle,
-              expandedBox === 'vouchers' && styles.actBoxActive,
-            ]}>
-            <Image source={VOUCHERS_SIGN} style={styles.boxWatermark} resizeMode="contain" />
-            <SymbolView
-              name="ticket.fill"
-              size={24}
-              tintColor={premiumColors.redBright}
-              fallback={<Text style={styles.boxGlyph}>▤</Text>}
-            />
-            <Text style={[styles.actBoxCount, surfaceTextStyle]}>{pendingVouchers.length}</Text>
-            <Text style={[styles.actBoxLabel, surfaceTextStyle]}>Vouchers</Text>
-            <Text style={[styles.actBoxSub, mutedTextStyle]}>Pending approval</Text>
-          </Pressable>
         </View>
-
-        {expandedBox === 'vouchers' ? (
-          <View style={[styles.expandedPanel, themedSurfaceStyle]}>
-            <Text style={[styles.expandedTitle, surfaceTextStyle]}>Pending Vouchers</Text>
-            <Text style={[styles.expandedSub, mutedTextStyle]}>
-              Awaiting admin approval. You can cancel before confirmation.
-            </Text>
-            {pendingVouchers.length === 0 ? (
-              <View style={[styles.emptyCard, themedSurfaceStyle]}>
-                <Text style={[styles.emptyTitle, surfaceTextStyle]}>No pending vouchers</Text>
-                <Text style={[styles.emptyBody, mutedTextStyle]}>Book a class to generate a pending voucher.</Text>
-              </View>
-            ) : (
-              <View style={styles.voucherList}>
-                {pendingVouchers.map((v) => (
-                  <View key={v.id} style={[styles.voucherRow, isLight && styles.voucherRowLight]}>
-                    <View style={[styles.voucherRail, { backgroundColor: premiumColors.warning }]} />
-                    <View style={styles.voucherBody}>
-                      <Text style={[styles.voucherTitle, surfaceTextStyle]}>{v.description}</Text>
-                      <Text style={[styles.voucherMeta, mutedTextStyle]}>{fmtVoucherDate(v.date)} · Pending</Text>
-                    </View>
-                    <Pressable
-                      onPress={() => handleCancelVoucher(v.id)}
-                      style={({ pressed }) => [styles.voucherCancelBtn, pressed && styles.btnPressed]}>
-                      <Text style={styles.voucherCancelText}>Cancel</Text>
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        ) : null}
 
         {expandedBox === 'bookings' ? (
           <View style={[styles.expandedPanel, themedSurfaceStyle]}>
             <Text style={[styles.expandedTitle, surfaceTextStyle]}>Booking History</Text>
             <Text style={[styles.expandedSub, mutedTextStyle]}>Confirmed and canceled class reservations.</Text>
-            <View style={styles.tabsRow}>
-              {(['Confirmed', 'Canceled'] as const).map((tab) => (
-                <Pressable
-                  key={tab}
-                  onPress={() => setOrdersTab(tab)}
-                  style={[styles.tab, ordersTab === tab && styles.tabActive]}>
-                  <Text style={[styles.tabText, ordersTab === tab && styles.tabTextActive]}>
-                    {tab}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+            <GlideSegmentedControl
+              options={['Confirmed', 'Canceled'] as const}
+              value={ordersTab}
+              onChange={setOrdersTab}
+            />
             {ordersFiltered.length === 0 ? (
               <View style={[styles.emptyCard, themedSurfaceStyle]}>
                 <Text style={[styles.emptyTitle, surfaceTextStyle]}>No {ordersTab.toLowerCase()} bookings</Text>
@@ -1770,7 +1792,7 @@ const styles = StyleSheet.create({
     height: 220,
   },
   featuredPageInner: {
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     borderRadius: 26,
     overflow: 'hidden',
   },
@@ -2318,16 +2340,6 @@ const styles = StyleSheet.create({
   voucherBody: { flex: 1, paddingVertical: 12, paddingHorizontal: 12 },
   voucherTitle: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', lineHeight: 18 },
   voucherMeta: { color: mutedColor, fontSize: 11, fontWeight: '700', marginTop: 3 },
-  voucherCancelBtn: {
-    borderWidth: 1,
-    borderColor: 'rgba(225,29,46,0.3)',
-    borderRadius: 10,
-    backgroundColor: 'rgba(177,18,38,0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginRight: 12,
-  },
-  voucherCancelText: { color: premiumColors.redBright, fontSize: 12, fontWeight: '900' },
   statusChip: {
     borderWidth: 1,
     borderRadius: 999,
@@ -2337,34 +2349,51 @@ const styles = StyleSheet.create({
   },
   statusChipText: { fontSize: 10, fontWeight: '900', textTransform: 'uppercase' },
 
-  // Tabs
-  tabsRow: {
+  // Segmented controls
+  segmentedControl: {
     flexDirection: 'row',
     borderWidth: 1,
     borderColor: premiumColors.border,
-    borderRadius: 14,
+    borderRadius: 999,
     backgroundColor: 'rgba(255,255,255,0.04)',
     marginBottom: 14,
     padding: 3,
-    gap: 3,
+    overflow: 'visible',
   },
-  tab: {
+  segmentedControlGlide: {
+    position: 'absolute',
+    top: 3,
+    bottom: 3,
+    left: 3,
+    overflow: 'hidden',
+    borderRadius: 999,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.32,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  segmentedControlBtn: {
     flex: 1,
     minHeight: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 11,
+    paddingVertical: 9,
+    zIndex: 1,
   },
-  tabActive: {
-    backgroundColor: premiumColors.red,
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 3,
+  segmentedControlBtnLeft: {
+    borderTopLeftRadius: 999,
+    borderBottomLeftRadius: 999,
   },
-  tabText: { color: mutedColor, fontSize: 13, fontWeight: '900' },
-  tabTextActive: { color: '#FFFFFF' },
+  segmentedControlBtnRight: {
+    borderTopRightRadius: 999,
+    borderBottomRightRadius: 999,
+  },
+  segmentedControlBtnPressed: {
+    opacity: 0.75,
+  },
+  segmentedControlText: { color: mutedColor, fontSize: 13, fontWeight: '900' },
+  segmentedControlTextActive: { color: '#FFFFFF' },
 
   // Empty
   emptyCard: {

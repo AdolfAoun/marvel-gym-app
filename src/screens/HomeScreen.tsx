@@ -771,7 +771,7 @@ export default function HomeScreen() {
   const sheetSymbolName = isFreezeSheet ? 'snowflake' : 'sparkles';
   const sheetSymbolFallback = isFreezeSheet ? '❄' : '✦';
   return (
-    <PremiumScreenBackground>
+    <PremiumScreenBackground redHorizonHeight={400}>
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
       <ScrollView
         contentContainerStyle={styles.content}
@@ -787,7 +787,10 @@ export default function HomeScreen() {
           <View pointerEvents="none" style={styles.heroGloss} />
           <View style={styles.heroTopRow}>
             <View style={styles.heroTextBlock}>
-              <Text style={styles.kicker}>Welcome Back</Text>
+              <Text style={styles.kicker}>
+                <Text style={styles.kickerAccent}>Welcome</Text>
+                <Text> Back</Text>
+              </Text>
               <Text style={styles.title}>{member?.firstName ?? 'Athlete'}</Text>
             </View>
             <View style={styles.avatarBadge}>
@@ -807,7 +810,6 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.heroMetaRow}>
-            <Text style={styles.heroTagline}>Consistency is key.</Text>
             <Text style={styles.heroExpiryText}>
               Member since {formatDate(membership?.startDate)}
             </Text>
@@ -935,7 +937,7 @@ export default function HomeScreen() {
           <View style={styles.daysGlassCard}>
             <LinearGradient
               pointerEvents="none"
-              colors={['rgba(177,18,38,0.10)', 'rgba(255,255,255,0.03)']}
+              colors={['rgba(177,18,38,0.08)', 'rgba(255,255,255,0.02)']}
               style={StyleSheet.absoluteFill}
             />
             <View style={styles.daysTopRow}>
@@ -1649,20 +1651,25 @@ function useStyles(theme: AppTheme) {
   },
   heroTextBlock: {
     flex: 1,
+    transform: [{ translateY: 3 }],
   },
   kicker: {
-    color: 'rgba(255, 255, 255, 0.78)',
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
+    marginTop: 6,
+  },
+  kickerAccent: {
+    color: '#B11226',
   },
   title: {
     color: '#FFFFFF',
     fontSize: 34,
     fontWeight: '900',
     letterSpacing: 0,
-    marginTop: 8,
+    marginTop: 10,
     textShadowColor: 'rgba(0, 0, 0, 0.25)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
@@ -1732,13 +1739,24 @@ function useStyles(theme: AppTheme) {
     fontWeight: '800',
   },
   whatsNewLabel: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.ink(0.14),
+    borderRadius: 20,
     marginTop: 2,
     marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    shadowColor: '#E11D2E',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.12,
+    shadowRadius: 28,
+    elevation: 6,
   },
   whatsNewLabelText: {
-    color: theme.colors.text,
+    color: 'rgba(203, 213, 225, 0.96)',
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 2.5,
@@ -1813,7 +1831,7 @@ function useStyles(theme: AppTheme) {
   },
   heroExpiryText: {
     flex: 1,
-    color: 'rgba(255, 255, 255, 0.82)',
+    color: 'rgba(107, 114, 128, 0.96)',
     fontSize: 12,
     fontWeight: '800',
     textAlign: 'right',
@@ -1897,12 +1915,12 @@ function useStyles(theme: AppTheme) {
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
     borderRadius: 26,
-    backgroundColor: 'rgba(18,20,28,0.86)',
+    backgroundColor: 'rgba(18,20,28,0.82)',
     width: '100%',
     padding: 18,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.60,
+    shadowOpacity: 0.52,
     shadowRadius: 32,
     elevation: 12,
   },
@@ -2115,11 +2133,11 @@ function useStyles(theme: AppTheme) {
     elevation: 7,
   },
   actionChipRenew: {
-    borderColor: 'rgba(225, 29, 46, 0.28)',
-    backgroundColor: 'rgba(177, 18, 38, 0.22)',
+    borderColor: 'rgba(225, 29, 46, 0.4)',
+    backgroundColor: 'rgba(177, 18, 38, 0.28)',
     shadowColor: theme.colors.redBright,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.22,
+    shadowOpacity: 0.3,
     shadowRadius: 14,
     elevation: 4,
   },
@@ -2427,7 +2445,7 @@ function useStyles(theme: AppTheme) {
   },
   requestLinkCardReservations: {
     borderColor: 'rgba(225, 29, 46, 0.2)',
-    backgroundColor: 'rgba(28, 14, 18, 0.72)',
+    backgroundColor: 'transparent',
   },
   requestLinkTopRow: {
     flexDirection: 'row',
