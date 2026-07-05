@@ -542,6 +542,48 @@ export const achievements: Achievement[] = [
     description: 'A long-term Marvel Gym milestone.',
     isUnlocked: false,
   },
+  {
+    id: 'achievement-005',
+    title: 'Cardio Starter',
+    description: 'Logged 5 cardio sessions. Your heart says thanks.',
+    isUnlocked: false,
+  },
+  {
+    id: 'achievement-006',
+    title: 'Fat Burner',
+    description: 'Burned 500+ calories in a single session.',
+    isUnlocked: false,
+  },
+  {
+    id: 'achievement-007',
+    title: 'Calorie Crusher',
+    description: 'Burned 5,000 total calories at Marvel Gym.',
+    isUnlocked: false,
+  },
+  {
+    id: 'achievement-008',
+    title: '14-Day Streak',
+    description: 'Trained 14 days in a row without missing one.',
+    isUnlocked: false,
+  },
+  {
+    id: 'achievement-009',
+    title: 'Early Bird',
+    description: 'Checked in before 7 AM five times.',
+    isUnlocked: false,
+  },
+  {
+    id: 'achievement-010',
+    title: 'Class Regular',
+    description: 'Attended 10 group classes.',
+    isUnlocked: false,
+  },
+  {
+    id: 'achievement-011',
+    title: 'PT Pro',
+    description: 'Completed your first personal training session.',
+    isUnlocked: false,
+  },
 ];
 
 export const machineGuides: MachineGuide[] = [

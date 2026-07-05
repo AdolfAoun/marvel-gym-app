@@ -1,8 +1,10 @@
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
+import type { StyleProp, ViewStyle } from 'react-native';
 import {
   ActivityIndicator,
   Image,
@@ -20,7 +22,6 @@ import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
 import {
   adminMemberService,
   classService,
-  entryContentService,
   productService,
   studentVerificationService,
   voucherService,
@@ -29,7 +30,6 @@ import {
 import type {
   AdminMemberSummary,
   ClassMutationInput,
-  EntrySlide,
   ProductMutationInput,
   StudentVerificationWithMember,
 } from '@/services';
@@ -302,6 +302,74 @@ function AdminShell({
   );
 }
 
+// Matches the member-facing "Sign Out" ghost button: pill shape, translucent
+// charcoal fill, red outline, red glow.
+function AdminSecondaryButton({
+  onPress,
+  disabled,
+  style,
+  children,
+}: {
+  onPress?: () => void;
+  disabled?: boolean;
+  style?: StyleProp<ViewStyle>;
+  children: ReactNode;
+}) {
+  return (
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.secondaryButton,
+        style,
+        disabled && styles.secondaryButtonDisabled,
+        pressed && !disabled && styles.buttonPressed,
+      ]}>
+      {children}
+    </Pressable>
+  );
+}
+
+// Matches the member-facing "Sign Out" confirm CTA: red gradient pill with a
+// glass gloss highlight.
+function AdminPrimaryButton({
+  onPress,
+  disabled,
+  style,
+  children,
+}: {
+  onPress?: () => void;
+  disabled?: boolean;
+  style?: StyleProp<ViewStyle>;
+  children: ReactNode;
+}) {
+  return (
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.primaryButtonWrap,
+        style,
+        disabled && styles.primaryButtonWrapDisabled,
+        pressed && !disabled && styles.buttonPressed,
+      ]}>
+      <LinearGradient
+        colors={
+          disabled
+            ? ['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.06)', 'rgba(255,255,255,0.04)']
+            : ['#FF2638', '#B11226', '#2A0308']
+        }
+        locations={[0, 0.58, 1]}
+        start={{ x: 0.08, y: 0 }}
+        end={{ x: 0.92, y: 1 }}
+        style={styles.primaryButton}>
+        <View pointerEvents="none" style={styles.primaryButtonGloss} />
+        {children}
+      </LinearGradient>
+    </Pressable>
+  );
+}
+
 function ConfirmModal({
   action,
   onClose,
@@ -320,16 +388,12 @@ function ConfirmModal({
           <Text style={styles.modalTitle}>{action?.title}</Text>
           <Text style={styles.modalBody}>{action?.body}</Text>
           <View style={styles.modalRow}>
-            <Pressable
-              onPress={onClose}
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                pressed && styles.buttonPressed,
-              ]}>
+            <AdminSecondaryButton onPress={onClose} style={styles.formActionButton}>
               <Text style={styles.secondaryButtonText}>Cancel</Text>
-            </Pressable>
-            <Pressable
+            </AdminSecondaryButton>
+            <AdminPrimaryButton
               disabled={isWorking}
+              style={styles.formActionButton}
               onPress={async () => {
                 if (!action) {
                   return;
@@ -339,17 +403,13 @@ function ConfirmModal({
                 await action.onConfirm();
                 setIsWorking(false);
                 onClose();
-              }}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                pressed && !isWorking && styles.buttonPressed,
-              ]}>
+              }}>
               {isWorking ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <Text style={styles.primaryButtonText}>Apply</Text>
               )}
-            </Pressable>
+            </AdminPrimaryButton>
           </View>
         </View>
       </View>
@@ -522,7 +582,7 @@ export function AdminMemberManagementScreen() {
                 </Pressable>
               ))}
             </View>
-            <Pressable
+            <AdminPrimaryButton
               disabled={!selectedMemberId}
               onPress={() =>
                 selectedMemberId &&
@@ -534,10 +594,9 @@ export function AdminMemberManagementScreen() {
                     await refreshSummary(selectedMemberId);
                   },
                 })
-              }
-              style={styles.primaryButton}>
+              }>
               <Text style={styles.primaryButtonText}>Extend</Text>
-            </Pressable>
+            </AdminPrimaryButton>
 
             <Text style={styles.fieldLabel}>
               Freeze membership: ${weeks * FREEZE_WEEKLY_PRICE}.00 total
@@ -554,7 +613,7 @@ export function AdminMemberManagementScreen() {
                 </Pressable>
               ))}
             </View>
-            <Pressable
+            <AdminSecondaryButton
               disabled={!selectedMemberId}
               onPress={() =>
                 selectedMemberId &&
@@ -566,12 +625,11 @@ export function AdminMemberManagementScreen() {
                     await refreshSummary(selectedMemberId);
                   },
                 })
-              }
-              style={styles.secondaryButton}>
+              }>
               <Text style={styles.secondaryButtonText}>Freeze</Text>
-            </Pressable>
+            </AdminSecondaryButton>
 
-            <Pressable
+            <AdminSecondaryButton
               disabled={!selectedMemberId}
               onPress={() =>
                 selectedMemberId &&
@@ -583,10 +641,9 @@ export function AdminMemberManagementScreen() {
                     await refreshSummary(selectedMemberId);
                   },
                 })
-              }
-              style={styles.secondaryButton}>
+              }>
               <Text style={styles.secondaryButtonText}>Unfreeze</Text>
-            </Pressable>
+            </AdminSecondaryButton>
 
             <Text style={styles.fieldLabel}>Change status</Text>
             <View style={styles.pillRow}>
@@ -605,7 +662,7 @@ export function AdminMemberManagementScreen() {
                 </Pressable>
               ))}
             </View>
-            <Pressable
+            <AdminPrimaryButton
               disabled={!selectedMemberId}
               onPress={() =>
                 selectedMemberId &&
@@ -620,10 +677,9 @@ export function AdminMemberManagementScreen() {
                     await refreshSummary(selectedMemberId);
                   },
                 })
-              }
-              style={styles.primaryButton}>
+              }>
               <Text style={styles.primaryButtonText}>Apply Status</Text>
-            </Pressable>
+            </AdminPrimaryButton>
           </View>
 
           <View style={styles.card}>
@@ -655,12 +711,18 @@ export function AdminMemberManagementScreen() {
 
 export function AdminVoucherManagementScreen() {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [memberMap, setMemberMap] = useState<Map<string, Member>>(new Map());
   const [selectedVoucherStatus, setSelectedVoucherStatus] =
     useState<Voucher['status']>('Pending');
   const [search, setSearch] = useState('');
 
   const loadVouchers = useCallback(async () => {
-    setVouchers(await voucherService.getAllVouchers());
+    const [allVouchers, members] = await Promise.all([
+      voucherService.getAllVouchers(),
+      adminMemberService.searchMembers(''),
+    ]);
+    setVouchers(allVouchers);
+    setMemberMap(new Map(members.map((member) => [member.id, member])));
   }, []);
 
   useEffect(() => {
@@ -726,11 +788,20 @@ export function AdminVoucherManagementScreen() {
                   : `No ${status.toLowerCase()} vouchers.`}
               </Text>
             ) : (
-              statusVouchers.map((voucher) => (
+              statusVouchers.map((voucher) => {
+                const requester = voucher.memberId
+                  ? memberMap.get(voucher.memberId)
+                  : undefined;
+
+                return (
                 <View key={voucher.id} style={styles.rowCard}>
                   <View style={styles.rowCopy}>
                     <Text style={styles.rowTitle}>{voucher.type}</Text>
                     <Text style={styles.bodyText}>{voucher.description}</Text>
+                    <Text style={styles.helperText}>
+                      Requested by{' '}
+                      {requester ? `${requester.firstName} ${requester.lastName}` : 'Unknown member'}
+                    </Text>
                     <Text style={styles.helperText}>
                       {voucher.currency} {voucher.amount.toFixed(2)} · {formatDate(voucher.date)}
                     </Text>
@@ -756,7 +827,8 @@ export function AdminVoucherManagementScreen() {
                     </View>
                   ) : null}
                 </View>
-              ))
+                );
+              })
             )}
           </View>
         );
@@ -774,6 +846,7 @@ export function AdminClassManagementScreen() {
   const [editingClass, setEditingClass] = useState<GymClass>();
   const [form, setForm] = useState<ClassForm>(getClassForm());
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>();
+  const [showClassForm, setShowClassForm] = useState(false);
 
   const loadClasses = useCallback(async () => {
     setClasses(await classService.getAdminClasses());
@@ -786,6 +859,13 @@ export function AdminClassManagementScreen() {
   const resetForm = () => {
     setEditingClass(undefined);
     setForm(getClassForm());
+    setShowClassForm(false);
+  };
+
+  const openCreateForm = () => {
+    setEditingClass(undefined);
+    setForm(getClassForm());
+    setShowClassForm(true);
   };
 
   const saveClass = async () => {
@@ -904,6 +984,11 @@ export function AdminClassManagementScreen() {
         </View>
       </View>
 
+      {!showClassForm ? (
+        <AdminPrimaryButton onPress={openCreateForm}>
+          <Text style={styles.primaryButtonText}>+ Add Class</Text>
+        </AdminPrimaryButton>
+      ) : (
       <View style={[styles.card, editingClass ? styles.cardEditing : styles.cardCreating]}>
         <View style={styles.formHeader}>
           <Text style={styles.formModeKicker}>
@@ -1006,7 +1091,7 @@ export function AdminClassManagementScreen() {
           <Text style={styles.fieldHint}>24-hour time, e.g. 18:30</Text>
         </View>
 
-        <Text style={styles.formSectionLabel}>Availability & capacity</Text>
+        <Text style={styles.formSectionLabel}>Availability</Text>
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>Availability</Text>
           <View style={styles.pillRow}>
@@ -1023,18 +1108,6 @@ export function AdminClassManagementScreen() {
             ))}
           </View>
         </View>
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Capacity</Text>
-          <TextInput
-            value={form.capacity}
-            onChangeText={(capacity) => setForm((current) => ({ ...current, capacity }))}
-            placeholder="0"
-            placeholderTextColor={premiumColors.textFaint}
-            keyboardType="number-pad"
-            style={styles.input}
-          />
-        </View>
-
         <View style={styles.formActions}>
           <Pressable
             onPress={resetForm}
@@ -1043,15 +1116,14 @@ export function AdminClassManagementScreen() {
               {editingClass ? 'Cancel' : 'Clear'}
             </Text>
           </Pressable>
-          <Pressable
-            onPress={saveClass}
-            style={[styles.primaryButton, styles.formActionButton]}>
+          <AdminPrimaryButton onPress={saveClass} style={styles.formActionButton}>
             <Text style={styles.primaryButtonText}>
               {editingClass ? 'Save changes' : 'Add class'}
             </Text>
-          </Pressable>
+          </AdminPrimaryButton>
         </View>
       </View>
+      )}
 
       {filteredClasses.length === 0 ? (
         <View style={styles.emptyCard}>
@@ -1089,6 +1161,7 @@ export function AdminClassManagementScreen() {
               onPress={() => {
                 setEditingClass(gymClass);
                 setForm(getClassForm(gymClass));
+                setShowClassForm(true);
               }}
               style={styles.tinyPrimary}>
               <Text style={styles.tinyPrimaryText}>Edit</Text>
@@ -1375,13 +1448,11 @@ export function AdminProductManagementScreen() {
               {editingProduct ? 'Cancel' : 'Clear'}
             </Text>
           </Pressable>
-          <Pressable
-            onPress={saveProduct}
-            style={[styles.primaryButton, styles.formActionButton]}>
+          <AdminPrimaryButton onPress={saveProduct} style={styles.formActionButton}>
             <Text style={styles.primaryButtonText}>
               {editingProduct ? 'Save changes' : 'Add product'}
             </Text>
-          </Pressable>
+          </AdminPrimaryButton>
         </View>
       </View>
 
@@ -1454,166 +1525,6 @@ export function AdminProductManagementScreen() {
       )}
 
       <ConfirmModal action={confirmAction} onClose={() => setConfirmAction(undefined)} />
-    </AdminShell>
-  );
-}
-
-export function AdminWelcomePhotoManagementScreen() {
-  const [photos, setPhotos] = useState<EntrySlide[]>([]);
-  const [signInWallpaper, setSignInWallpaper] = useState<EntrySlide>();
-  const [label, setLabel] = useState('');
-
-  const loadPhotos = useCallback(async () => {
-    setPhotos(await entryContentService.getWelcomePhotos());
-    setSignInWallpaper(await entryContentService.getSignInWallpaper());
-  }, []);
-
-  useEffect(() => {
-    loadPhotos();
-  }, [loadPhotos]);
-
-  const movePhoto = async (photoId: string, direction: -1 | 1) => {
-    const currentIndex = photos.findIndex((photo) => photo.id === photoId);
-    const nextIndex = currentIndex + direction;
-
-    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= photos.length) {
-      return;
-    }
-
-    const nextPhotos = [...photos];
-    const [selectedPhoto] = nextPhotos.splice(currentIndex, 1);
-
-    nextPhotos.splice(nextIndex, 0, selectedPhoto);
-    await entryContentService.reorderWelcomePhotos(nextPhotos.map((photo) => photo.id));
-    await loadPhotos();
-  };
-
-  const handleUploadPhoto = async () => {
-    const uri = await pickImageFromLibrary();
-
-    if (!uri) {
-      return;
-    }
-
-    await entryContentService.addWelcomePhoto({
-      image: { uri },
-      label: label.trim() || undefined,
-    });
-    setLabel('');
-    await loadPhotos();
-  };
-
-  const handleReplacePhoto = async (photoId: string) => {
-    const uri = await pickImageFromLibrary();
-
-    if (!uri) {
-      return;
-    }
-
-    await entryContentService.updateWelcomePhoto(photoId, { image: { uri } });
-    await loadPhotos();
-  };
-
-  const handleReplaceSignInWallpaper = async () => {
-    const uri = await pickImageFromLibrary();
-
-    if (!uri) {
-      return;
-    }
-
-    await entryContentService.updateSignInWallpaper({
-      image: { uri },
-      label: 'Sign In Wallpaper',
-    });
-    await loadPhotos();
-  };
-
-  return (
-    <AdminShell
-      title="Welcome Photos"
-      subtitle="Manage Welcome Page carousel photos and the Sign In wallpaper.">
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Sign In wallpaper</Text>
-        <Text style={styles.bodyText}>
-          This image is used behind the phone and password fields on the Sign In screen.
-        </Text>
-        <View style={styles.imagePreviewBox}>
-          {signInWallpaper ? (
-            <Image
-              source={signInWallpaper.image}
-              style={styles.imagePreview}
-              resizeMode="cover"
-            />
-          ) : (
-            <Text style={styles.imagePlaceholderText}>No wallpaper loaded</Text>
-          )}
-        </View>
-        <Pressable onPress={handleReplaceSignInWallpaper} style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>Replace Sign In Wallpaper</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Add photo</Text>
-        <Text style={styles.bodyText}>
-          Upload photos from your gallery for the Welcome Page carousel shown
-          behind the Sign In and Continue as Guest buttons.
-        </Text>
-        <TextInput
-          value={label}
-          onChangeText={setLabel}
-          placeholder="Optional photo label"
-          placeholderTextColor={premiumColors.textFaint}
-          style={styles.input}
-        />
-        <Pressable onPress={handleUploadPhoto} style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>Upload Photo</Text>
-        </Pressable>
-      </View>
-
-      {photos.map((photo, index) => (
-        <View key={photo.id} style={styles.rowCard}>
-          <View style={styles.photoPreviewSlot}>
-            <Image
-              source={photo.image}
-              style={styles.photoPreviewImage}
-              resizeMode="cover"
-            />
-            <View style={styles.photoPositionBadge}>
-              <Text style={styles.photoPositionText}>#{index + 1}</Text>
-            </View>
-          </View>
-          <View style={styles.rowCopy}>
-            <Text style={styles.rowTitle}>{photo.label ?? `Photo ${index + 1}`}</Text>
-            <Text style={styles.helperText}>Welcome carousel photo</Text>
-          </View>
-          <View style={styles.actionStack}>
-            <Pressable
-              onPress={() => movePhoto(photo.id, -1)}
-              style={styles.tinyPrimary}>
-              <Text style={styles.tinyPrimaryText}>Up</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => movePhoto(photo.id, 1)}
-              style={styles.tinyPrimary}>
-              <Text style={styles.tinyPrimaryText}>Down</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => handleReplacePhoto(photo.id)}
-              style={styles.tinySecondary}>
-              <Text style={styles.tinySecondaryText}>Replace</Text>
-            </Pressable>
-            <Pressable
-              onPress={async () => {
-                await entryContentService.deleteWelcomePhoto(photo.id);
-                await loadPhotos();
-              }}
-              style={styles.tinySecondary}>
-              <Text style={styles.tinySecondaryText}>Remove</Text>
-            </Pressable>
-          </View>
-        </View>
-      ))}
     </AdminShell>
   );
 }
@@ -1943,37 +1854,82 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textTransform: 'uppercase',
   },
-  compactPrimary: {
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 15,
-    backgroundColor: premiumColors.red,
-    paddingHorizontal: 16,
+  // ── Member-app "Sign Out" button theme, reused for all admin CTAs ──────────
+  primaryButtonWrap: {
+    minHeight: 50,
+    borderRadius: 999,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  primaryButtonWrapDisabled: {
+    shadowOpacity: 0,
+    elevation: 0,
   },
   primaryButton: {
+    flexDirection: 'row',
     minHeight: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
-    backgroundColor: premiumColors.red,
+    overflow: 'hidden',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,91,106,0.72)',
+    borderRadius: 999,
+    paddingHorizontal: 16,
+  },
+  primaryButtonGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '42%',
+    backgroundColor: 'rgba(255,255,255,0.075)',
   },
   primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  compactPrimary: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,91,106,0.72)',
+    borderRadius: 999,
+    backgroundColor: premiumColors.red,
+    paddingHorizontal: 18,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
   },
   secondaryButton: {
     minHeight: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: premiumColors.borderStrong,
-    borderRadius: 16,
-    backgroundColor: premiumColors.surfaceSoft,
+    borderWidth: 1.4,
+    borderColor: 'rgba(225,29,46,0.55)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(7,2,5,0.45)',
+    paddingHorizontal: 16,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    elevation: 6,
+  },
+  secondaryButtonDisabled: {
+    opacity: 0.5,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   secondaryButtonText: {
-    color: premiumColors.redBright,
+    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -2049,6 +2005,8 @@ const styles = StyleSheet.create({
     minHeight: 30,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,91,106,0.72)',
     borderRadius: 999,
     backgroundColor: premiumColors.red,
     paddingHorizontal: 10,
@@ -2062,14 +2020,14 @@ const styles = StyleSheet.create({
     minHeight: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: premiumColors.borderStrong,
+    borderWidth: 1.2,
+    borderColor: 'rgba(225,29,46,0.55)',
     borderRadius: 999,
-    backgroundColor: premiumColors.surfaceSoft,
+    backgroundColor: 'rgba(7,2,5,0.45)',
     paddingHorizontal: 10,
   },
   tinySecondaryText: {
-    color: premiumColors.redBright,
+    color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '900',
   },
@@ -2092,43 +2050,6 @@ const styles = StyleSheet.create({
     color: premiumColors.redBright,
     fontSize: 16,
     fontWeight: '900',
-  },
-  photoPreviewSlot: {
-    width: 74,
-    height: 58,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: premiumColors.borderStrong,
-    borderRadius: 16,
-    backgroundColor: 'rgba(177, 18, 38, 0.12)',
-  },
-  photoPreviewImage: {
-    ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
-  },
-  photoPositionBadge: {
-    position: 'absolute',
-    top: 4,
-    left: 4,
-    borderRadius: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  photoPositionText: {
-    color: premiumColors.redBright,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  photoPreviewText: {
-    color: premiumColors.textMuted,
-    fontSize: 10,
-    fontWeight: '900',
-    marginTop: 2,
-    textTransform: 'uppercase',
   },
   imagePreviewBox: {
     height: 150,
@@ -2193,11 +2114,17 @@ const styles = StyleSheet.create({
 
 export function AdminClassRegistrationsScreen() {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [memberMap, setMemberMap] = useState<Map<string, Member>>(new Map());
   const [selectedStatus, setSelectedStatus] = useState<Voucher['status']>('Pending');
   const [search, setSearch] = useState('');
 
   const loadVouchers = useCallback(async () => {
-    setVouchers(await voucherService.getAllClassVouchers());
+    const [allVouchers, members] = await Promise.all([
+      voucherService.getAllClassVouchers(),
+      adminMemberService.searchMembers(''),
+    ]);
+    setVouchers(allVouchers);
+    setMemberMap(new Map(members.map((member) => [member.id, member])));
   }, []);
 
   useEffect(() => {
@@ -2251,11 +2178,20 @@ export function AdminClassRegistrationsScreen() {
               : `No ${selectedStatus.toLowerCase()} class registrations.`}
           </Text>
         ) : (
-          filteredVouchers.map((voucher) => (
+          filteredVouchers.map((voucher) => {
+            const requester = voucher.memberId
+              ? memberMap.get(voucher.memberId)
+              : undefined;
+
+            return (
             <View key={voucher.id} style={styles.rowCard}>
               <View style={styles.rowCopy}>
                 <StatusChip label={voucher.status} />
                 <Text style={styles.rowTitle}>{voucher.description}</Text>
+                <Text style={styles.helperText}>
+                  Requested by{' '}
+                  {requester ? `${requester.firstName} ${requester.lastName}` : 'Unknown member'}
+                </Text>
                 <Text style={styles.helperText}>
                   Submitted {formatDate(voucher.date)}
                 </Text>
@@ -2281,7 +2217,8 @@ export function AdminClassRegistrationsScreen() {
                 </View>
               ) : null}
             </View>
-          ))
+            );
+          })
         )}
       </View>
     </AdminShell>

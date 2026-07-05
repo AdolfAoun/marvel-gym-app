@@ -420,6 +420,7 @@ export default function ProfileScreen() {
         style={({ pressed }) => [
           styles.fieldActionButton,
           styles.fieldEditButton,
+          isLight && styles.fieldEditButtonLight,
           pressed && styles.buttonPressed,
         ]}>
         <SymbolView name="pencil" size={15} tintColor="#E6E8ED" weight="regular" />
@@ -466,13 +467,13 @@ export default function ProfileScreen() {
           <Text style={[styles.phoneText, mutedTextStyle]}>{member.phone || 'Member profile'}</Text>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Details</Text>
+        <View style={[styles.card, isLight && styles.cardLight]}>
+          <Text style={[styles.sectionTitle, isLight && styles.textStrongLight]}>Details</Text>
 
           <View style={styles.detailsGrid}>
             <View style={styles.fieldGroup}>
               <View style={styles.inputLabelRow}>
-                <Text style={[styles.label, styles.inputLabel]}>First name</Text>
+                <Text style={[styles.label, styles.inputLabel, isLight && styles.textStrongLight]}>First name</Text>
                 {renderFieldActions('firstName')}
               </View>
               <TextInput
@@ -482,28 +483,28 @@ export default function ProfileScreen() {
                 placeholder="First name"
                 placeholderTextColor="#667282"
                 selectionColor={accentColor}
-                style={[styles.input, editingField !== 'firstName' && styles.inputReadOnly]}
+                style={[styles.input, editingField !== 'firstName' && styles.inputReadOnly, isLight && editingField !== 'firstName' && styles.inputReadOnlyLight]}
               />
             </View>
 
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Family name</Text>
+              <Text style={[styles.label, isLight && styles.textStrongLight]}>Family name</Text>
               <View style={styles.disabledField}>
-                <Text style={styles.disabledValue}>{member.lastName || '-'}</Text>
+                <Text style={[styles.disabledValue, isLight && styles.textStrongLight]}>{member.lastName || '-'}</Text>
               </View>
             </View>
 
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Phone number</Text>
+              <Text style={[styles.label, isLight && styles.textStrongLight]}>Phone number</Text>
               <View style={styles.disabledField}>
-                <Text style={styles.disabledValue}>{member.phone || '-'}</Text>
+                <Text style={[styles.disabledValue, isLight && styles.textStrongLight]}>{member.phone || '-'}</Text>
               </View>
             </View>
           </View>
 
           <View style={styles.inputGroup}>
             <View style={styles.inputLabelRow}>
-              <Text style={[styles.label, styles.inputLabel]}>Date of birth</Text>
+              <Text style={[styles.label, styles.inputLabel, isLight && styles.textStrongLight]}>Date of birth</Text>
               {renderFieldActions('dateOfBirth')}
             </View>
             <TextInput
@@ -516,13 +517,13 @@ export default function ProfileScreen() {
               placeholder="DD/MM/YYYY"
               placeholderTextColor="#667282"
               selectionColor={accentColor}
-              style={[styles.input, editingField !== 'dateOfBirth' && styles.inputReadOnly]}
+              style={[styles.input, editingField !== 'dateOfBirth' && styles.inputReadOnly, isLight && editingField !== 'dateOfBirth' && styles.inputReadOnlyLight]}
             />
           </View>
 
           <View style={styles.inputGroup}>
             <View style={styles.inputLabelRow}>
-              <Text style={[styles.label, styles.inputLabel]}>Email</Text>
+              <Text style={[styles.label, styles.inputLabel, isLight && styles.textStrongLight]}>Email</Text>
               {renderFieldActions('email')}
             </View>
             <TextInput
@@ -535,13 +536,13 @@ export default function ProfileScreen() {
               placeholder="member@marvelgym.com"
               placeholderTextColor="#667282"
               selectionColor={accentColor}
-              style={[styles.input, editingField !== 'email' && styles.inputReadOnly]}
+              style={[styles.input, editingField !== 'email' && styles.inputReadOnly, isLight && editingField !== 'email' && styles.inputReadOnlyLight]}
             />
           </View>
 
           <View style={styles.inputGroup}>
             <View style={styles.inputLabelRow}>
-              <Text style={[styles.label, styles.inputLabel]}>Place of living</Text>
+              <Text style={[styles.label, styles.inputLabel, isLight && styles.textStrongLight]}>Place of living</Text>
               {renderFieldActions('location')}
             </View>
             <TextInput
@@ -551,16 +552,16 @@ export default function ProfileScreen() {
               placeholder="City, country"
               placeholderTextColor="#667282"
               selectionColor={accentColor}
-              style={[styles.input, editingField !== 'location' && styles.inputReadOnly]}
+              style={[styles.input, editingField !== 'location' && styles.inputReadOnly, isLight && editingField !== 'location' && styles.inputReadOnlyLight]}
             />
           </View>
 
           {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
         </View>
 
-        <View style={styles.card}>
+        <View style={[styles.card, isLight && styles.cardLight]}>
           <View style={styles.sectionRow}>
-            <Text style={[styles.sectionTitle, styles.sectionTitleInRow]}>
+            <Text style={[styles.sectionTitle, styles.sectionTitleInRow, isLight && styles.textStrongLight]}>
               Student Verification
             </Text>
             <View
@@ -569,12 +570,12 @@ export default function ProfileScreen() {
                 studentStatus === 'Confirmed' && styles.studentStatusConfirmed,
                 studentStatus === 'Rejected' && styles.studentStatusRejected,
               ]}>
-              <Text style={styles.studentStatusText}>
+              <Text style={[styles.studentStatusText, isLight && styles.textStrongLight]}>
                 {studentStatus === 'Not Submitted' ? 'Not Submitted' : studentStatus}
               </Text>
             </View>
           </View>
-          <Text style={styles.studentBody}>
+          <Text style={[styles.studentBody, isLight && styles.textStrongLight]}>
             {studentStatus === 'Confirmed'
               ? 'Student status confirmed. Membership renewal is $70/month.'
               : studentStatus === 'Pending Verification'
@@ -584,7 +585,7 @@ export default function ProfileScreen() {
                   : 'Upload your student ID to benefit from our student discount.'}
           </Text>
           {studentVerification?.proofLabel ? (
-            <Text style={styles.studentProofText}>
+            <Text style={[styles.studentProofText, isLight && styles.textStrongLight]}>
               Proof: {studentVerification.proofLabel}
             </Text>
           ) : null}
@@ -763,9 +764,6 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '900',
     marginTop: 14,
-    textShadowColor: 'rgba(0, 0, 0, 0.25)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
   },
   phoneText: {
     color: 'rgba(255, 255, 255, 0.85)',
@@ -781,6 +779,14 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 14,
     ...premiumShadow,
+  },
+  cardLight: {
+    borderColor: 'rgba(10, 11, 15, 0.14)',
+    backgroundColor: 'rgba(232, 234, 238, 0.78)',
+    shadowOpacity: 0.12,
+  },
+  textStrongLight: {
+    color: '#000000',
   },
   sectionTitle: {
     color: premiumColors.text,
@@ -902,6 +908,9 @@ const styles = StyleSheet.create({
   fieldEditButton: {
     backgroundColor: 'rgba(148, 154, 166, 0.34)',
   },
+  fieldEditButtonLight: {
+    backgroundColor: 'rgba(100, 110, 130, 0.55)',
+  },
   fieldCancelButton: {
     backgroundColor: 'transparent',
   },
@@ -950,6 +959,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(177, 18, 38, 0.08)',
     backgroundColor: 'rgba(255, 255, 255, 0.045)',
     color: premiumColors.textMuted,
+  },
+  inputReadOnlyLight: {
+    color: '#14161D',
   },
   errorText: {
     color: '#F2B8BF',

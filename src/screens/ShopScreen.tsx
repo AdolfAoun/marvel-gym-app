@@ -344,6 +344,12 @@ export default function ShopScreen() {
         borderColor: theme.colors.border,
       }
     : undefined;
+  const lightGlassStyle = isLight
+    ? {
+        backgroundColor: 'rgba(255,255,255,0.22)',
+        borderColor: 'rgba(10,11,15,0.78)',
+      }
+    : undefined;
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] =
     useState<ShopCategory>('Supplements');
@@ -664,6 +670,7 @@ export default function ShopScreen() {
               pointerEvents="none"
               style={[
                 styles.categoryActivePill,
+                isLight && styles.categoryActivePillLight,
                 {
                   opacity: categoryPillW.interpolate({
                     inputRange: [0, 1],
@@ -694,6 +701,7 @@ export default function ShopScreen() {
                 onPress={() => setSelectedCategory(meta.key)}
                 style={({ pressed }) => [
                   styles.categoryTile,
+                  isLight && styles.categoryTileLight,
                   isSelected && styles.categoryTileGliding,
                   !available && styles.categoryTileDisabled,
                   pressed && styles.buttonPressed,
@@ -937,8 +945,9 @@ export default function ShopScreen() {
             }}
             style={[
               styles.actBox,
-              themedSurfaceStyle,
+              lightGlassStyle,
               expandedBox === 'vouchers' && styles.actBoxActive,
+              isLight && expandedBox === 'vouchers' && styles.actBoxActiveLight,
             ]}>
             <Image
               source={VOUCHERS_SIGN}
@@ -963,8 +972,9 @@ export default function ShopScreen() {
             }
             style={[
               styles.actBox,
-              themedSurfaceStyle,
+              lightGlassStyle,
               expandedBox === 'orders' && styles.actBoxActive,
+              isLight && expandedBox === 'orders' && styles.actBoxActiveLight,
             ]}>
             <Image
               source={ORDERS_SIGN}
@@ -985,7 +995,7 @@ export default function ShopScreen() {
 
         {/* Vouchers expanded — pending, can cancel */}
         {expandedBox === 'vouchers' ? (
-          <View style={[styles.expandedPanel, themedSurfaceStyle]}>
+          <View style={[styles.expandedPanel, lightGlassStyle]}>
             <Text style={[styles.expandedTitle, surfaceTextStyle]}>My Vouchers</Text>
             <Text style={[styles.expandedSub, mutedTextStyle]}>
               Awaiting counter confirmation. Cancel anytime before pickup.
@@ -1000,7 +1010,7 @@ export default function ShopScreen() {
             ) : (
               <View style={styles.voucherList}>
                 {pendingVouchers.map((voucher) => (
-                  <View key={voucher.id} style={[styles.voucherRow, themedSurfaceStyle]}>
+                  <View key={voucher.id} style={[styles.voucherRow, lightGlassStyle]}>
                     <View
                       style={[
                         styles.voucherRail,
@@ -1033,7 +1043,7 @@ export default function ShopScreen() {
 
         {/* Orders expanded — confirmed + canceled history */}
         {expandedBox === 'orders' ? (
-          <View style={[styles.expandedPanel, themedSurfaceStyle]}>
+          <View style={[styles.expandedPanel, lightGlassStyle]}>
             <Text style={[styles.expandedTitle, surfaceTextStyle]}>Order History</Text>
             <Text style={[styles.expandedSub, mutedTextStyle]}>
               Confirmed and canceled shop orders.
@@ -1057,7 +1067,7 @@ export default function ShopScreen() {
             ) : (
               <View style={styles.voucherList}>
                 {orderedVouchers.map((voucher) => (
-                  <View key={voucher.id} style={[styles.voucherRow, themedSurfaceStyle]}>
+                  <View key={voucher.id} style={[styles.voucherRow, lightGlassStyle]}>
                     <View
                       style={[
                         styles.voucherRail,
@@ -1420,7 +1430,7 @@ const styles = StyleSheet.create({
   },
   categoryRail: {
     paddingRight: 4,
-    paddingBottom: 4,
+    paddingVertical: 8,
     marginBottom: 22,
   },
   categoryRailInner: {
@@ -1435,13 +1445,16 @@ const styles = StyleSheet.create({
     left: 0,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.5)',
-    backgroundColor: 'rgba(177, 18, 38, 0.16)',
+    borderColor: 'rgba(225, 29, 46, 0.72)',
+    backgroundColor: 'rgba(177, 18, 38, 0.34)',
     shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.65,
+    shadowRadius: 12,
     elevation: 6,
+  },
+  categoryActivePillLight: {
+    borderColor: 'rgba(225, 29, 46, 0.68)',
   },
   categoryTile: {
     width: 104,
@@ -1452,6 +1465,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     paddingVertical: 13,
     paddingHorizontal: 10,
+  },
+  categoryTileLight: {
+    borderColor: 'rgba(148, 163, 184, 0.55)',
   },
   categoryTileGliding: {
     borderColor: 'transparent',
@@ -1943,6 +1959,9 @@ const styles = StyleSheet.create({
   actBoxActive: {
     borderColor: 'rgba(225, 29, 46, 0.55)',
     backgroundColor: 'rgba(177, 18, 38, 0.12)',
+  },
+  actBoxActiveLight: {
+    borderColor: 'rgba(10, 11, 15, 0.78)',
   },
   actBoxGlyph: { color: premiumColors.redBright, fontSize: 22 },
   actBoxCount: { color: '#FFFFFF', fontSize: 30, fontWeight: '900', marginTop: 4 },

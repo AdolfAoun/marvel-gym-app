@@ -14,6 +14,7 @@ import {
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import { premiumColors, premiumGradients, premiumShadow } from '@/constants/premiumTheme';
 import { voucherService } from '@/services';
+import { useAppTheme } from '@/theme/useAppTheme';
 import type { Voucher, VoucherStatus, VoucherType } from '@/types';
 
 type VoucherHistoryTab = 'All' | VoucherStatus;
@@ -58,6 +59,8 @@ export default function VoucherHistoryScreen({
   emptyBody,
   canCancelPending = false,
 }: VoucherHistoryScreenProps) {
+  const theme = useAppTheme();
+  const isLightMode = theme.scheme === 'light';
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<VoucherHistoryTab>('All');
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
@@ -94,7 +97,7 @@ export default function VoucherHistoryScreen({
   if (isLoading) {
     return (
       <PremiumScreenBackground>
-        <StatusBar style="light" />
+        <StatusBar style={isLightMode ? 'dark' : 'light'} />
         <View style={styles.loadingState}>
           <ActivityIndicator color={premiumColors.redBright} />
           <Text style={styles.loadingText}>Loading your requests...</Text>
@@ -105,7 +108,7 @@ export default function VoucherHistoryScreen({
 
   return (
     <PremiumScreenBackground>
-      <StatusBar style="light" />
+      <StatusBar style={isLightMode ? 'dark' : 'light'} />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
@@ -134,7 +137,7 @@ export default function VoucherHistoryScreen({
           </View>
         </LinearGradient>
 
-        <Text style={styles.filterLabel}>Filter requests</Text>
+        <Text style={[styles.filterLabel, isLightMode && { color: theme.colors.text }]}>Filter requests</Text>
         <ScrollView
           horizontal
           contentContainerStyle={styles.filtersRow}
@@ -150,12 +153,14 @@ export default function VoucherHistoryScreen({
                 onPress={() => setActiveTab(tab)}
                 style={({ pressed }) => [
                   styles.filterChip,
+                  isLightMode && { backgroundColor: 'rgba(255,255,255,0.22)', borderColor: 'rgba(177,18,38,0.18)' },
                   isSelected && styles.filterChipSelected,
                   pressed && styles.filterChipPressed,
                 ]}>
                 <Text
                   style={[
                     styles.filterChipText,
+                    isLightMode && { color: theme.colors.text },
                     isSelected && styles.filterChipTextSelected,
                   ]}>
                   {tab}
@@ -166,9 +171,9 @@ export default function VoucherHistoryScreen({
         </ScrollView>
 
         {filteredVouchers.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>{emptyTitle}</Text>
-            <Text style={styles.emptyBody}>{emptyBody}</Text>
+          <View style={[styles.emptyCard, isLightMode && { backgroundColor: 'rgba(255,255,255,0.22)', borderColor: 'rgba(177,18,38,0.18)' }]}>
+            <Text style={[styles.emptyTitle, isLightMode && { color: theme.colors.text }]}>{emptyTitle}</Text>
+            <Text style={[styles.emptyBody, isLightMode && { color: theme.colors.textMuted }]}>{emptyBody}</Text>
           </View>
         ) : (
           <View style={styles.voucherList}>
@@ -176,7 +181,15 @@ export default function VoucherHistoryScreen({
               const statusColor = getStatusColor(voucher.status);
 
               return (
-                <View key={voucher.id} style={styles.voucherCard}>
+                <View
+                  key={voucher.id}
+                  style={[
+                    styles.voucherCard,
+                    isLightMode && {
+                      backgroundColor: 'rgba(255,255,255,0.22)',
+                      borderColor: 'rgba(177,18,38,0.18)',
+                    },
+                  ]}>
                   <View style={[styles.statusRail, { backgroundColor: statusColor }]} />
                   <View style={styles.voucherContent}>
                     <View style={styles.voucherTopRow}>
@@ -186,9 +199,13 @@ export default function VoucherHistoryScreen({
                           {voucher.status}
                         </Text>
                       </View>
-                      <Text style={styles.voucherDate}>{formatVoucherDate(voucher.date)}</Text>
+                      <Text style={[styles.voucherDate, isLightMode && { color: theme.colors.textMuted }]}>
+                        {formatVoucherDate(voucher.date)}
+                      </Text>
                     </View>
-                    <Text style={styles.voucherDescription}>{voucher.description}</Text>
+                    <Text style={[styles.voucherDescription, isLightMode && { color: theme.colors.text }]}>
+                      {voucher.description}
+                    </Text>
                     <View style={styles.voucherFooter}>
                       <Text style={styles.voucherAmount}>
                         {voucher.currency} {voucher.amount.toFixed(2)}

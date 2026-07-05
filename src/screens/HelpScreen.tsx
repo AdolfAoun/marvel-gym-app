@@ -9,14 +9,14 @@ import {
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
-import { MarvelMarks } from '@/components/PremiumUI';
 import {
   premiumColors,
-  premiumGradients,
   premiumShadow,
 } from '@/constants/premiumTheme';
+import { useAppTheme } from '@/theme/useAppTheme';
 
 const accentColor = premiumColors.red;
 const backgroundColor = premiumColors.background;
@@ -25,6 +25,8 @@ const textColor = premiumColors.text;
 const mutedColor = premiumColors.textMuted;
 
 export default function HelpScreen() {
+  const theme = useAppTheme();
+  const isLightMode = theme.scheme === 'light';
   const handleContact = async (url: string) => {
     try {
       await Linking.openURL(url);
@@ -35,30 +37,20 @@ export default function HelpScreen() {
 
   return (
     <PremiumScreenBackground>
-      <StatusBar style="light" />
+      <StatusBar style={isLightMode ? 'dark' : 'light'} />
+      <SafeAreaView edges={['top']} style={styles.safeTop}>
+        <View style={styles.helpHeader}>
+          <Text style={styles.helpEyebrow}>Help</Text>
+          <Text style={[styles.helpTitle, isLightMode && { color: theme.colors.text }]}>Support Hub</Text>
+        </View>
+      </SafeAreaView>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        <LinearGradient
-          colors={premiumGradients.redPanel}
-          start={{ x: 0.1, y: 0 }}
-          end={{ x: 0.9, y: 1 }}
-          style={styles.heroCard}>
-          <View pointerEvents="none" style={styles.heroGloss} />
-          <MarvelMarks variant="corner" color="#FFFFFF" />
-          <Text style={styles.kicker}>Help</Text>
-          <Text style={styles.heroTitle}>Support Hub</Text>
-          <Text style={styles.heroBody}>
-            How to use the app, contact options, and the future Marvel Gym assistant.
-          </Text>
-        </LinearGradient>
 
-        <View style={styles.aiCard}>
-          <View style={styles.aiBadge}>
-            <Text style={styles.aiBadgeText}>Coming soon</Text>
-          </View>
-          <Text style={styles.aiTitle}>AI Assistant</Text>
-          <Text style={styles.aiBody}>
+        <View style={[styles.aiCard, isLightMode && { backgroundColor: 'rgba(255,255,255,0.64)', borderColor: theme.colors.border }]}>
+          <Text style={[styles.aiTitle, isLightMode && { color: theme.colors.text }]}>AI Assistant</Text>
+          <Text style={[styles.aiBody, isLightMode && { color: theme.colors.textMuted }]}>
             Ask questions about your membership, visits, classes, and gym services.
           </Text>
           <View style={styles.aiInputPreview}>
@@ -70,60 +62,60 @@ export default function HelpScreen() {
           <View style={styles.accentBar} />
           <View style={styles.sectionHeadingText}>
             <Text style={styles.sectionEyebrow}>How it works</Text>
-            <Text style={styles.sectionHeadingTitle}>How to use the app</Text>
+            <Text style={[styles.sectionHeadingTitle, isLightMode && { color: theme.colors.text }]}>How to use the app</Text>
           </View>
         </View>
         <View style={styles.stepList}>
-            <View style={styles.stepRow}>
+            <View style={[styles.stepRow, isLightMode && { backgroundColor: 'rgba(255,255,255,0.64)', borderColor: theme.colors.border }]}>
               <Text style={styles.stepNumber}>01</Text>
               <View style={styles.stepCopy}>
-                <Text style={styles.stepTitle}>Entry and membership</Text>
-                <Text style={styles.stepBody}>
+                <Text style={[styles.stepTitle, isLightMode && { color: theme.colors.text }]}>Entry and membership</Text>
+                <Text style={[styles.stepBody, isLightMode && { color: theme.colors.textMuted }]}>
                   Use Home to check your membership status and open your QR when your plan is active.
                 </Text>
               </View>
             </View>
-            <View style={styles.stepRow}>
+            <View style={[styles.stepRow, isLightMode && { backgroundColor: 'rgba(255,255,255,0.64)', borderColor: theme.colors.border }]}>
               <Text style={styles.stepNumber}>02</Text>
               <View style={styles.stepCopy}>
-                <Text style={styles.stepTitle}>Freeze, renew, or extend</Text>
-                <Text style={styles.stepBody}>
+                <Text style={[styles.stepTitle, isLightMode && { color: theme.colors.text }]}>Freeze, renew, or extend</Text>
+                <Text style={[styles.stepBody, isLightMode && { color: theme.colors.textMuted }]}>
                   Request membership changes from Home and complete cash confirmation at the counter.
                 </Text>
               </View>
             </View>
-            <View style={styles.stepRow}>
+            <View style={[styles.stepRow, isLightMode && { backgroundColor: 'rgba(255,255,255,0.64)', borderColor: theme.colors.border }]}>
               <Text style={styles.stepNumber}>03</Text>
               <View style={styles.stepCopy}>
-                <Text style={styles.stepTitle}>Vouchers</Text>
-                <Text style={styles.stepBody}>
+                <Text style={[styles.stepTitle, isLightMode && { color: theme.colors.text }]}>Vouchers</Text>
+                <Text style={[styles.stepBody, isLightMode && { color: theme.colors.textMuted }]}>
                   Track pending, confirmed, and canceled cash requests in the Vouchers section.
                 </Text>
               </View>
             </View>
-            <View style={styles.stepRow}>
+            <View style={[styles.stepRow, isLightMode && { backgroundColor: 'rgba(255,255,255,0.64)', borderColor: theme.colors.border }]}>
               <Text style={styles.stepNumber}>04</Text>
               <View style={styles.stepCopy}>
-                <Text style={styles.stepTitle}>Classes and Gym Shop</Text>
-                <Text style={styles.stepBody}>
+                <Text style={[styles.stepTitle, isLightMode && { color: theme.colors.text }]}>Classes and Gym Shop</Text>
+                <Text style={[styles.stepBody, isLightMode && { color: theme.colors.textMuted }]}>
                   Browse classes when available and check product availability, prices, and filters in Gym Shop.
                 </Text>
               </View>
             </View>
-            <View style={styles.stepRow}>
+            <View style={[styles.stepRow, isLightMode && { backgroundColor: 'rgba(255,255,255,0.64)', borderColor: theme.colors.border }]}>
               <Text style={styles.stepNumber}>05</Text>
               <View style={styles.stepCopy}>
-                <Text style={styles.stepTitle}>Journey</Text>
-                <Text style={styles.stepBody}>
+                <Text style={[styles.stepTitle, isLightMode && { color: theme.colors.text }]}>Journey</Text>
+                <Text style={[styles.stepBody, isLightMode && { color: theme.colors.textMuted }]}>
                   Follow your visits, attendance streak, workout timer, and progress stats.
                 </Text>
               </View>
             </View>
-            <View style={styles.stepRow}>
+            <View style={[styles.stepRow, isLightMode && { backgroundColor: 'rgba(255,255,255,0.64)', borderColor: theme.colors.border }]}>
               <Text style={styles.stepNumber}>06</Text>
               <View style={styles.stepCopy}>
-                <Text style={styles.stepTitle}>Profile</Text>
-                <Text style={styles.stepBody}>
+                <Text style={[styles.stepTitle, isLightMode && { color: theme.colors.text }]}>Profile</Text>
+                <Text style={[styles.stepBody, isLightMode && { color: theme.colors.textMuted }]}>
                   Open Profile from the top-right icon to review member details and update editable preferences.
                 </Text>
               </View>
@@ -134,7 +126,9 @@ export default function HelpScreen() {
           <View style={styles.accentBar} />
           <View style={styles.sectionHeadingText}>
             <Text style={styles.sectionEyebrow}>Contact Us</Text>
-            <Text style={styles.sectionHeadingTitle}>Need help from Marvel Gym?</Text>
+            <Text style={[styles.sectionHeadingTitle, { color: '#000000' }]}>
+              Need help from Marvel Gym?
+            </Text>
           </View>
         </View>
         <View style={styles.contactRow}>
@@ -165,69 +159,31 @@ export default function HelpScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor,
+  safeTop: { backgroundColor: 'transparent' },
+  helpHeader: {
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+  },
+  helpEyebrow: {
+    color: premiumColors.red,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  helpTitle: {
+    color: premiumColors.text,
+    fontSize: 28,
+    fontWeight: '900',
+    fontStyle: 'italic',
   },
   content: {
     paddingHorizontal: 20,
-    paddingTop: 72,
+    paddingTop: 8,
     paddingBottom: 132,
-  },
-  heroCard: {
-    position: 'relative',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-    borderRadius: 26,
-    padding: 22,
-    marginBottom: 16,
-    shadowColor: premiumColors.red,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.4,
-    shadowRadius: 26,
-    elevation: 10,
-  },
-  heroGloss: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  heroSheen: {
-    position: 'absolute',
-    top: -70,
-    right: -50,
-    width: 200,
-    height: 200,
-    borderRadius: 120,
-    backgroundColor: 'rgba(255, 120, 130, 0.2)',
-  },
-  kicker: {
-    color: 'rgba(255, 255, 255, 0.78)',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-  },
-  heroTitle: {
-    color: '#FFFFFF',
-    fontSize: 32,
-    fontWeight: '900',
-    lineHeight: 37,
-    marginTop: 6,
-    textShadowColor: 'rgba(0, 0, 0, 0.25)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
-  },
-  heroBody: {
-    color: 'rgba(255, 255, 255, 0.86)',
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 20,
-    marginTop: 10,
   },
   card: {
     borderWidth: 1,

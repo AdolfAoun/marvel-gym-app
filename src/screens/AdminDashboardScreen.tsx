@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
@@ -18,7 +19,6 @@ import {
   adminMemberService,
   authService,
   classService,
-  entryContentService,
   productService,
   studentVerificationService,
   voucherService,
@@ -29,8 +29,7 @@ type StatKey =
   | 'vouchers'
   | 'students'
   | 'classes'
-  | 'products'
-  | 'photos';
+  | 'products';
 
 type AdminStats = {
   members: number;
@@ -40,7 +39,6 @@ type AdminStats = {
   classes: number;
   products: number;
   outOfStock: number;
-  photos: number;
 };
 
 type AdminSection = {
@@ -102,17 +100,6 @@ const adminGroups: AdminGroup[] = [
       },
     ],
   },
-  {
-    title: 'App Display',
-    sections: [
-      {
-        description: 'Manage Welcome Page carousel photos.',
-        href: '/admin/photos',
-        title: 'Welcome Photos',
-        statKey: 'photos',
-      },
-    ],
-  },
 ];
 
 const quickStatTiles: { key: StatKey; label: string }[] = [
@@ -147,8 +134,6 @@ function getSectionBadge(statKey: StatKey, stats?: AdminStats): Badge {
       return stats.outOfStock > 0
         ? { label: `${stats.outOfStock} out of stock`, tone: 'warn' }
         : { label: `${stats.products} listed`, tone: 'neutral' };
-    case 'photos':
-      return { label: `${stats.photos} photos`, tone: 'neutral' };
     default:
       return { label: '—', tone: 'neutral' };
   }
@@ -170,8 +155,6 @@ function getQuickStatValue(statKey: StatKey, stats?: AdminStats): string {
       return `${stats.classes}`;
     case 'products':
       return `${stats.products}`;
-    case 'photos':
-      return `${stats.photos}`;
     default:
       return '—';
   }
@@ -187,7 +170,7 @@ export default function AdminDashboardScreen() {
     let isActive = true;
 
     const loadStats = async () => {
-      const [members, pending, allVouchers, students, classes, products, photos] =
+      const [members, pending, allVouchers, students, classes, products] =
         await Promise.all([
           adminMemberService.searchMembers(''),
           voucherService.getPendingVouchers(),
@@ -195,7 +178,6 @@ export default function AdminDashboardScreen() {
           studentVerificationService.getStudentVerificationRequests(),
           classService.getAdminClasses(),
           productService.getAdminProducts(),
-          entryContentService.getWelcomePhotos(),
         ]);
 
       if (!isActive) {
@@ -212,7 +194,6 @@ export default function AdminDashboardScreen() {
         classes: classes.length,
         products: products.length,
         outOfStock: products.filter((product) => !product.isAvailable).length,
-        photos: photos.length,
       });
     };
 
@@ -413,10 +394,18 @@ export default function AdminDashboardScreen() {
               <Pressable
                 onPress={handleLogout}
                 style={({ pressed }) => [
-                  styles.confirmPrimary,
+                  styles.confirmPrimaryWrap,
                   pressed && styles.buttonPressed,
                 ]}>
-                <Text style={styles.confirmPrimaryText}>Log out</Text>
+                <LinearGradient
+                  colors={['#FF2638', '#B11226', '#2A0308']}
+                  locations={[0, 0.58, 1]}
+                  start={{ x: 0.08, y: 0 }}
+                  end={{ x: 0.92, y: 1 }}
+                  style={styles.confirmPrimary}>
+                  <View pointerEvents="none" style={styles.confirmPrimaryGloss} />
+                  <Text style={styles.confirmPrimaryText}>Log out</Text>
+                </LinearGradient>
               </Pressable>
             </View>
           </View>
@@ -657,15 +646,23 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 5,
   },
+  // ── Matches the member-facing Profile screen's "Sign Out" button theme ──
   logoutButton: {
     minHeight: 54,
+    alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.4)',
-    borderRadius: 18,
-    backgroundColor: 'rgba(177, 18, 38, 0.16)',
+    borderWidth: 1.4,
+    borderColor: 'rgba(225,29,46,0.55)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(7,2,5,0.45)',
+    paddingHorizontal: 52,
     marginTop: 6,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    elevation: 6,
   },
   logoutText: {
     color: '#FFFFFF',
@@ -690,7 +687,7 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     borderWidth: 1,
     borderColor: premiumColors.border,
-    borderRadius: 26,
+    borderRadius: 28,
     backgroundColor: premiumColors.surface,
     padding: 22,
     ...premiumShadow,
@@ -704,9 +701,9 @@ const styles = StyleSheet.create({
   },
   confirmTitle: {
     color: premiumColors.text,
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '900',
-    lineHeight: 27,
+    lineHeight: 29,
   },
   confirmBody: {
     color: premiumColors.textMuted,
@@ -718,34 +715,53 @@ const styles = StyleSheet.create({
   confirmRow: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 18,
+    marginTop: 20,
   },
   confirmSecondary: {
     minHeight: 52,
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    borderRadius: 18,
-    backgroundColor: premiumColors.surfaceSoft,
+    borderWidth: 1.4,
+    borderColor: 'rgba(225,29,46,0.55)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(7,2,5,0.45)',
   },
   confirmSecondaryText: {
-    color: premiumColors.text,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  confirmPrimary: {
-    minHeight: 52,
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
-    backgroundColor: premiumColors.red,
-  },
-  confirmPrimaryText: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '900',
+  },
+  confirmPrimaryWrap: {
+    flex: 1,
+    borderRadius: 999,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  confirmPrimary: {
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,91,106,0.72)',
+    borderRadius: 999,
+  },
+  confirmPrimaryGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '42%',
+    backgroundColor: 'rgba(255,255,255,0.075)',
+  },
+  confirmPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.3,
   },
 });

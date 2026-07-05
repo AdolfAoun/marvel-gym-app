@@ -9,15 +9,25 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Easing,
   Modal,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import ReanimatedAnimated, {
+  Easing as ReanimatedEasing,
+  useAnimatedProps,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
 import Svg, {
   Circle,
   Defs,
@@ -52,7 +62,10 @@ const neonGreen = '#4ADE80';
 const neonBlue = '#3B82F6';
 const midnightPurple = '#6D4AB8';
 const neonYellow = '#FDE68A';
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+// Drives the ring's strokeDashoffset on the UI thread (via Reanimated) so it
+// can't block JS-thread work elsewhere in the app — e.g. the tab bar's own
+// animations — the way react-native's JS-driven Animated API would.
+const RingCircle = ReanimatedAnimated.createAnimatedComponent(Circle);
 const monthRailItemWidth = 116;
 const journeyMonthRailWidth = 84;
 const calendarTimeOptionHeight = 38;
@@ -315,46 +328,84 @@ function buildAreaPath(points: PlotPoint[], height: number) {
   return `${curve} L ${last.x.toFixed(1)} ${height} L ${first.x.toFixed(1)} ${height} Z`;
 }
 
-function MetricRing({ metric, size = 138 }: { metric: RingMetric; size?: number }) {
+function MetricRing({
+  metric,
+  size = 138,
+  index = 0,
+  seed = 0,
+  trackColor = 'rgba(255,255,255,0.10)',
+  valueColor = '#FFFFFF',
+  detailColor = 'rgba(255,255,255,0.68)',
+  labelColor = 'rgba(255,255,255,0.72)',
+}: {
+  metric: RingMetric;
+  size?: number;
+  index?: number;
+  seed?: number;
+  trackColor?: string;
+  valueColor?: string;
+  detailColor?: string;
+  labelColor?: string;
+}) {
   const strokeWidth = 9;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const clampedProgress = Math.min(1, Math.max(0.04, metric.progress));
   const dashOffset = circumference * (1 - clampedProgress);
-  const progressAnimation = useRef(new Animated.Value(0)).current;
-  const animatedDashOffset = progressAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [circumference, dashOffset],
-  });
+  const progress = useSharedValue(0);
 
   useEffect(() => {
-    progressAnimation.setValue(0);
-    Animated.timing(progressAnimation, {
-      duration: 900,
-      toValue: 1,
-      useNativeDriver: false,
-    }).start();
-  }, [dashOffset, progressAnimation]);
+    progress.value = 0;
+    // Staggered per ring (rather than all four animating at once) — cheaper
+    // to render one at a time and reads as a nicer cascading reveal. Runs on
+    // the UI thread so it can't compete with JS-thread work elsewhere (the
+    // tab bar's own animations, navigation, etc.).
+    progress.value = withDelay(
+      index * 110,
+      withTiming(1, { duration: 700, easing: ReanimatedEasing.out(ReanimatedEasing.cubic) }),
+    );
+    // dashOffset intentionally omitted — it derives from metric.progress,
+    // which only changes alongside `seed` (a fresh data load).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed, index]);
+
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: circumference - progress.value * (circumference - dashOffset),
+  }));
 
   return (
     <View style={styles.staticRingCard}>
-      <Svg width={size} height={size}>
+      {/* Glow via a real native shadow on the SVG's own layer (using its
+          rendered alpha as the shadow shape) — a GPU-composited platform
+          effect, not a software blur filter, so it hugs the exact arc
+          without the per-frame cost that caused the app-wide lag. iOS only:
+          Android ignores shadowColor/shadowRadius without `elevation`, and
+          elevation would only add a plain grey box, so it's left off. */}
+      <Svg
+        width={size}
+        height={size}
+        style={{
+          shadowColor: metric.accent,
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.85,
+          shadowRadius: 8,
+        }}>
         <Defs>
           <SvgLinearGradient id={`ring-${metric.label}`} x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.95" />
-            <Stop offset="0.42" stopColor={metric.accent} stopOpacity="1" />
-            <Stop offset="1" stopColor={metric.accent} stopOpacity="0.62" />
+            <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.92" />
+            <Stop offset="0.34" stopColor={metric.accent} stopOpacity="1" />
+            <Stop offset="1" stopColor={metric.accent} stopOpacity="1" />
           </SvgLinearGradient>
         </Defs>
         <Circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="rgba(255,255,255,0.10)"
+          stroke={trackColor}
           strokeWidth={strokeWidth}
           fill="transparent"
         />
-        <AnimatedCircle
+        <RingCircle
           cx={size / 2}
           cy={size / 2}
           r={radius}
@@ -362,7 +413,7 @@ function MetricRing({ metric, size = 138 }: { metric: RingMetric; size?: number 
           strokeWidth={strokeWidth}
           fill="transparent"
           strokeDasharray={`${circumference} ${circumference}`}
-          strokeDashoffset={animatedDashOffset as unknown as number}
+          animatedProps={animatedProps}
           strokeLinecap="round"
           rotation="-90"
           originX={size / 2}
@@ -376,33 +427,45 @@ function MetricRing({ metric, size = 138 }: { metric: RingMetric; size?: number 
           tintColor={metric.accent}
           fallback={<Text style={[styles.ringIconFallback, { color: metric.accent }]}>*</Text>}
         />
-        <Text style={styles.ringValue}>{metric.value}</Text>
-        <Text style={styles.ringDetail}>{metric.detail}</Text>
+        <Text style={[styles.ringValue, { color: valueColor }]}>{metric.value}</Text>
+        <Text style={[styles.ringDetail, { color: detailColor }]}>{metric.detail}</Text>
       </View>
-      <Text style={styles.ringLabel}>{metric.label}</Text>
+      <Text style={[styles.ringLabel, { color: labelColor }]}>{metric.label}</Text>
     </View>
   );
 }
 
-function TrendChart({ points }: { points: ChartPoint[] }) {
+function TrendChart({
+  axisTitleColor = 'rgba(255,255,255,0.48)',
+  expanded = false,
+  onLongPress,
+  onPressIn,
+  points,
+}: {
+  axisTitleColor?: string;
+  expanded?: boolean;
+  onLongPress?: () => void;
+  onPressIn?: () => void;
+  points: ChartPoint[];
+}) {
   // Reference scale: at these baseline domains the plot exactly fills the visible
   // box (no scrolling). Sessions inside these ranges look identical to before;
   // anything beyond just extends the scrollable content, never the box itself.
-  const defaultDuration = 120;
-  const baseWidth = 310;
-  const viewportHeight = 126;
-  const baseCalorieRange = 400;
-  const calorieStep = 100;
+  const defaultDuration = expanded ? 120 : 180;
+  const baseWidth = expanded ? 260 : 310;
+  const viewportHeight = expanded ? 190 : 126;
+  const baseCalorieRange = 600;
+  const calorieStep = 200;
   // Always keep at least this much room to scroll into, even for short/light
-  // sessions, so there's headroom for a 4-hour workout or an 800+ kcal burn.
-  const minDurationDomain = 240;
+  // sessions, so there's headroom for a 4-hour workout.
+  const minDurationDomain = 180;
 
   const sortedPoints = [
     { calories: 0, duration: 0, label: 'Start' },
     ...[...points].sort((left, right) => left.duration - right.duration),
   ];
   const longestDuration = Math.max(...sortedPoints.map((point) => point.duration), minDurationDomain);
-  const maxDuration = Math.ceil(longestDuration / 30) * 30;
+  const maxDuration = Math.ceil(longestDuration / 60) * 60;
   const width = baseWidth * (maxDuration / defaultDuration);
 
   const maxCaloriesInData = Math.max(...sortedPoints.map((point) => point.calories), 0);
@@ -423,7 +486,7 @@ function TrendChart({ points }: { points: ChartPoint[] }) {
   );
   const caloriePath = buildCurvePath(caloriePoints);
   const areaPath = buildAreaPath(caloriePoints, plotHeight);
-  const durationTicks = Array.from({ length: maxDuration / 30 + 1 }, (_, index) => index * 30);
+  const durationTicks = Array.from({ length: Math.floor(maxDuration / 60) + 1 }, (_, index) => index * 60);
   // Checkpoints only, descending — the shared "0" is drawn once, separately, at
   // the corner where both axes meet.
   const calorieCheckpoints = Array.from(
@@ -438,18 +501,43 @@ function TrendChart({ points }: { points: ChartPoint[] }) {
   // default; scrolling up reveals whatever lies beyond it.
   const initialCalorieScrollY = Math.max(0, svgHeight - viewportSvgHeight);
   const formatDurationTick = (tick: number) => {
-    if (tick % 60 === 0) return `${tick / 60}h`;
-    if (tick < 60) return `${tick}m`;
-    return `${Math.floor(tick / 60)}h30`;
+    if (tick === 0) return '0';
+    return `${tick / 60}h`;
   };
 
   return (
-    <View style={styles.chartRow}>
-      <View style={styles.chartYAxisTitleCol}>
-        <Text style={styles.chartYAxisTitle}>Avg calories</Text>
-      </View>
-      <View style={styles.chartCanvasGlow}>
-        <View style={styles.chartCanvas}>
+    <View style={[styles.chartRow, expanded && styles.chartRowExpanded]}>
+      <View style={[styles.chartCanvasGlow, expanded && styles.chartCanvasGlowExpanded]}>
+        <View style={[styles.chartCanvas, expanded && styles.chartCanvasExpanded]}>
+          {onLongPress ? (
+            <Pressable
+              delayLongPress={360}
+              onLongPress={onLongPress}
+              onPressIn={onPressIn}
+              style={styles.chartPreviewHoldTarget}
+              accessibilityLabel="Hold to open expanded chart"
+              accessibilityRole="button">
+              <View pointerEvents="none" style={StyleSheet.absoluteFillObject} />
+            </Pressable>
+          ) : null}
+          <View style={[styles.chartCanvasInner, expanded && styles.chartCanvasInnerExpanded]}>
+            <View style={[styles.chartYAxisTitleCol, expanded && styles.chartYAxisTitleColExpanded]}>
+              <Svg
+                width={expanded ? 34 : 20}
+                height={expanded ? 178 : 136}
+                viewBox={`0 0 ${expanded ? 34 : 20} ${expanded ? 178 : 136}`}>
+                <SvgText
+                  x={(expanded ? 34 : 20) / 2}
+                  y={expanded ? 96 : 73}
+                  fontSize={expanded ? 10 : 9}
+                  fontWeight="900"
+                  fill="rgba(160,170,185,0.85)"
+                  textAnchor="middle"
+                  transform={`rotate(-90 ${(expanded ? 34 : 20) / 2} ${expanded ? 96 : 73})`}>
+                  Calories
+                </SvgText>
+              </Svg>
+            </View>
           {/* Vertical scroll wraps the whole plot row (calorie axis + duration
               plot together, exactly like the duration axis already rides along
               inside the horizontal scroll) — that's what keeps the calorie
@@ -458,6 +546,7 @@ function TrendChart({ points }: { points: ChartPoint[] }) {
               content behind it can run past 400 kcal. */}
           <ScrollView
             style={{ height: viewportSvgHeight }}
+            scrollEnabled={false}
             showsVerticalScrollIndicator={false}
             bounces={false}
             nestedScrollEnabled
@@ -479,20 +568,18 @@ function TrendChart({ points }: { points: ChartPoint[] }) {
                 {/* The single, shared "0" — sits diagonally right on the corner
                     where the calorie axis and duration axis intersect. */}
                 <SvgText
-                  x={axisLabelWidth - 2}
-                  y={plotHeight + 3}
+                  x={axisLabelWidth - 6}
+                  y={plotHeight - 2}
                   fontSize={9}
                   fontWeight="900"
                   fill="rgba(255,255,255,0.46)"
-                  textAnchor="end"
-                  rotation="-40"
-                  originX={axisLabelWidth - 2}
-                  originY={plotHeight + 3}>
+                  textAnchor="end">
                   0
                 </SvgText>
               </Svg>
               <ScrollView
                 horizontal
+                scrollEnabled={false}
                 showsHorizontalScrollIndicator={false}
                 bounces={false}
                 style={styles.chartPlotScroll}
@@ -554,28 +641,505 @@ function TrendChart({ points }: { points: ChartPoint[] }) {
                     {caloriePoints.map((point, index) => (
                       <Circle key={`calorie-${index}`} cx={point.x} cy={point.y} r={3.5} fill="#9B7FF0" />
                     ))}
-                  </Svg>
-                  <View style={styles.chartXAxis}>
                     {durationTicks
                       .filter((tick) => tick > 0)
-                      .map((tick) => (
-                        <Text key={tick} style={styles.chartXAxisLabel} numberOfLines={1}>
-                          {formatDurationTick(tick)}
-                        </Text>
-                      ))}
-                  </View>
+                      .map((tick) => {
+                        const x = (tick / maxDuration) * width;
+                        return (
+                          <SvgText
+                            key={`duration-label-${tick}`}
+                            x={x}
+                            y={plotHeight + 18}
+                            fontSize={9}
+                            fontWeight="900"
+                            fill="rgba(255,255,255,0.52)"
+                            textAnchor="middle">
+                            {formatDurationTick(tick)}
+                          </SvgText>
+                        );
+                      })}
+                  </Svg>
                 </View>
               </ScrollView>
             </View>
           </ScrollView>
-          <Text style={styles.chartXAxisTitle}>Avg session duration</Text>
+          </View>
+          <Text style={[styles.chartXAxisTitle, { color: 'rgba(160,170,185,0.85)' }]}>Time</Text>
           <View style={styles.chartLegendRow}>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: midnightPurple }]} />
               <Text style={styles.legendText}>Monthly average</Text>
             </View>
           </View>
+          {onLongPress ? (
+            <Text pointerEvents="none" style={styles.chartHoldHint}>
+              Hold to view
+            </Text>
+          ) : null}
         </View>
+      </View>
+    </View>
+  );
+}
+
+type ChartZoomAPI = {
+  stepZoomIn: () => void;
+  stepZoomOut: () => void;
+};
+
+function FittedTrendChart({
+  axisTitleColor = 'rgba(255,255,255,0.52)',
+  onZoomChange,
+  points,
+  xAxisTitleColor = 'rgba(255,255,255,0.52)',
+  zoomApiRef,
+}: {
+  axisTitleColor?: string;
+  onZoomChange?: (zoom: number) => void;
+  points: ChartPoint[];
+  xAxisTitleColor?: string;
+  zoomApiRef?: React.MutableRefObject<ChartZoomAPI>;
+}) {
+  const { width: windowWidth } = useWindowDimensions();
+  const viewportWidth = Math.min(620, Math.max(284, windowWidth * 0.98 - 58));
+  const viewportHeight = 246;
+  const topInset = 14;
+  const titleWidth = 34;
+  const axisLabelWidth = 34;
+  const bottomAxisHeight = 54;
+  const calorieStep = 100;
+  const minDurationDomain = 240;
+  const sortedPoints = [
+    { calories: 0, duration: 0, label: 'Start' },
+    ...[...points].sort((left, right) => left.duration - right.duration),
+  ];
+  const maxCalories = Math.max(
+    600,
+    Math.ceil(Math.max(...sortedPoints.map((point) => point.calories), 0) / calorieStep) * calorieStep,
+  );
+  const longestDuration = Math.max(...sortedPoints.map((point) => point.duration), minDurationDomain);
+  const maxDuration = Math.ceil(longestDuration / 30) * 30;
+  const plotOriginX = titleWidth + axisLabelWidth;
+  const visiblePlotWidth = viewportWidth - plotOriginX;
+  const plotWidth = Math.max(
+    visiblePlotWidth * 1.45,
+    310 * (maxDuration / 120),
+  );
+  const plotHeight = Math.max(286, viewportHeight * (maxCalories / 600));
+  const plotPoints = buildDurationPlotPoints(
+    sortedPoints,
+    plotWidth,
+    plotHeight,
+    maxDuration,
+    maxCalories,
+  );
+  const caloriePath = buildCurvePath(plotPoints);
+  const areaPath = buildAreaPath(plotPoints, plotHeight);
+  const calorieTicks = Array.from({ length: maxCalories / calorieStep + 1 }, (_, index) => index * calorieStep);
+  const durationTicks = Array.from({ length: Math.floor(maxDuration / 30) + 1 }, (_, index) => index * 30);
+  const svgWidth = plotOriginX + plotWidth;
+  const svgHeight = topInset + plotHeight + bottomAxisHeight;
+  const formatDurationTick = (tick: number) => {
+    if (tick === 0) return '0';
+    if (tick % 60 === 0) return `${tick / 60}h`;
+    return `${Math.floor(tick / 60)}h30`;
+  };
+  const minZoom = 0.62;
+  const normalZoom = 1;
+  const doubleTapZoom = 1.65;
+  const zoomSteps = [0.62, 0.80, 1.0, 1.3, 1.65];
+  const [zoom, setZoom] = useState(1);
+  const renderedSvgWidth = svgWidth * zoom;
+  const renderedSvgHeight = svgHeight * zoom;
+  const initialScrollY = Math.max(0, svgHeight - viewportHeight);
+  const panOffsetRef = useRef({ x: 0, y: -initialScrollY });
+  const panStartRef = useRef({ x: 0, y: -initialScrollY });
+  const zoomRef = useRef(1);
+  // Animated.ValueXY drives the pan transform natively — no React re-render per
+  // touchmove frame (the old setState approach re-rendered the whole component
+  // on every event, which is what caused the gesture lag).
+  const animPan = useRef(new Animated.ValueXY({ x: 0, y: -initialScrollY })).current;
+  const pinchStartDistanceRef = useRef(0);
+  const pinchStartZoomRef = useRef(1);
+  const pinchAnchorRef = useRef({ contentX: 0, contentY: 0, viewX: 0, viewY: 0 });
+  const lastTapRef = useRef({ time: 0, x: 0, y: 0 });
+
+  useEffect(() => {
+    const nextOffset = { x: 0, y: -initialScrollY };
+    panOffsetRef.current = nextOffset;
+    panStartRef.current = nextOffset;
+    animPan.setValue(nextOffset);
+  }, [animPan, initialScrollY, svgHeight, svgWidth, viewportHeight, viewportWidth]);
+
+  const clampPanOffset = useCallback(
+    (x: number, y: number) => {
+      const z = zoomRef.current;
+      const mpx = Math.max(0, svgWidth * z - viewportWidth);
+      const mpy = Math.max(0, svgHeight * z - viewportHeight);
+      return {
+        x: Math.min(0, Math.max(-mpx, x)),
+        y: Math.min(0, Math.max(-mpy, y)),
+      };
+    },
+    [svgHeight, svgWidth, viewportHeight, viewportWidth],
+  );
+
+  const applyZoomAtPoint = useCallback(
+    (nextZoom: number, center: { x: number; y: number }) => {
+      const currentZoom = zoomRef.current;
+      const contentX = (center.x - panOffsetRef.current.x) / currentZoom;
+      const contentY = (center.y - panOffsetRef.current.y) / currentZoom;
+      const zoomedMaxPanX = Math.max(0, svgWidth * nextZoom - viewportWidth);
+      const zoomedMaxPanY = Math.max(0, svgHeight * nextZoom - viewportHeight);
+      const nextOffset = {
+        x: Math.min(0, Math.max(-zoomedMaxPanX, center.x - contentX * nextZoom)),
+        y: Math.min(0, Math.max(-zoomedMaxPanY, center.y - contentY * nextZoom)),
+      };
+
+      zoomRef.current = nextZoom;
+      setZoom(nextZoom);
+      panOffsetRef.current = nextOffset;
+      panStartRef.current = nextOffset;
+      animPan.setValue(nextOffset);
+    },
+    [animPan, svgHeight, svgWidth, viewportHeight, viewportWidth],
+  );
+
+  const resetZoom = useCallback(() => {
+    const nextOffset = { x: 0, y: -initialScrollY };
+    zoomRef.current = normalZoom;
+    setZoom(normalZoom);
+    panOffsetRef.current = nextOffset;
+    panStartRef.current = nextOffset;
+    animPan.setValue(nextOffset);
+  }, [animPan, initialScrollY]);
+
+  // Animated variants — used for double-tap and button presses so pan
+  // transitions smoothly instead of jumping instantly (which caused the trembling).
+  const applyZoomAtPointAnimated = useCallback(
+    (nextZoom: number, center: { x: number; y: number }) => {
+      const currentZoom = zoomRef.current;
+      const contentX = (center.x - panOffsetRef.current.x) / currentZoom;
+      const contentY = (center.y - panOffsetRef.current.y) / currentZoom;
+      const zoomedMaxPanX = Math.max(0, svgWidth * nextZoom - viewportWidth);
+      const zoomedMaxPanY = Math.max(0, svgHeight * nextZoom - viewportHeight);
+      const nextOffset = {
+        x: Math.min(0, Math.max(-zoomedMaxPanX, center.x - contentX * nextZoom)),
+        y: Math.min(0, Math.max(-zoomedMaxPanY, center.y - contentY * nextZoom)),
+      };
+      zoomRef.current = nextZoom;
+      setZoom(nextZoom);
+      panOffsetRef.current = nextOffset;
+      panStartRef.current = nextOffset;
+      animPan.stopAnimation();
+      Animated.timing(animPan, {
+        toValue: nextOffset,
+        duration: 300,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    },
+    [animPan, svgHeight, svgWidth, viewportHeight, viewportWidth],
+  );
+
+  const resetZoomAnimated = useCallback(() => {
+    const nextOffset = { x: 0, y: -initialScrollY };
+    zoomRef.current = normalZoom;
+    setZoom(normalZoom);
+    panOffsetRef.current = nextOffset;
+    panStartRef.current = nextOffset;
+    animPan.stopAnimation();
+    Animated.timing(animPan, {
+      toValue: nextOffset,
+      duration: 300,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [animPan, initialScrollY]);
+
+  const getTouchDistance = (touches: unknown) => {
+    const touchList = touches as { pageX: number; pageY: number }[];
+    if (touchList.length < 2) return 0;
+    const [first, second] = touchList;
+    return Math.hypot(second.pageX - first.pageX, second.pageY - first.pageY);
+  };
+  const getTouchCenter = (touches: unknown) => {
+    const touchList = touches as { locationX: number; locationY: number }[];
+    if (touchList.length < 2) return { x: 0, y: 0 };
+    const [first, second] = touchList;
+    return {
+      x: (first.locationX + second.locationX) / 2,
+      y: (first.locationY + second.locationY) / 2,
+    };
+  };
+
+  const chartPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (event, gesture) =>
+          event.nativeEvent.touches.length > 1 ||
+          Math.abs(gesture.dx) > 2 ||
+          Math.abs(gesture.dy) > 2,
+        onPanResponderGrant: (event) => {
+          panStartRef.current = panOffsetRef.current;
+          if (event.nativeEvent.touches.length > 1) {
+            pinchStartDistanceRef.current = getTouchDistance(event.nativeEvent.touches);
+            pinchStartZoomRef.current = zoomRef.current;
+            const center = getTouchCenter(event.nativeEvent.touches);
+            pinchAnchorRef.current = {
+              contentX: (center.x - panOffsetRef.current.x) / zoomRef.current,
+              contentY: (center.y - panOffsetRef.current.y) / zoomRef.current,
+              viewX: center.x,
+              viewY: center.y,
+            };
+          }
+        },
+        onPanResponderMove: (event, gesture) => {
+          if (event.nativeEvent.touches.length > 1) {
+            const distance = getTouchDistance(event.nativeEvent.touches);
+            if (pinchStartDistanceRef.current <= 0) {
+              pinchStartDistanceRef.current = distance;
+              pinchStartZoomRef.current = zoomRef.current;
+              const center = getTouchCenter(event.nativeEvent.touches);
+              pinchAnchorRef.current = {
+                contentX: (center.x - panOffsetRef.current.x) / zoomRef.current,
+                contentY: (center.y - panOffsetRef.current.y) / zoomRef.current,
+                viewX: center.x,
+                viewY: center.y,
+              };
+              return;
+            }
+            if (pinchStartDistanceRef.current > 0 && distance > 0) {
+              const center = getTouchCenter(event.nativeEvent.touches);
+              if (pinchStartZoomRef.current > normalZoom + 0.02) {
+                return;
+              }
+              const requestedZoom = pinchStartZoomRef.current * (pinchStartDistanceRef.current / distance);
+              const nextZoom =
+                pinchStartZoomRef.current >= normalZoom - 0.02
+                  ? Math.min(normalZoom, Math.max(minZoom, requestedZoom))
+                  : Math.min(normalZoom, Math.max(pinchStartZoomRef.current, requestedZoom));
+              zoomRef.current = nextZoom;
+              setZoom(nextZoom);
+              const zoomedMaxPanX = Math.max(0, svgWidth * nextZoom - viewportWidth);
+              const zoomedMaxPanY = Math.max(0, svgHeight * nextZoom - viewportHeight);
+              const nextOffset = {
+                x: Math.min(
+                  0,
+                  Math.max(-zoomedMaxPanX, center.x - pinchAnchorRef.current.contentX * nextZoom),
+                ),
+                y: Math.min(
+                  0,
+                  Math.max(-zoomedMaxPanY, center.y - pinchAnchorRef.current.contentY * nextZoom),
+                ),
+              };
+              panOffsetRef.current = nextOffset;
+              panStartRef.current = nextOffset;
+              animPan.setValue(nextOffset);
+            }
+            return;
+          }
+          pinchStartDistanceRef.current = 0;
+          pinchStartZoomRef.current = zoomRef.current;
+          const nextOffset = clampPanOffset(
+            panStartRef.current.x + gesture.dx,
+            panStartRef.current.y + gesture.dy,
+          );
+          panOffsetRef.current = nextOffset;
+          animPan.setValue(nextOffset);
+        },
+        onPanResponderRelease: (event, gesture) => {
+          const isTap = Math.abs(gesture.dx) < 8 && Math.abs(gesture.dy) < 8;
+          if (isTap) {
+            const now = Date.now();
+            const tap = {
+              time: now,
+              x: event.nativeEvent.locationX,
+              y: event.nativeEvent.locationY,
+            };
+            const lastTap = lastTapRef.current;
+            const isDoubleTap =
+              now - lastTap.time < 300 &&
+              Math.hypot(tap.x - lastTap.x, tap.y - lastTap.y) < 46;
+
+            if (isDoubleTap) {
+              lastTapRef.current = { time: 0, x: 0, y: 0 };
+              if (zoomRef.current > normalZoom + 0.02) {
+                resetZoomAnimated();
+              } else {
+                applyZoomAtPointAnimated(doubleTapZoom, { x: tap.x, y: tap.y });
+              }
+              pinchStartDistanceRef.current = 0;
+              pinchStartZoomRef.current = zoomRef.current;
+              return;
+            }
+            lastTapRef.current = tap;
+          }
+          panStartRef.current = panOffsetRef.current;
+          pinchStartDistanceRef.current = 0;
+          pinchStartZoomRef.current = zoomRef.current;
+        },
+        onPanResponderTerminate: () => {
+          panStartRef.current = panOffsetRef.current;
+          pinchStartDistanceRef.current = 0;
+          pinchStartZoomRef.current = zoomRef.current;
+        },
+      }),
+    [animPan, applyZoomAtPointAnimated, clampPanOffset, resetZoomAnimated],
+  );
+
+  const currentStepIndex = zoomSteps.reduce(
+    (best, step, i) => (Math.abs(step - zoom) < Math.abs(zoomSteps[best] - zoom) ? i : best),
+    0,
+  );
+  const stepZoomOut = useCallback(() => {
+    if (currentStepIndex > 0) {
+      applyZoomAtPointAnimated(zoomSteps[currentStepIndex - 1]!, { x: viewportWidth / 2, y: viewportHeight / 2 });
+    }
+  }, [applyZoomAtPointAnimated, currentStepIndex, viewportHeight, viewportWidth, zoomSteps]);
+  const stepZoomIn = useCallback(() => {
+    if (currentStepIndex < zoomSteps.length - 1) {
+      applyZoomAtPointAnimated(zoomSteps[currentStepIndex + 1]!, { x: viewportWidth / 2, y: viewportHeight / 2 });
+    }
+  }, [applyZoomAtPointAnimated, currentStepIndex, viewportHeight, viewportWidth, zoomSteps]);
+
+  // Sync the imperative API ref so the modal's +/- buttons can call into the chart
+  useEffect(() => {
+    if (zoomApiRef) {
+      zoomApiRef.current = { stepZoomIn, stepZoomOut };
+    }
+  });
+  // Notify parent of zoom changes so the % display stays in sync
+  useEffect(() => {
+    onZoomChange?.(zoom);
+  }, [zoom, onZoomChange]);
+
+  return (
+    <View style={styles.fittedChartWrap}>
+      <View
+        {...chartPanResponder.panHandlers}
+        style={[styles.fittedChartPanViewport, { height: viewportHeight, width: viewportWidth }]}>
+        <Text pointerEvents="none" style={styles.fittedChartXAxisTitle}>Time</Text>
+        <Animated.View
+          style={[
+            styles.fittedChartPanContent,
+            {
+              height: renderedSvgHeight,
+              transform: animPan.getTranslateTransform(),
+              width: renderedSvgWidth,
+            },
+          ]}>
+          <Svg width={renderedSvgWidth} height={renderedSvgHeight} viewBox={`0 0 ${svgWidth} ${svgHeight}`}>
+            <Defs>
+              <SvgLinearGradient id="journey-popup-area" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={midnightPurple} stopOpacity="0.34" />
+                <Stop offset="1" stopColor={midnightPurple} stopOpacity="0" />
+              </SvgLinearGradient>
+              <SvgLinearGradient id="journey-popup-line" x1="0" y1="0" x2="1" y2="0">
+                <Stop offset="0" stopColor="#9B7FF0" stopOpacity="1" />
+                <Stop offset="1" stopColor={midnightPurple} stopOpacity="1" />
+              </SvgLinearGradient>
+            </Defs>
+            <SvgText
+              x={16}
+              y={topInset + plotHeight * 0.6}
+              fontSize={9}
+              fontWeight="900"
+              fill="rgba(160,170,185,0.85)"
+              textAnchor="middle"
+              rotation="-90"
+              originX={16}
+              originY={topInset + plotHeight * 0.6}>
+              Calories
+            </SvgText>
+            {calorieTicks.map((tick) => {
+              const y = topInset + plotHeight - (tick / maxCalories) * plotHeight;
+              return (
+                <Path
+                  key={`popup-calorie-grid-${tick}`}
+                  d={`M ${plotOriginX} ${y.toFixed(1)} H ${svgWidth}`}
+                  stroke="rgba(255,255,255,0.08)"
+                  strokeWidth="1"
+                />
+              );
+            })}
+            {calorieTicks.map((tick) => {
+              const y = topInset + plotHeight - (tick / maxCalories) * plotHeight;
+              return (
+                <SvgText
+                  key={`popup-calorie-label-${tick}`}
+                  x={plotOriginX - 8}
+                  y={y + 3}
+                  fontSize={9}
+                  fontWeight="900"
+                  fill="rgba(255,255,255,0.58)"
+                  textAnchor="end">
+                  {tick}
+                </SvgText>
+              );
+            })}
+            {durationTicks.map((tick) => {
+              const x = plotOriginX + (tick / maxDuration) * plotWidth;
+              return (
+                <Path
+                  key={`popup-duration-grid-${tick}`}
+                  d={`M ${x.toFixed(1)} ${topInset} V ${topInset + plotHeight}`}
+                  stroke="rgba(255,255,255,0.07)"
+                  strokeWidth="1"
+                />
+              );
+            })}
+            <Path d={`M ${plotOriginX} ${topInset + plotHeight} H ${svgWidth}`} stroke="rgba(255,255,255,0.25)" strokeWidth="1.4" />
+            <Path d={`M ${plotOriginX} ${topInset} V ${topInset + plotHeight}`} stroke="rgba(255,255,255,0.25)" strokeWidth="1.4" />
+            <Path d={areaPath} fill="url(#journey-popup-area)" transform={`translate(${plotOriginX} ${topInset})`} />
+            <Path
+              d={caloriePath}
+              fill="none"
+              stroke={midnightPurple}
+              strokeOpacity={0.42}
+              strokeWidth="8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              transform={`translate(${plotOriginX} ${topInset})`}
+            />
+            <Path
+              d={caloriePath}
+              fill="none"
+              stroke="url(#journey-popup-line)"
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              transform={`translate(${plotOriginX} ${topInset})`}
+            />
+            {plotPoints.map((point, index) => (
+              <Circle
+                key={`popup-point-${index}`}
+                cx={plotOriginX + point.x}
+                cy={topInset + point.y}
+                r={3.6}
+                fill="#9B7FF0"
+              />
+            ))}
+            {durationTicks
+              .filter((tick) => tick > 0)
+              .map((tick) => {
+              const x = plotOriginX + (tick / maxDuration) * plotWidth;
+              return (
+                <SvgText
+                  key={`popup-duration-label-${tick}`}
+                  x={x}
+                  y={topInset + plotHeight + 22}
+                  fontSize={9}
+                  fontWeight="900"
+                  fill="rgba(255,255,255,0.58)"
+                  textAnchor="middle">
+                  {formatDurationTick(tick)}
+                </SvgText>
+              );
+            })}
+          </Svg>
+        </Animated.View>
       </View>
     </View>
   );
@@ -583,6 +1147,7 @@ function TrendChart({ points }: { points: ChartPoint[] }) {
 
 export default function JourneyScreen() {
   const theme = useAppTheme();
+  const isLightMode = theme.scheme === 'light';
   const [member, setMember] = useState<Member>();
   const [profile, setProfile] = useState<JourneyProfile>();
 
@@ -605,6 +1170,14 @@ export default function JourneyScreen() {
   const [isCalendarTimeEnabled, setIsCalendarTimeEnabled] = useState(false);
   const [calendarStartTime, setCalendarStartTime] = useState('17:00');
   const [calendarEndTime, setCalendarEndTime] = useState('18:00');
+  const [isChartModalVisible, setIsChartModalVisible] = useState(false);
+  const [chartZoom, setChartZoom] = useState(1);
+  const chartZoomApiRef = useRef<ChartZoomAPI>({ stepZoomIn: () => {}, stepZoomOut: () => {} });
+  const chartZoomSteps = [0.62, 0.80, 1.0, 1.3, 1.65];
+  const chartZoomStepIndex = chartZoomSteps.reduce(
+    (best, step, i) => (Math.abs(step - chartZoom) < Math.abs(chartZoomSteps[best] - chartZoom) ? i : best),
+    0,
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [ringAnimationSeed, setRingAnimationSeed] = useState(0);
   const timerStartedAtRef = useRef<number | undefined>(undefined);
@@ -615,6 +1188,13 @@ export default function JourneyScreen() {
   const attendanceMonthRailRef = useRef<ScrollView>(null);
   const calendarStartTimeRef = useRef<ScrollView>(null);
   const calendarEndTimeRef = useRef<ScrollView>(null);
+  const calendarTimeHapticTimersRef = useRef<
+    Partial<Record<'start' | 'end', ReturnType<typeof setTimeout>>>
+  >({});
+  const lastCalendarTimeHapticRef = useRef<Record<'start' | 'end', string>>({
+    start: '17:00',
+    end: '18:00',
+  });
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -948,6 +1528,14 @@ export default function JourneyScreen() {
     setStats(nextStats);
   };
 
+  const handleChartPressIn = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+  }, []);
+
+  const openChartModal = useCallback(() => {
+    setIsChartModalVisible(true);
+  }, []);
+
   const handleSelectCalendarDay = (date: string) => {
     setPendingVisitDate(date);
     setIsCalendarTimeEnabled(false);
@@ -961,6 +1549,47 @@ export default function JourneyScreen() {
       ref.current?.scrollTo({
         animated,
         y: nextIndex * calendarTimeOptionHeight,
+      });
+    },
+    [],
+  );
+
+  const triggerCalendarTimeHaptic = useCallback((kind: 'start' | 'end', value: string) => {
+    if (lastCalendarTimeHapticRef.current[kind] === value) return;
+    lastCalendarTimeHapticRef.current[kind] = value;
+    Haptics.selectionAsync();
+  }, []);
+
+  const scheduleCalendarTimeHaptic = useCallback(
+    (kind: 'start' | 'end', value: string) => {
+      const timers = calendarTimeHapticTimersRef.current;
+      if (timers[kind]) clearTimeout(timers[kind]);
+      timers[kind] = setTimeout(() => {
+        triggerCalendarTimeHaptic(kind, value);
+        delete calendarTimeHapticTimersRef.current[kind];
+      }, 180);
+    },
+    [triggerCalendarTimeHaptic],
+  );
+
+  const selectCalendarTimeOption = useCallback(
+    (kind: 'start' | 'end', value: string) => {
+      if (kind === 'start') {
+        setCalendarStartTime(value);
+        scrollCalendarTimeWheel(calendarStartTimeRef, value, true);
+      } else {
+        setCalendarEndTime(value);
+        scrollCalendarTimeWheel(calendarEndTimeRef, value, true);
+      }
+      scheduleCalendarTimeHaptic(kind, value);
+    },
+    [scheduleCalendarTimeHaptic, scrollCalendarTimeWheel],
+  );
+
+  useEffect(
+    () => () => {
+      Object.values(calendarTimeHapticTimersRef.current).forEach((timer) => {
+        if (timer) clearTimeout(timer);
       });
     },
     [],
@@ -994,11 +1623,12 @@ export default function JourneyScreen() {
       if (!nextValue) return;
       if (kind === 'start') {
         setCalendarStartTime(nextValue);
-        return;
+      } else {
+        setCalendarEndTime(nextValue);
       }
-      setCalendarEndTime(nextValue);
+      triggerCalendarTimeHaptic(kind, nextValue);
     },
-    [],
+    [triggerCalendarTimeHaptic],
   );
 
   const handleSaveCalendarEntry = async () => {
@@ -1514,13 +2144,22 @@ export default function JourneyScreen() {
           </View>
 
           <View style={stylesForTheme.ringsGrid}>
-            {ringMetrics.map((metric) => (
-              <MetricRing key={`${metric.label}-${ringAnimationSeed}`} metric={metric} />
+            {ringMetrics.map((metric, index) => (
+              <MetricRing
+                key={metric.label}
+                metric={metric}
+                index={index}
+                seed={ringAnimationSeed}
+                trackColor={isLightMode ? theme.colors.border : undefined}
+                valueColor={isLightMode ? theme.colors.text : undefined}
+                detailColor={isLightMode ? theme.colors.text : undefined}
+                labelColor={isLightMode ? theme.colors.text : undefined}
+              />
             ))}
           </View>
         </View>
 
-        <View style={stylesForTheme.analyticsPanel}>
+        <View style={[stylesForTheme.analyticsPanel, isLightMode && stylesForTheme.analyticsPanelLight]}>
           <View style={stylesForTheme.panelTopRow}>
             <View>
               <Text style={stylesForTheme.panelKicker}>Analytics</Text>
@@ -1603,7 +2242,11 @@ export default function JourneyScreen() {
               )}
             </View>
           </View>
-          <TrendChart points={chartPoints} />
+          <TrendChart
+            points={chartPoints}
+            onLongPress={openChartModal}
+            onPressIn={handleChartPressIn}
+          />
         </View>
 
         <View style={stylesForTheme.metricHeader}>
@@ -1620,7 +2263,7 @@ export default function JourneyScreen() {
           {metricCards.map((metric) => (
             <View key={metric.key} style={stylesForTheme.metricModule}>
               <View style={[stylesForTheme.metricModuleAccent, { backgroundColor: metric.accent }]} />
-              <Text style={[stylesForTheme.metricModuleValue, { color: '#FFFFFF' }]}>
+              <Text style={[stylesForTheme.metricModuleValue, { color: isLightMode ? theme.colors.text : '#FFFFFF' }]}>
                 {metric.value}
               </Text>
               <Text style={stylesForTheme.metricModuleLabel}>{metric.label}</Text>
@@ -1680,6 +2323,60 @@ export default function JourneyScreen() {
           ))}
         </ScrollView>
       </ScrollView>
+
+      <Modal transparent visible={isChartModalVisible} animationType="fade">
+        <View style={stylesForTheme.centerModalOverlay}>
+          <Pressable
+            style={stylesForTheme.modalBackdrop}
+            onPress={() => setIsChartModalVisible(false)}
+          />
+          <View style={stylesForTheme.chartModalCard}>
+            <View style={stylesForTheme.chartModalTopBar}>
+              <View style={stylesForTheme.chartZoomControls}>
+                <Pressable
+                  onPress={() => chartZoomApiRef.current.stepZoomOut()}
+                  disabled={chartZoomStepIndex === 0}
+                  style={({ pressed }) => [
+                    stylesForTheme.chartZoomBtn,
+                    pressed && stylesForTheme.buttonPressed,
+                    chartZoomStepIndex === 0 && { opacity: 0.28 },
+                  ]}>
+                  <View style={stylesForTheme.chartZoomMinusBar} />
+                </Pressable>
+                <Text style={stylesForTheme.chartZoomPct}>{Math.round(chartZoom * 100)}%</Text>
+                <Pressable
+                  onPress={() => chartZoomApiRef.current.stepZoomIn()}
+                  disabled={chartZoomStepIndex === chartZoomSteps.length - 1}
+                  style={({ pressed }) => [
+                    stylesForTheme.chartZoomBtn,
+                    pressed && stylesForTheme.buttonPressed,
+                    chartZoomStepIndex === chartZoomSteps.length - 1 && { opacity: 0.28 },
+                  ]}>
+                  <Text style={stylesForTheme.chartZoomBtnText}>+</Text>
+                </Pressable>
+              </View>
+              <Pressable
+                onPress={() => setIsChartModalVisible(false)}
+                style={({ pressed }) => [
+                  stylesForTheme.chartModalClose,
+                  pressed && stylesForTheme.buttonPressed,
+                ]}
+                accessibilityLabel="Close expanded chart"
+                accessibilityRole="button">
+                <Text style={stylesForTheme.chartModalCloseText}>×</Text>
+              </Pressable>
+            </View>
+            <View style={stylesForTheme.chartModalGraphWrap}>
+              <FittedTrendChart
+                onZoomChange={setChartZoom}
+                points={chartPoints}
+                xAxisTitleColor={isLightMode ? theme.colors.text : undefined}
+                zoomApiRef={chartZoomApiRef}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal transparent visible={Boolean(pendingVisitDate)} animationType="fade">
         <View style={stylesForTheme.centerModalOverlay}>
@@ -1752,10 +2449,7 @@ export default function JourneyScreen() {
                           {TIME_OPTIONS.map((timeOption) => (
                             <Pressable
                               key={`start-${timeOption}`}
-                              onPress={() => {
-                                setCalendarStartTime(timeOption);
-                                scrollCalendarTimeWheel(calendarStartTimeRef, timeOption, true);
-                              }}
+                              onPress={() => selectCalendarTimeOption('start', timeOption)}
                               style={({ pressed }) => [
                                 stylesForTheme.calendarTimeOption,
                                 pressed && stylesForTheme.buttonPressed,
@@ -1806,10 +2500,7 @@ export default function JourneyScreen() {
                           {TIME_OPTIONS.map((timeOption) => (
                             <Pressable
                               key={`end-${timeOption}`}
-                              onPress={() => {
-                                setCalendarEndTime(timeOption);
-                                scrollCalendarTimeWheel(calendarEndTimeRef, timeOption, true);
-                              }}
+                              onPress={() => selectCalendarTimeOption('end', timeOption)}
                               style={({ pressed }) => [
                                 stylesForTheme.calendarTimeOption,
                                 pressed && stylesForTheme.buttonPressed,
@@ -1975,10 +2666,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'stretch',
   },
+  chartRowExpanded: {
+    width: '100%',
+    alignSelf: 'center',
+  },
   chartYAxisTitleCol: {
-    width: 14,
+    width: 20,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  chartYAxisTitleColExpanded: {
+    width: 34,
   },
   chartCanvasGlow: {
     flex: 1,
@@ -1989,12 +2687,17 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 8,
   },
+  chartCanvasGlowExpanded: {
+    flexShrink: 1,
+    minWidth: 0,
+    maxWidth: '100%',
+  },
   chartPlotRow: {
     flexDirection: 'row',
   },
   chartCanvas: {
     flex: 1,
-    minHeight: 208,
+    minHeight: 214,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.10)',
@@ -2002,7 +2705,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(3, 5, 10, 0.54)',
     paddingTop: 14,
     paddingRight: 14,
-    paddingBottom: 14,
+    paddingBottom: 18,
+  },
+  chartPreviewHoldTarget: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 5,
+  },
+  chartCanvasExpanded: {
+    minHeight: 284,
+    paddingTop: 12,
+    paddingRight: 10,
+    paddingBottom: 12,
+  },
+  chartCanvasInner: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  chartCanvasInnerExpanded: {
+    width: '100%',
   },
   chartPlotScroll: {
     flexGrow: 0,
@@ -2020,7 +2740,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   chartYAxisTitle: {
-    width: 120,
+    width: 136,
     color: 'rgba(255,255,255,0.42)',
     fontSize: 9,
     fontWeight: '900',
@@ -2028,19 +2748,9 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     transform: [{ rotate: '-90deg' }],
   },
-  chartXAxis: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 4,
-    marginTop: -6,
-    paddingHorizontal: 2,
-  },
-  chartXAxisLabel: {
-    flex: 1,
-    color: 'rgba(255,255,255,0.46)',
-    fontSize: 9,
-    fontWeight: '800',
-    textAlign: 'center',
+  chartYAxisTitleExpanded: {
+    width: 178,
+    fontSize: 10,
   },
   chartXAxisTitle: {
     color: 'rgba(255,255,255,0.48)',
@@ -2064,6 +2774,82 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.68)',
     fontSize: 11,
     fontWeight: '800',
+  },
+  chartHoldHint: {
+    position: 'absolute',
+    left: 14,
+    bottom: 10,
+    zIndex: 6,
+    color: 'rgba(255,255,255,0.52)',
+    fontSize: 9,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  fittedChartWrap: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    transform: [{ translateY: 18 }],
+  },
+  fittedChartPanViewport: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: 'rgba(3, 5, 10, 0.54)',
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  fittedChartPanContent: {
+    position: 'relative',
+  },
+  fittedChartXAxisTitle: {
+    position: 'absolute',
+    bottom: 7,
+    left: 0,
+    right: 0,
+    color: 'rgba(160,170,185,0.85)',
+    fontSize: 9,
+    fontWeight: '900',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    zIndex: 4,
+  },
+  zoomControlsOverlay: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    zIndex: 10,
+  },
+  zoomControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(4, 5, 12, 0.78)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+  },
+  zoomBtn: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zoomBtnText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+    lineHeight: 22,
+    includeFontPadding: false,
+  },
+  zoomPct: {
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 11,
+    fontWeight: '900',
+    minWidth: 34,
+    textAlign: 'center',
   },
 });
 
@@ -2116,10 +2902,9 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           position: 'relative',
           overflow: 'hidden',
           borderWidth: 1,
-          borderColor:
-            theme.scheme === 'dark' ? 'rgba(255,255,255,0.13)' : 'rgba(10,11,15,0.12)',
+          borderColor: theme.scheme === 'dark' ? 'rgba(255,255,255,0.13)' : theme.colors.border,
           borderRadius: 30,
-          backgroundColor: 'transparent',
+          backgroundColor: theme.scheme === 'dark' ? 'transparent' : 'rgba(255,255,255,0.56)',
           padding: 14,
           marginBottom: 14,
           ...theme.shadow,
@@ -2249,13 +3034,17 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
         },
         analyticsPanel: {
           borderWidth: 1,
-          borderColor: theme.ink(0.11),
+          borderColor: theme.scheme === 'dark' ? theme.ink(0.11) : theme.colors.border,
           borderRadius: 28,
           backgroundColor:
-            theme.scheme === 'dark' ? 'rgba(16,18,26,0.78)' : 'rgba(255,255,255,0.78)',
+            theme.scheme === 'dark' ? 'rgba(16,18,26,0.78)' : 'rgba(255,255,255,0.56)',
           padding: 16,
           marginBottom: 16,
           ...theme.shadow,
+        },
+        analyticsPanelLight: {
+          marginLeft: -12,
+          paddingLeft: 28,
         },
         panelTopRow: {
           flexDirection: 'row',
@@ -2430,9 +3219,9 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           width: '48%',
           minHeight: 130,
           borderWidth: 1,
-          borderColor: theme.ink(0.1),
+          borderColor: theme.scheme === 'dark' ? theme.ink(0.1) : theme.colors.border,
           borderRadius: 22,
-          backgroundColor: 'transparent',
+          backgroundColor: theme.scheme === 'dark' ? 'transparent' : 'rgba(255,255,255,0.56)',
           padding: 14,
           ...theme.shadow,
         },
@@ -2503,9 +3292,9 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
         },
         calendarPanel: {
           borderWidth: 1,
-          borderColor: theme.ink(0.11),
+          borderColor: theme.scheme === 'dark' ? theme.ink(0.11) : theme.colors.border,
           borderRadius: 28,
-          backgroundColor: 'transparent',
+          backgroundColor: theme.scheme === 'dark' ? 'transparent' : 'rgba(255,255,255,0.56)',
           padding: 16,
           marginBottom: 16,
           ...theme.shadow,
@@ -2987,16 +3776,16 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           width: 166,
           minHeight: 142,
           borderWidth: 1,
-          borderColor: theme.ink(0.1),
+          borderColor: theme.scheme === 'dark' ? theme.ink(0.1) : theme.colors.border,
           borderRadius: 22,
-          backgroundColor: 'transparent',
+          backgroundColor: theme.scheme === 'dark' ? 'transparent' : 'rgba(255,255,255,0.56)',
           opacity: 0.54,
           padding: 16,
         },
         achievementCardUnlocked: {
           opacity: 1,
           borderColor: 'rgba(177,18,38,0.30)',
-          backgroundColor: 'transparent',
+          backgroundColor: theme.scheme === 'dark' ? 'transparent' : 'rgba(255,255,255,0.56)',
         },
         achievementIcon: {
           width: 42,
@@ -3048,6 +3837,88 @@ function useStyles(theme: AppTheme, timerState: TimerState) {
           backgroundColor: theme.colors.surface,
           padding: 22,
           ...theme.shadow,
+        },
+        chartModalCard: {
+          width: '98%',
+          maxWidth: 720,
+          minHeight: 382,
+          maxHeight: '86%',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 1,
+          borderColor: theme.ink(0.14),
+          borderRadius: 26,
+          backgroundColor: theme.scheme === 'light' ? 'rgba(192, 200, 214, 0.98)' : 'rgba(5, 7, 13, 0.96)',
+          paddingHorizontal: 10,
+          paddingTop: 10,
+          paddingBottom: 34,
+          ...theme.shadow,
+        },
+        chartModalTopBar: {
+          width: '100%',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 4,
+          marginBottom: 8,
+        },
+        chartZoomControls: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+          backgroundColor: theme.scheme === 'light' ? 'rgba(226, 232, 240, 0.92)' : theme.ink(0.12),
+          borderWidth: 1,
+          borderColor: theme.scheme === 'light' ? 'rgba(148, 163, 184, 0.45)' : theme.ink(0.15),
+          borderRadius: 999,
+          paddingVertical: 5,
+          paddingHorizontal: 10,
+        },
+        chartZoomBtn: {
+          width: 26,
+          height: 26,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        chartZoomBtnText: {
+          color: theme.colors.text,
+          fontSize: 20,
+          fontWeight: '600',
+          lineHeight: 24,
+          includeFontPadding: false,
+        },
+        chartZoomMinusBar: {
+          width: 11,
+          height: 2,
+          borderRadius: 1,
+          backgroundColor: theme.colors.text,
+        },
+        chartZoomPct: {
+          color: theme.scheme === 'light' ? theme.colors.text : theme.colors.textMuted,
+          fontSize: 12,
+          fontWeight: '900',
+          minWidth: 40,
+          textAlign: 'center',
+        },
+        chartModalGraphWrap: {
+          width: '100%',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        chartModalClose: {
+          width: 36,
+          height: 36,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 1,
+          borderColor: theme.scheme === 'light' ? 'rgba(148, 163, 184, 0.45)' : theme.ink(0.16),
+          borderRadius: 18,
+          backgroundColor: theme.scheme === 'light' ? 'rgba(226, 232, 240, 0.92)' : theme.ink(0.08),
+        },
+        chartModalCloseText: {
+          color: theme.colors.text,
+          fontSize: 24,
+          fontWeight: '900',
+          lineHeight: 26,
         },
         calendarConfirmCard: {
           paddingTop: 24,

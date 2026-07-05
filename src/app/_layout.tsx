@@ -1,4 +1,5 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { SymbolView } from 'expo-symbols';
 import { Stack, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
@@ -24,6 +25,7 @@ function BackHeaderButton() {
         router.replace('/(tabs)');
       }}
       style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}>
+      <SymbolView name="chevron.left" size={22} tintColor={theme.colors.text} weight="bold" />
       <Text style={[styles.backArrow, { color: theme.colors.text }]}>‹</Text>
     </Pressable>
   );
@@ -168,6 +170,23 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="ai-plan"
+        options={{
+          headerBackTitle: '',
+          headerBackButtonDisplayMode: 'minimal',
+          headerShown: true,
+          headerBackVisible: false,
+          headerLeft: () => <BackHeaderButton />,
+          headerTitle: '',
+          headerBackground: () => null,
+          headerTransparent: true,
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: 'transparent' },
+          headerTintColor: accentColor,
+          title: '',
+        }}
+      />
+      <Stack.Screen
         name="how-to-use"
         options={{
           headerBackTitle: '',
@@ -208,6 +227,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.94 }],
   },
   backArrow: {
+    display: 'none',
     color: '#FFFFFF',
     fontSize: 42,
     fontWeight: '900',

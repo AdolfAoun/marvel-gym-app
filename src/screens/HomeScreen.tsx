@@ -229,12 +229,6 @@ type DurationSliderProps = {
 
 const THUMB_SIZE = 30;
 
-// While dragging fast across many values, a buzz-per-week feels like a buzz saw.
-// A value only gets a haptic once the finger has rested on it for this long —
-// i.e. the drag has slowed down or stopped there. The final value on release
-// always gets a haptic immediately, even if it hasn't "rested" yet.
-const HAPTIC_SETTLE_MS = 70;
-
 function DurationSlider({ value, min, max, accent, trackColor, onChange }: DurationSliderProps) {
   const [trackW, setTrackW] = useState(0);
   const trackWRef = useRef(0);
@@ -245,13 +239,14 @@ function DurationSlider({ value, min, max, accent, trackColor, onChange }: Durat
   const lastValueRef = useRef(value);
   lastValueRef.current = value;
   const lastHapticValueRef = useRef(value);
-  const hapticTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // Continuous 0..1 thumb position while dragging (null → follow `value`). This is
-  // what makes the drag feel smooth: the thumb tracks the finger exactly, while the
-  // whole-week value only steps as it crosses a boundary.
+  // Continuous 0..1 thumb position while dragging (null means follow `value`).
+  // The selected whole value is committed only on release/tap, so the thumb never
+  // visually catches on each month/week while the finger is moving.
   const [dragRatio, setDragRatio] = useState<number | null>(null);
   const startRatioRef = useRef(0);
+  const touchStartRatioRef = useRef(0);
+  const hasMovedRef = useRef(false);
 
   const buzzFor = (next: number) => {
     if (next === lastHapticValueRef.current) return;
@@ -259,23 +254,17 @@ function DurationSlider({ value, min, max, accent, trackColor, onChange }: Durat
     Haptics.selectionAsync();
   };
 
-  const emitFromRatio = (ratio: number, settle: boolean) => {
+  const commitFromRatio = (ratio: number) => {
     const { min: lo, max: hi } = rangeRef.current;
     const clamped = Math.max(0, Math.min(1, ratio));
     const next = Math.round(lo + clamped * (hi - lo));
-
-    if (hapticTimerRef.current) clearTimeout(hapticTimerRef.current);
 
     if (next !== lastValueRef.current) {
       lastValueRef.current = next;
       onChangeRef.current(next);
     }
 
-    if (settle) {
-      buzzFor(next);
-    } else {
-      hapticTimerRef.current = setTimeout(() => buzzFor(next), HAPTIC_SETTLE_MS);
-    }
+    buzzFor(next);
   };
 
   const responder = useRef(
@@ -285,24 +274,34 @@ function DurationSlider({ value, min, max, accent, trackColor, onChange }: Durat
       onPanResponderGrant: (event) => {
         const w = trackWRef.current;
         if (w <= 0) return;
-        const ratio = Math.max(0, Math.min(1, event.nativeEvent.locationX / w));
-        startRatioRef.current = ratio;
-        setDragRatio(ratio);
-        emitFromRatio(ratio, false);
+        const valueRatio =
+          rangeRef.current.max > rangeRef.current.min
+            ? (lastValueRef.current - rangeRef.current.min) /
+              (rangeRef.current.max - rangeRef.current.min)
+            : 0;
+        const currentRatio = Math.max(0, Math.min(1, valueRatio));
+        touchStartRatioRef.current = Math.max(0, Math.min(1, event.nativeEvent.locationX / w));
+        startRatioRef.current = currentRatio;
+        hasMovedRef.current = false;
+        setDragRatio(currentRatio);
       },
       onPanResponderMove: (_event, gesture) => {
         const w = trackWRef.current;
         if (w <= 0) return;
+        hasMovedRef.current = true;
         const ratio = Math.max(0, Math.min(1, startRatioRef.current + gesture.dx / w));
         setDragRatio(ratio);
-        emitFromRatio(ratio, false);
       },
       onPanResponderRelease: (_event, gesture) => {
         const w = trackWRef.current;
         if (w > 0) {
-          const ratio = Math.max(0, Math.min(1, startRatioRef.current + gesture.dx / w));
-          emitFromRatio(ratio, true);
+          const didDrag = hasMovedRef.current || Math.abs(gesture.dx) > 2 || Math.abs(gesture.dy) > 2;
+          const ratio = didDrag
+            ? Math.max(0, Math.min(1, startRatioRef.current + gesture.dx / w))
+            : touchStartRatioRef.current;
+          commitFromRatio(ratio);
         }
+        hasMovedRef.current = false;
         setDragRatio(null);
       },
       onPanResponderTerminate: () => setDragRatio(null),
@@ -368,6 +367,7 @@ const sliderStyles = StyleSheet.create({
 export default function HomeScreen() {
   const theme = useAppTheme();
   const styles = useStyles(theme);
+  const isLightMode = theme.scheme === 'light';
   const router = useRouter();
   const { width: windowWidth } = useWindowDimensions();
   // Big swipeable feature cards (Machine Guide / AI Gym Help) snap one-per-view
@@ -791,7 +791,14 @@ export default function HomeScreen() {
                 <Text style={styles.kickerAccent}>Welcome</Text>
                 <Text> Back</Text>
               </Text>
-              <Text style={styles.title}>{member?.firstName ?? 'Athlete'}</Text>
+              <Text
+                style={[
+                  styles.title,
+                  isLightMode && { color: theme.colors.text, textShadowColor: 'transparent' },
+                  member?.firstName === 'Guest' && styles.guestTitle,
+                ]}>
+                {member?.firstName ?? 'Athlete'}
+              </Text>
             </View>
             <View style={styles.avatarBadge}>
               {member?.profileImageUri ? (
@@ -937,19 +944,24 @@ export default function HomeScreen() {
           <View style={styles.daysGlassCard}>
             <LinearGradient
               pointerEvents="none"
-              colors={['rgba(177,18,38,0.08)', 'rgba(255,255,255,0.02)']}
+              colors={
+                isLightMode
+                  ? ['rgba(225,29,46,0.18)', 'rgba(177,18,38,0.07)', 'rgba(255,255,255,0.04)']
+                  : ['rgba(177,18,38,0.08)', 'rgba(255,255,255,0.02)']
+              }
+              locations={isLightMode ? [0, 0.42, 1] : undefined}
               style={StyleSheet.absoluteFill}
             />
             <View style={styles.daysTopRow}>
               <View>
-                <Text style={[styles.daysNumber, { color: countdownColor }]}>
+                <Text style={[styles.daysNumber, { color: isLightMode ? theme.colors.text : countdownColor }]}>
                   {daysRemaining}
                 </Text>
-                <Text style={styles.daysLabel}>Days Remaining</Text>
+                <Text style={[styles.daysLabel, isLightMode && { color: theme.colors.text }]}>Days Remaining</Text>
               </View>
               <View style={styles.daysStatusPill}>
                 <View style={[styles.statusDot, { backgroundColor: statusTone }]} />
-                <Text style={styles.daysStatusText}>{status ?? 'Pending'}</Text>
+                <Text style={[styles.daysStatusText, isLightMode && { color: theme.colors.text }]}>{status ?? 'Pending'}</Text>
               </View>
             </View>
             <View style={styles.membershipTrack}>
@@ -964,10 +976,10 @@ export default function HomeScreen() {
               />
             </View>
             <View style={styles.daysMetaRow}>
-              <Text style={styles.daysMetaText}>
+              <Text style={[styles.daysMetaText, isLightMode && { color: theme.colors.text }]}>
                 {Math.round(membershipProgress * 100)}% of plan remaining
               </Text>
-              <Text style={styles.daysMetaText}>{expiryDate}</Text>
+              <Text style={[styles.daysMetaText, isLightMode && { color: theme.colors.text }]}>{expiryDate}</Text>
             </View>
           </View>
         </View>
@@ -994,6 +1006,7 @@ export default function HomeScreen() {
               style={({ pressed }) => [
                 styles.actionChip,
                 styles.actionChipRenew,
+                isLightMode && styles.actionChipLightGrey,
                 pressed && styles.buttonPressed,
               ]}>
               <LinearGradient
@@ -1016,6 +1029,7 @@ export default function HomeScreen() {
               style={({ pressed }) => [
                 styles.actionChip,
                 styles.actionChipFreeze,
+                isLightMode && styles.actionChipLightGrey,
                 pressed && styles.buttonPressed,
               ]}>
               <LinearGradient
@@ -1036,6 +1050,7 @@ export default function HomeScreen() {
               style={({ pressed }) => [
                 styles.actionChip,
                 styles.actionChipRenew,
+                isLightMode && styles.actionChipLightGrey,
                 !canShowQr && styles.actionCardDisabled,
                 pressed && styles.buttonPressed,
               ]}>
@@ -1251,7 +1266,7 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        <View style={styles.activityPanel}>
+        <View style={[styles.activityPanel, isLightMode && styles.activityPanelLight]}>
           <View style={styles.daySelector}>
             <GlowingChips
               items={activitySchedule.map((item) => ({
@@ -1268,10 +1283,10 @@ export default function HomeScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.activityChart}>
+            contentContainerStyle={[styles.activityChart, isLightMode && styles.activityChartLight]}>
             {selectedActivityDay?.levels.map((item) => (
               <View key={item.id} style={styles.activityColumn}>
-                <Text style={styles.activityValue}>
+                <Text style={[styles.activityValue, isLightMode && { color: theme.colors.text }]}>
                   {getCrowdLevelLabel(item.count)}
                 </Text>
                 <View style={styles.activityTrack}>
@@ -1308,6 +1323,8 @@ export default function HomeScreen() {
               style={({ pressed }) => [
                 styles.requestLinkCard,
                 styles.requestLinkCardPayments,
+                isLightMode && styles.requestLinkCardGlass,
+                isLightMode && styles.requestLinkCardPaymentsLight,
                 pressed && styles.buttonPressed,
               ]}>
               <LinearGradient
@@ -1330,11 +1347,11 @@ export default function HomeScreen() {
                   <Text style={styles.requestLinkCountText}>{paymentVouchers.length}</Text>
                 </View>
               </View>
-              <Text style={styles.requestLinkTitle}>Vouchers</Text>
-              <Text style={styles.requestLinkBody}>
+              <Text style={[styles.requestLinkTitle, isLightMode && { color: theme.colors.text }]}>Vouchers</Text>
+              <Text style={[styles.requestLinkBody, isLightMode && { color: theme.colors.textMuted }]}>
                 Renewals, freezes, and shop requests paid at the counter.
               </Text>
-              <Text style={styles.requestLinkMeta}>
+              <Text style={[styles.requestLinkMeta, isLightMode && { color: theme.colors.text }]}>
                 {pendingPaymentVoucherCount} pending
               </Text>
             </Pressable>
@@ -1344,6 +1361,8 @@ export default function HomeScreen() {
               style={({ pressed }) => [
                 styles.requestLinkCard,
                 styles.requestLinkCardReservations,
+                isLightMode && styles.requestLinkCardGlass,
+                isLightMode && styles.requestLinkCardReservationsLight,
                 pressed && styles.buttonPressed,
               ]}>
               <LinearGradient
@@ -1366,11 +1385,11 @@ export default function HomeScreen() {
                   <Text style={styles.requestLinkCountText}>{reservationVouchers.length}</Text>
                 </View>
               </View>
-              <Text style={styles.requestLinkTitle}>My Reservations</Text>
-              <Text style={styles.requestLinkBody}>
+              <Text style={[styles.requestLinkTitle, isLightMode && { color: theme.colors.text }]}>My Reservations</Text>
+              <Text style={[styles.requestLinkBody, isLightMode && { color: theme.colors.textMuted }]}>
                 See every pending, confirmed, and canceled class booking.
               </Text>
-              <Text style={styles.requestLinkMeta}>
+              <Text style={[styles.requestLinkMeta, isLightMode && { color: theme.colors.text }]}>
                 {pendingReservationCount} pending
               </Text>
             </Pressable>
@@ -1478,9 +1497,11 @@ export default function HomeScreen() {
               />
 
               <View style={styles.selectorScaleRow}>
-                <Text style={styles.selectorScaleText}>1 {isFreezeSheet ? 'wk' : 'mo'}</Text>
                 <Text style={styles.selectorScaleText}>
-                  {isFreezeSheet ? 12 : maxRenewMonths} {isFreezeSheet ? 'wks' : 'mos'}
+                  - {isFreezeSheet ? '1 Week' : '1 Month'}
+                </Text>
+                <Text style={styles.selectorScaleText}>
+                  + {isFreezeSheet ? '12 Weeks' : '12 Months'}
                 </Text>
               </View>
             </View>
@@ -1654,7 +1675,7 @@ function useStyles(theme: AppTheme) {
     transform: [{ translateY: 3 }],
   },
   kicker: {
-    color: '#FFFFFF',
+    color: theme.scheme === 'light' ? theme.colors.text : '#FFFFFF',
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 1.5,
@@ -1673,6 +1694,9 @@ function useStyles(theme: AppTheme) {
     textShadowColor: 'rgba(0, 0, 0, 0.25)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
+  },
+  guestTitle: {
+    transform: [{ translateY: 8 }],
   },
   subtitle: {
     color: 'rgba(255, 255, 255, 0.85)',
@@ -1756,7 +1780,7 @@ function useStyles(theme: AppTheme) {
     elevation: 6,
   },
   whatsNewLabelText: {
-    color: 'rgba(203, 213, 225, 0.96)',
+    color: theme.scheme === 'light' ? theme.colors.text : 'rgba(203, 213, 225, 0.96)',
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 2.5,
@@ -1913,14 +1937,14 @@ function useStyles(theme: AppTheme) {
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: theme.scheme === 'light' ? 'rgba(177,18,38,0.18)' : 'rgba(255,255,255,0.12)',
     borderRadius: 26,
-    backgroundColor: 'rgba(18,20,28,0.82)',
+    backgroundColor: theme.scheme === 'light' ? 'rgba(255,255,255,0.22)' : 'rgba(18,20,28,0.82)',
     width: '100%',
     padding: 18,
-    shadowColor: '#000000',
+    shadowColor: theme.scheme === 'light' ? '#E11D2E' : '#000000',
     shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.52,
+    shadowOpacity: theme.scheme === 'light' ? 0.12 : 0.52,
     shadowRadius: 32,
     elevation: 12,
   },
@@ -1968,7 +1992,7 @@ function useStyles(theme: AppTheme) {
     lineHeight: 58,
   },
   daysLabel: {
-    color: theme.ink(0.72),
+    color: theme.scheme === 'light' ? '#FFFFFF' : theme.ink(0.72),
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0,
@@ -1986,7 +2010,7 @@ function useStyles(theme: AppTheme) {
     paddingHorizontal: 12,
   },
   daysStatusText: {
-    color: theme.colors.text,
+    color: theme.scheme === 'light' ? '#FFFFFF' : theme.colors.text,
     fontSize: 11,
     fontWeight: '900',
     textTransform: 'uppercase',
@@ -2009,7 +2033,7 @@ function useStyles(theme: AppTheme) {
     marginTop: 8,
   },
   daysMetaText: {
-    color: theme.ink(0.62),
+    color: theme.scheme === 'light' ? '#FFFFFF' : theme.ink(0.62),
     flexShrink: 1,
     fontSize: 11,
     fontWeight: '800',
@@ -2088,6 +2112,10 @@ function useStyles(theme: AppTheme) {
     shadowRadius: 22,
     elevation: 6,
   },
+  activityPanelLight: {
+    borderColor: theme.colors.border,
+    backgroundColor: 'rgba(255,255,255,0.56)',
+  },
   voucherRail: {
     gap: 12,
     paddingRight: 4,
@@ -2149,6 +2177,12 @@ function useStyles(theme: AppTheme) {
     shadowOpacity: 0.22,
     shadowRadius: 14,
     elevation: 4,
+  },
+  actionChipLightGrey: {
+    borderColor: 'rgba(10,11,15,0.14)',
+    backgroundColor: 'rgba(232,234,238,0.68)',
+    shadowColor: '#E11D2E',
+    shadowOpacity: 0.10,
   },
   actionIconWrap: {
     width: 38,
@@ -2388,6 +2422,10 @@ function useStyles(theme: AppTheme) {
     paddingBottom: 14,
     paddingRight: 16,
   },
+  activityChartLight: {
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+  },
   activityColumn: {
     width: 42,
     alignItems: 'center',
@@ -2446,6 +2484,18 @@ function useStyles(theme: AppTheme) {
   requestLinkCardReservations: {
     borderColor: 'rgba(225, 29, 46, 0.2)',
     backgroundColor: 'transparent',
+  },
+  requestLinkCardGlass: {
+    borderColor: 'rgba(10,11,15,0.78)',
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    shadowColor: '#E11D2E',
+    shadowOpacity: 0.12,
+  },
+  requestLinkCardPaymentsLight: {
+    backgroundColor: 'rgba(76,42,158,0.16)',
+  },
+  requestLinkCardReservationsLight: {
+    backgroundColor: 'rgba(177,18,38,0.14)',
   },
   requestLinkTopRow: {
     flexDirection: 'row',

@@ -22,6 +22,7 @@ import Body, { type ExtendedBodyPart, type Slug } from 'react-native-body-highli
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
 import { machineGuideService } from '@/services';
+import { useAppTheme } from '@/theme/useAppTheme';
 import type { MachineGuide } from '@/types';
 
 // ─── Muscle taxonomy ─────────────────────────────────────────────────────────
@@ -55,20 +56,20 @@ const MUSCLES: MuscleDef[] = [
   { key: 'Upper Back',           region: 'Back',       label: 'Upper Back',      short: 'Upper Back',     slug: 'upper-back', side: 'back',  color: '#6E4FCF' },
   { key: 'Lower Back',           region: 'Lower Back', label: 'Lower Back',      short: 'Lower Back',     slug: 'lower-back', side: 'back',  color: '#4C2A9E' },
   // Traps
-  { key: 'Upper Traps',          region: 'Traps',     label: 'Upper Traps',      short: 'Upper',          slug: 'trapezius',  side: 'back',  color: '#C4B5FD' },
-  { key: 'Lower Traps',          region: 'Traps',     label: 'Lower Traps',      short: 'Lower',          slug: 'trapezius',  side: 'back',  color: '#DDD6FE' },
+  { key: 'Upper Traps',          region: 'Traps',     label: 'Upper Traps',      short: 'Upper',          slug: 'trapezius',  side: 'back',  color: '#7C3AED' },
+  { key: 'Lower Traps',          region: 'Traps',     label: 'Lower Traps',      short: 'Lower',          slug: 'trapezius',  side: 'back',  color: '#6D28D9' },
   // Shoulders
   { key: 'Anterior Deltoid',     region: 'Shoulders', label: 'Front Delts',      short: 'Front Delts',    slug: 'deltoids',   side: 'front', color: '#FB923C' },
   { key: 'Lateral Deltoid',      region: 'Shoulders', label: 'Side Delts',       short: 'Side Delts',     slug: 'deltoids',   side: 'both',  color: '#F97316' },
-  { key: 'Posterior Deltoid',    region: 'Shoulders', label: 'Rear Delts',       short: 'Rear Delts',     slug: 'deltoids',   side: 'back',  color: '#FDBA74' },
+  { key: 'Posterior Deltoid',    region: 'Shoulders', label: 'Rear Delts',       short: 'Rear Delts',     slug: 'deltoids',   side: 'back',  color: '#C2410C' },
   // Biceps
   { key: 'Bicep Long Head',      region: 'Biceps',    label: 'Biceps Long Head', short: 'Long Head',      slug: 'biceps',     side: 'front', color: '#34D399' },
   { key: 'Bicep Short Head',     region: 'Biceps',    label: 'Biceps Short Head',short: 'Short Head',     slug: 'biceps',     side: 'front', color: '#10B981' },
-  { key: 'Brachialis',           region: 'Biceps',    label: 'Brachialis',       short: 'Brachialis',     slug: 'biceps',     side: 'front', color: '#6EE7B7' },
+  { key: 'Brachialis',           region: 'Biceps',    label: 'Brachialis',       short: 'Brachialis',     slug: 'biceps',     side: 'front', color: '#047857' },
   // Triceps
   { key: 'Tricep Long Head',     region: 'Triceps',   label: 'Triceps Long Head',    short: 'Long Head',    slug: 'triceps',    side: 'back',  color: '#2DD4BF' },
   { key: 'Tricep Lateral Head',  region: 'Triceps',   label: 'Triceps Lateral Head', short: 'Lateral Head', slug: 'triceps',    side: 'back',  color: '#14B8A6' },
-  { key: 'Tricep Medial Head',   region: 'Triceps',   label: 'Triceps Medial Head',  short: 'Medial Head',  slug: 'triceps',    side: 'back',  color: '#5EEAD4' },
+  { key: 'Tricep Medial Head',   region: 'Triceps',   label: 'Triceps Medial Head',  short: 'Medial Head',  slug: 'triceps',    side: 'back',  color: '#0F766E' },
   // Forearms
   { key: 'Forearm Extensors',    region: 'Forearms',  label: 'Forearm Extensors',short: 'Extensors',      slug: 'forearm',    side: 'both',  color: '#A3E635' },
   { key: 'Forearm Flexors',      region: 'Forearms',  label: 'Forearm Flexors',  short: 'Flexors',        slug: 'forearm',    side: 'both',  color: '#84CC16' },
@@ -81,17 +82,17 @@ const MUSCLES: MuscleDef[] = [
   // Glutes
   { key: 'Gluteus Maximus',      region: 'Glutes',    label: 'Glute Max',        short: 'Glute Max',      slug: 'gluteal',    side: 'back',  color: '#FB7185' },
   { key: 'Gluteus Medius',       region: 'Glutes',    label: 'Glute Med',        short: 'Glute Med',      slug: 'gluteal',    side: 'back',  color: '#F43F5E' },
-  { key: 'Gluteus Minimus',      region: 'Glutes',    label: 'Glute Min',        short: 'Glute Min',      slug: 'gluteal',    side: 'back',  color: '#FDA4AF' },
+  { key: 'Gluteus Minimus',      region: 'Glutes',    label: 'Glute Min',        short: 'Glute Min',      slug: 'gluteal',    side: 'back',  color: '#BE123C' },
   // Calves & shin — nobody at the gym says "gastroc / soleus", so both machines
   // just live under one "Calves".
-  { key: 'Gastrocnemius',        region: 'Calves',    label: 'Calves',           short: 'Calves',         slug: 'calves',     side: 'both',  color: '#FCA5A5' },
-  { key: 'Soleus',               region: 'Calves',    label: 'Calves',           short: 'Calves',         slug: 'calves',     side: 'both',  color: '#FCA5A5' },
-  { key: 'Tibialis Anterior',    region: 'Shins',     label: 'Shins',            short: 'Shins',          slug: 'tibialis',   side: 'front', color: '#FECACA' },
+  { key: 'Gastrocnemius',        region: 'Calves',    label: 'Calves',           short: 'Calves',         slug: 'calves',     side: 'both',  color: '#DC2626' },
+  { key: 'Soleus',               region: 'Calves',    label: 'Calves',           short: 'Calves',         slug: 'calves',     side: 'both',  color: '#DC2626' },
+  { key: 'Tibialis Anterior',    region: 'Shins',     label: 'Shins',            short: 'Shins',          slug: 'tibialis',   side: 'front', color: '#B91C1C' },
   // Core — Abs is one block on the figure, so its parts live in the boxes.
   // Obliques have their own spot on the figure, so they stand alone.
-  { key: 'Upper Abs',            region: 'Abs',       label: 'Upper Abs',        short: 'Upper',          slug: 'abs',        side: 'front', color: '#F472B6' },
+  { key: 'Upper Abs',            region: 'Abs',       label: 'Upper Abs',        short: 'Upper',          slug: 'abs',        side: 'front', color: '#DB2777' },
   { key: 'Lower Abs',            region: 'Abs',       label: 'Lower Abs',        short: 'Lower',          slug: 'abs',        side: 'front', color: '#EC4899' },
-  { key: 'Transverse Abdominis', region: 'Abs',       label: 'Deep Core (TVA)',  short: 'Deep Core',      slug: 'abs',        side: 'front', color: '#F9A8D4' },
+  { key: 'Transverse Abdominis', region: 'Abs',       label: 'Deep Core (TVA)',  short: 'Deep Core',      slug: 'abs',        side: 'front', color: '#BE185D' },
   { key: 'Obliques',             region: 'Obliques',  label: 'Obliques',         short: 'Obliques',       slug: 'obliques',   side: 'front', color: '#DB2777' },
   // Inner thigh
   { key: 'Adductors',            region: 'Inner Thighs', label: 'Inner Thighs',  short: 'Inner Thighs',   slug: 'adductors',  side: 'front', color: '#EF4444' },
@@ -163,6 +164,8 @@ function getMachineImage(name: string, imageUri?: string): string {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function MachineGuideScreen() {
+  const theme = useAppTheme();
+  const isLightMode = theme.scheme === 'light';
   const [guides, setGuides]               = useState<MachineGuide[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<MuscleGroupKey>('Upper Chest');
   const [selectedGuide, setSelectedGuide] = useState<MachineGuide | undefined>();
@@ -304,9 +307,9 @@ export default function MachineGuideScreen() {
       slug,
       color: slug === selectedSlug
         ? colorOf(selectedGroup)
-        : 'rgba(255,255,255,0.10)',
+        : isLightMode ? 'rgba(10,11,15,0.14)' : 'rgba(255,255,255,0.10)',
     }));
-  }, [availableGroups, selectedGroup]);
+  }, [availableGroups, isLightMode, selectedGroup]);
 
   // Auto-switch to the side where a muscle is actually visible
   const showMuscleSide = (group: MuscleGroupKey) => {
@@ -344,7 +347,7 @@ export default function MachineGuideScreen() {
   if (isLoading) {
     return (
       <PremiumScreenBackground>
-        <StatusBar style="light" />
+        <StatusBar style={isLightMode ? 'dark' : 'light'} />
         <View style={styles.loadingState}>
           <ActivityIndicator color={premiumColors.redBright} size="large" />
           <Text style={styles.loadingText}>Loading machine guide...</Text>
@@ -355,7 +358,7 @@ export default function MachineGuideScreen() {
 
   return (
     <PremiumScreenBackground>
-      <StatusBar style="light" />
+      <StatusBar style={isLightMode ? 'dark' : 'light'} />
 
       <ScrollView
         ref={scrollRef}
@@ -364,9 +367,9 @@ export default function MachineGuideScreen() {
 
         {/* ── Page Header ─────────────────────────────────────────────── */}
         <View style={styles.pageHeader}>
-          <Text style={styles.pageEyebrow}>MARVEL GYM</Text>
-          <Text style={styles.pageTitle}>MACHINE{'\n'}GUIDE</Text>
-          <Text style={styles.pageSubtitle}>
+          <Text style={[styles.pageEyebrow, isLightMode && { color: theme.colors.redBright }]}>MARVEL GYM</Text>
+          <Text style={[styles.pageTitle, isLightMode && { color: theme.colors.text, textShadowColor: 'transparent' }]}>MACHINE{'\n'}GUIDE</Text>
+          <Text style={[styles.pageSubtitle, isLightMode && { color: theme.colors.textMuted }]}>
             Tap a muscle on the body to see the machines that train it.
           </Text>
           <View style={styles.headerDivider} />
@@ -376,7 +379,16 @@ export default function MachineGuideScreen() {
         <View style={styles.bodyMapSection}>
 
           {/* Front / Back toggle */}
-          <View style={styles.viewToggle} {...togglePanResponder.panHandlers}>
+          <View
+            style={[
+              styles.viewToggle,
+              isLightMode && {
+                backgroundColor: 'rgba(255,255,255,0.62)',
+                borderColor: theme.colors.border,
+                borderWidth: 1,
+              },
+            ]}
+            {...togglePanResponder.panHandlers}>
             <Animated.View
               pointerEvents="none"
               style={[
@@ -408,7 +420,12 @@ export default function MachineGuideScreen() {
                     side === 'front' ? styles.viewToggleBtnLeft : styles.viewToggleBtnRight,
                     pressed && { opacity: 0.75 },
                   ]}>
-                  <Text style={[styles.viewToggleText, isActive && styles.viewToggleTextActive]}>
+                  <Text
+                    style={[
+                      styles.viewToggleText,
+                      isLightMode && { color: theme.colors.text },
+                      isActive && styles.viewToggleTextActive,
+                    ]}>
                     {side === 'front' ? 'Front' : 'Back'}
                   </Text>
                 </Pressable>
@@ -424,7 +441,7 @@ export default function MachineGuideScreen() {
                 {selectedRegion}
               </Text>
             </View>
-            <Text style={styles.selectedMuscleMeta}>
+            <Text style={[styles.selectedMuscleMeta, isLightMode && { color: theme.colors.textMuted }]}>
               {showRegionParts
                 ? `${labelOf(selectedGroup)} · ${selectedGuides.length} machine${selectedGuides.length === 1 ? '' : 's'}`
                 : `${selectedGuides.length} machine${selectedGuides.length === 1 ? '' : 's'}`}
@@ -447,10 +464,10 @@ export default function MachineGuideScreen() {
                     side={side}
                     gender="male"
                     scale={1.7}
-                    border="none"
-                    defaultFill="rgba(255,255,255,0.06)"
-                    defaultStroke="rgba(255,255,255,0.12)"
-                    defaultStrokeWidth={0.8}
+                    border={isLightMode ? 'rgba(10,11,15,0.72)' : 'none'}
+                    defaultFill={isLightMode ? 'rgba(10,11,15,0.035)' : 'rgba(255,255,255,0.06)'}
+                    defaultStroke={isLightMode ? 'rgba(10,11,15,0.72)' : 'rgba(255,255,255,0.12)'}
+                    defaultStrokeWidth={isLightMode ? 1.05 : 0.8}
                     onBodyPartPress={handleBodyPartPress}
                   />
                 </View>
@@ -462,11 +479,11 @@ export default function MachineGuideScreen() {
           <View style={styles.legend}>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: activeColor }]} />
-              <Text style={styles.legendText}>Selected</Text>
+              <Text style={[styles.legendText, isLightMode && { color: theme.colors.textMuted }]}>Selected</Text>
             </View>
             <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: 'rgba(255,255,255,0.35)' }]} />
-              <Text style={styles.legendText}>Other groups</Text>
+              <View style={[styles.legendDot, { backgroundColor: isLightMode ? 'rgba(10,11,15,0.35)' : 'rgba(255,255,255,0.35)' }]} />
+              <Text style={[styles.legendText, isLightMode && { color: theme.colors.textMuted }]}>Other groups</Text>
             </View>
           </View>
 
@@ -475,9 +492,9 @@ export default function MachineGuideScreen() {
             onPress={() => Linking.openURL('https://musclewiki.com')}
             accessibilityRole="link"
             style={({ pressed }) => [styles.creditRow, pressed && { opacity: 0.55 }]}>
-            <Text style={styles.creditText}>
+            <Text style={[styles.creditText, isLightMode && { color: theme.colors.textFaint }]}>
               Body map concept inspired by{' '}
-              <Text style={styles.creditLink}>MuscleWiki</Text>
+              <Text style={[styles.creditLink, isLightMode && { color: theme.colors.textMuted }]}>MuscleWiki</Text>
             </Text>
           </Pressable>
         </View>
@@ -488,7 +505,7 @@ export default function MachineGuideScreen() {
             Lower), using common gym names. */}
         {showRegionParts && (
           <View style={styles.partsSection}>
-            <Text style={styles.partsSectionTitle}>
+            <Text style={[styles.partsSectionTitle, isLightMode && { color: theme.colors.text }]}>
               {selectedRegion.toUpperCase()} · PICK A PART
             </Text>
             <View style={styles.partsRow}>
@@ -504,15 +521,24 @@ export default function MachineGuideScreen() {
                     style={[
                       styles.partChip,
                       isActive
-                        ? { backgroundColor: hexToRgba(part.color, 0.16), borderColor: part.color }
-                        : styles.partChipInactive,
+                        ? {
+                            backgroundColor: isLightMode ? 'rgba(10,11,15,0.06)' : hexToRgba(part.color, 0.16),
+                            borderColor: isLightMode ? 'rgba(107, 114, 128, 0.82)' : part.color,
+                          }
+                        : [
+                            styles.partChipInactive,
+                            isLightMode && {
+                              backgroundColor: 'rgba(255,255,255,0.62)',
+                              borderColor: 'rgba(107, 114, 128, 0.82)',
+                            },
+                          ],
                       disabled && styles.partChipDisabled,
                     ]}>
                     <View style={[styles.partChipDot, { backgroundColor: part.color }]} />
                     <Text
                       style={[
                         styles.partChipLabel,
-                        { color: isActive ? part.color : premiumColors.textMuted },
+                        { color: isLightMode ? theme.colors.text : isActive ? part.color : premiumColors.textMuted },
                       ]}>
                       {part.short}
                     </Text>
@@ -520,7 +546,7 @@ export default function MachineGuideScreen() {
                       <Text
                         style={[
                           styles.partChipCount,
-                          isActive && { color: part.color },
+                          isLightMode ? { color: theme.colors.text } : isActive && { color: part.color },
                         ]}>
                         {count}
                       </Text>
@@ -541,7 +567,7 @@ export default function MachineGuideScreen() {
             <Text style={[styles.machinesSectionEyebrow, { color: activeColor }]}>
               {labelOf(selectedGroup).toUpperCase()}
             </Text>
-            <Text style={styles.machinesSectionTitle}>Machines</Text>
+            <Text style={[styles.machinesSectionTitle, isLightMode && { color: '#000000' }]}>Machines</Text>
           </View>
           <View style={[styles.countBadge, { backgroundColor: activeTint, borderColor: activeColor }]}>
             <Text style={[styles.countBadgeText, { color: activeColor }]}>

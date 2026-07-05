@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
 import { premiumColors, premiumGlow, premiumShadow } from '@/constants/premiumTheme';
 import { journeyService } from '@/services';
+import { useAppTheme } from '@/theme/useAppTheme';
 import type { JourneyProfile } from '@/types';
 
 const accentColor = premiumColors.red;
@@ -39,6 +40,8 @@ const GREETING: ChatMessage = {
 
 export default function AIPlanScreen() {
   const router = useRouter();
+  const theme = useAppTheme();
+  const isLightMode = theme.scheme === 'light';
   const [profile, setProfile] = useState<JourneyProfile>();
   const [biographyDraft, setBiographyDraft] = useState('');
   const [isEditingBio, setIsEditingBio] = useState(false);
@@ -134,7 +137,7 @@ export default function AIPlanScreen() {
   if (isLoading) {
     return (
       <PremiumScreenBackground>
-        <StatusBar style="light" />
+        <StatusBar style={isLightMode ? 'dark' : 'light'} />
         <View style={styles.loadingState}>
           <ActivityIndicator color={accentColor} />
         </View>
@@ -144,7 +147,7 @@ export default function AIPlanScreen() {
 
   return (
     <PremiumScreenBackground>
-      <StatusBar style="light" />
+      <StatusBar style={isLightMode ? 'dark' : 'light'} />
       <SafeAreaView edges={['top']} style={styles.safeTop}>
         {/* Header */}
         <View style={styles.header}>
@@ -155,7 +158,7 @@ export default function AIPlanScreen() {
           </Pressable>
           <View style={styles.headerTextBlock}>
             <Text style={styles.headerEyebrow}>AI Planner</Text>
-            <Text style={styles.headerTitle}>Tailor Your Plan</Text>
+            <Text style={[styles.headerTitle, isLightMode && { color: theme.colors.text }]}>Tailor Your Plan</Text>
           </View>
           <View style={styles.headerSparkle}>
             <Text style={styles.headerSparkleText}>✦</Text>
@@ -174,7 +177,7 @@ export default function AIPlanScreen() {
           keyboardShouldPersistTaps="handled">
 
           {/* About Me section */}
-          <View style={styles.aboutCard}>
+          <View style={[styles.aboutCard, isLightMode && { backgroundColor: 'rgba(255,255,255,0.64)', borderColor: theme.colors.border }]}>
             <LinearGradient
               pointerEvents="none"
               colors={['rgba(177,18,38,0.10)', 'rgba(255,255,255,0.03)']}
@@ -183,8 +186,8 @@ export default function AIPlanScreen() {
             <View style={styles.aboutCardHeader}>
               <View style={styles.aboutCardHeaderText}>
                 <Text style={styles.aboutLabel}>About Me</Text>
-                <Text style={styles.aboutTitle}>Training note</Text>
-                <Text style={styles.aboutSubtitle}>
+                <Text style={[styles.aboutTitle, isLightMode && { color: theme.colors.text }]}>Training note</Text>
+                <Text style={[styles.aboutSubtitle, isLightMode && { color: theme.colors.textMuted }]}>
                   This helps the AI tailor advice to your body, goals and injuries.
                 </Text>
               </View>
@@ -216,7 +219,7 @@ export default function AIPlanScreen() {
                 style={styles.bioInput}
               />
             ) : (
-              <Text style={styles.bioText}>
+              <Text style={[styles.bioText, isLightMode && { color: theme.colors.textMuted }]}>
                 {profile?.biography || 'Tap Edit to add your training note.'}
               </Text>
             )}
@@ -227,7 +230,7 @@ export default function AIPlanScreen() {
             <View style={styles.chatAccentBar} />
             <View>
               <Text style={styles.chatEyebrow}>AI Assistant</Text>
-              <Text style={styles.chatHeadingTitle}>Chat to build your plan</Text>
+              <Text style={[styles.chatHeadingTitle, isLightMode && { color: theme.colors.text }]}>Chat to build your plan</Text>
             </View>
           </View>
 
@@ -243,7 +246,9 @@ export default function AIPlanScreen() {
                 key={msg.id}
                 style={[
                   styles.bubble,
-                  msg.role === 'user' ? styles.bubbleUser : styles.bubbleAi,
+                  msg.role === 'user'
+                    ? styles.bubbleUser
+                    : [styles.bubbleAi, isLightMode && { backgroundColor: 'rgba(255,255,255,0.68)' }],
                 ]}>
                 {msg.role === 'ai' && (
                   <View style={styles.aiBubbleAccent}>
@@ -253,14 +258,16 @@ export default function AIPlanScreen() {
                 <Text
                   style={[
                     styles.bubbleText,
-                    msg.role === 'user' ? styles.bubbleTextUser : styles.bubbleTextAi,
+                    msg.role === 'user'
+                      ? styles.bubbleTextUser
+                      : [styles.bubbleTextAi, isLightMode && { color: theme.colors.text }],
                   ]}>
                   {msg.text}
                 </Text>
               </View>
             ))}
             {isAiTyping && (
-              <View style={[styles.bubble, styles.bubbleAi]}>
+              <View style={[styles.bubble, styles.bubbleAi, isLightMode && { backgroundColor: 'rgba(255,255,255,0.68)' }]}>
                 <View style={styles.aiBubbleAccent}>
                   <Text style={styles.aiBubbleAccentText}>✦</Text>
                 </View>
@@ -270,14 +277,14 @@ export default function AIPlanScreen() {
           </ScrollView>
 
           {/* Chat input */}
-          <View style={styles.inputRow}>
+          <View style={[styles.inputRow, isLightMode && { backgroundColor: 'rgba(255,255,255,0.72)', borderColor: theme.colors.border }]}>
             <TextInput
               value={inputText}
               onChangeText={setInputText}
               placeholder="Ask about your training plan..."
-              placeholderTextColor={mutedColor}
+              placeholderTextColor={isLightMode ? theme.colors.textMuted : mutedColor}
               selectionColor={accentColor}
-              style={styles.chatInput}
+              style={[styles.chatInput, isLightMode && { color: theme.colors.text }]}
               returnKeyType="send"
               onSubmitEditing={handleSend}
               blurOnSubmit={false}
@@ -310,12 +317,13 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'center',
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 16,
   },
   backBtn: {
+    display: 'none',
     width: 40,
     height: 40,
     alignItems: 'center',
@@ -331,7 +339,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 26,
   },
-  headerTextBlock: { flex: 1 },
+  headerTextBlock: { alignItems: 'center' },
   headerEyebrow: {
     color: wineColor,
     fontSize: 11,
@@ -345,6 +353,8 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   headerSparkle: {
+    position: 'absolute',
+    right: 20,
     width: 40,
     height: 40,
     alignItems: 'center',

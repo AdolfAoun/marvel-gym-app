@@ -64,57 +64,50 @@ const SPECIAL_SESSIONS = [
     id: 'spa-facial',
     title: 'Facial',
     subtitle: 'SKINCARE',
-    description: 'Deep cleansing, hydration & anti-aging treatments tailored to your skin type.',
     duration: '60 MIN',
-    colors: ['#3A0810', '#1A0407', '#0D0205'] as const,
+    image: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=900&q=80',
   },
   {
     id: 'spa-tanning',
     title: 'Tanning',
     subtitle: 'SUNBED',
-    description: 'Come for the tan, leave with the glow! Your golden tan is waiting — book your sunbed session now.',
     duration: '20–30 MIN',
-    colors: ['#1A1200', '#0D0800', '#060400'] as const,
+    image: 'https://images.unsplash.com/photo-1533105079780-92b9be482077?w=900&q=80',
   },
   {
     id: 'spa-mesotherapy',
     title: 'Mesotherapy',
     subtitle: 'TREATMENT',
-    description: 'Microinjection therapy delivering vitamins & hyaluronic acid for skin rejuvenation.',
     duration: '45 MIN',
-    colors: ['#2D0A15', '#150308', '#0A0105'] as const,
+    image: 'https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?w=900&q=80',
   },
   {
     id: 'spa-deep-tissue',
     title: 'Deep Tissue Massage',
     subtitle: 'MASSAGE',
-    description: 'Targets deep muscle layers to relieve chronic tension, knots and post-workout soreness.',
     duration: '60 MIN',
-    colors: ['#2A0D14', '#120408', '#080204'] as const,
+    image: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=900&q=80',
   },
   {
     id: 'spa-relaxing',
     title: 'Relaxing Massage',
     subtitle: 'MASSAGE',
-    description: 'Full-body Swedish techniques to melt away stress and calm your nervous system.',
     duration: '60 MIN',
-    colors: ['#1E0B12', '#0E0307', '#060103'] as const,
+    image: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=900&q=80',
   },
   {
     id: 'spa-maderotherapy',
     title: 'Maderotherapy',
     subtitle: 'BODY TREATMENT',
-    description: 'Cellulite & water retention massage using sculpted natural wood tools.',
     duration: '90 MIN',
-    colors: ['#320810', '#180409', '#0C0204'] as const,
+    image: 'https://images.unsplash.com/photo-1519823551278-64ac92734fb1?w=900&q=80',
   },
   {
     id: 'spa-laser',
     title: 'Laser Hair Removal',
     subtitle: 'LASER',
-    description: 'Advanced laser technology for smooth, permanent hair reduction on any area.',
     duration: '30–60 MIN',
-    colors: ['#250811', '#120309', '#080105'] as const,
+    image: 'https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?w=900&q=80',
   },
 ] as const;
 
@@ -468,11 +461,13 @@ function WeekPageStrip({
   week,
   weekIdx,
   selectedOffset,
+  isLight,
   onSelect,
 }: {
   week: ReturnType<typeof getWeekDays>;
   weekIdx: number;
   selectedOffset: number;
+  isLight: boolean;
   onSelect: (iso: string) => void;
 }) {
   const weekStartOffset = (weekIdx - 1) * 5;
@@ -487,14 +482,14 @@ function WeekPageStrip({
       Animated.parallel([
         Animated.spring(pillX, {
           toValue: indexInWeek * CELL_STEP,
-          useNativeDriver: true,
+          useNativeDriver: false,
           tension: 220,
           friction: 18,
         }),
-        Animated.timing(pillOpacity, { toValue: 1, duration: 120, useNativeDriver: true }),
+        Animated.timing(pillOpacity, { toValue: 1, duration: 120, useNativeDriver: false }),
       ]).start();
     } else {
-      Animated.timing(pillOpacity, { toValue: 0, duration: 80, useNativeDriver: true }).start();
+      Animated.timing(pillOpacity, { toValue: 0, duration: 80, useNativeDriver: false }).start();
     }
   // pillX and pillOpacity are stable refs; intentionally omitted
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -504,7 +499,11 @@ function WeekPageStrip({
     <View style={styles.weekPage}>
       <Animated.View
         pointerEvents="none"
-        style={[styles.dayPill, { transform: [{ translateX: pillX }], opacity: pillOpacity }]}
+        style={[
+          styles.dayPill,
+          isLight && styles.dayPillLight,
+          { transform: [{ translateX: pillX }], opacity: pillOpacity },
+        ]}
       />
       {week.map((day) => {
         const selected = day.offset === selectedOffset;
@@ -515,7 +514,7 @@ function WeekPageStrip({
               void Haptics.selectionAsync().catch(() => undefined);
               onSelect(day.iso);
             }}
-            style={styles.dayCell}>
+            style={[styles.dayCell, isLight && styles.dayCellLight]}>
             <Text style={[styles.dayCellShort, selected && styles.dayCellTextActive]}>
               {day.short}
             </Text>
@@ -542,6 +541,12 @@ export default function ClassesScreen() {
     ? {
         backgroundColor: theme.colors.surface,
         borderColor: theme.colors.border,
+      }
+    : undefined;
+  const lightGlassStyle = isLight
+    ? {
+        backgroundColor: 'rgba(255,255,255,0.22)',
+        borderColor: 'rgba(10,11,15,0.78)',
       }
     : undefined;
   const [classes, setClasses] = useState<GymClass[]>([]);
@@ -938,11 +943,18 @@ export default function ClassesScreen() {
             <View key={session.id} style={styles.specialSlide}>
               {/* Neon bloom behind card */}
               <View style={styles.specialCardGlow} />
-              <LinearGradient
-                colors={session.colors}
-                start={{ x: 0.18, y: 0 }}
-                end={{ x: 0.82, y: 1 }}
-                style={styles.specialCard}>
+              <View style={styles.specialCard}>
+                <Image
+                  source={{ uri: session.image }}
+                  style={StyleSheet.absoluteFillObject}
+                  resizeMode="cover"
+                />
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={['rgba(8,3,8,0.05)', 'rgba(8,3,8,0.30)', 'rgba(8,3,8,0.90)']}
+                  locations={[0, 0.42, 1]}
+                  style={StyleSheet.absoluteFillObject}
+                />
                 {/* Glass highlight at top */}
                 <View pointerEvents="none" style={styles.specialCardHighlight} />
                 {/* Top row */}
@@ -955,7 +967,6 @@ export default function ClassesScreen() {
                 {/* Big title */}
                 <View style={styles.specialCardBody}>
                   <Text style={styles.specialTitle}>{session.title}</Text>
-                  <Text style={styles.specialDesc}>{session.description}</Text>
                 </View>
                 {/* CTA */}
                 <Pressable
@@ -963,7 +974,7 @@ export default function ClassesScreen() {
                   <Text style={styles.specialBookText}>Book Session</Text>
                   <Text style={styles.specialBookArrow}> ›</Text>
                 </Pressable>
-              </LinearGradient>
+              </View>
             </View>
           ))}
         </Animated.ScrollView>
@@ -1035,6 +1046,7 @@ export default function ClassesScreen() {
               name="chevron.left"
               size={13}
               tintColor={isLight ? theme.colors.text : '#FFFFFF'}
+              style={{ transform: [{ translateX: -1.5 }] }}
               fallback={<Text style={styles.weekEdgeGlyph}>‹</Text>}
             />
           </Pressable>
@@ -1060,6 +1072,7 @@ export default function ClassesScreen() {
                 week={week}
                 weekIdx={wIdx}
                 selectedOffset={selectedOffset}
+                isLight={isLight}
                 onSelect={setSelectedIso}
               />
             ))}
@@ -1189,7 +1202,11 @@ export default function ClassesScreen() {
                   });
                 }}
                 onPress={() => setScheduleFilter(f.key)}
-                style={[styles.chip, scheduleFilter === f.key && styles.chipSelected]}>
+                style={[
+                  styles.chip,
+                  isLight && styles.chipLight,
+                  scheduleFilter === f.key && styles.chipSelected,
+                ]}>
                 <Text
                   style={[
                     styles.chipText,
@@ -1416,21 +1433,28 @@ export default function ClassesScreen() {
               <Pressable
                 key={trainer.id}
                 onPress={() => setPtBookPending(trainer.id)}
-                style={({ pressed }) => [styles.ptCard, pressed && styles.btnPressed]}>
+                style={({ pressed }) => [
+                  styles.ptCard,
+                  isLight && {
+                    backgroundColor: 'rgba(255,255,255,0.22)',
+                    borderColor: theme.colors.text,
+                    shadowColor: premiumColors.redBright,
+                    shadowOpacity: 0.12,
+                  },
+                  pressed && styles.btnPressed,
+                ]}>
                 <LinearGradient
-                  colors={['rgba(255,255,255,0.07)', 'rgba(255,255,255,0.01)']}
+                  colors={
+                    isLight
+                      ? ['rgba(225,29,46,0.10)', 'rgba(255,255,255,0.00)']
+                      : ['rgba(255,255,255,0.07)', 'rgba(255,255,255,0.01)']
+                  }
                   start={{ x: 0.1, y: 0 }}
                   end={{ x: 0.9, y: 1 }}
                   style={StyleSheet.absoluteFillObject}
                 />
-                {/* Top row: badge + heart */}
+                {/* Top row: heart */}
                 <View style={styles.ptCardTopRow}>
-                  <View style={[styles.ptAvailBadge, trainer.available && styles.ptAvailBadgeOn]}>
-                    <View style={[styles.ptAvailDot, trainer.available && styles.ptAvailDotOn]} />
-                    <Text style={[styles.ptAvailText, trainer.available && styles.ptAvailTextOn]}>
-                      {trainer.available ? 'Available' : 'Busy'}
-                    </Text>
-                  </View>
                   <HeartButton
                     isFav={favorites.has(trainer.id)}
                     onToggle={() => toggleFavorite(trainer.id)}
@@ -1444,9 +1468,9 @@ export default function ClassesScreen() {
                   <View style={styles.ptAvatarRing} />
                 </View>
                 {/* Name & specialty */}
-                <Text style={styles.ptName}>{trainer.name}</Text>
+                <Text style={[styles.ptName, surfaceTextStyle]}>{trainer.name}</Text>
                 <Text style={styles.ptSpecialty}>{trainer.specialty}</Text>
-                <Text style={styles.ptTagline}>{trainer.tagline}</Text>
+                <Text style={[styles.ptTagline, mutedTextStyle]}>{trainer.tagline}</Text>
                 {/* Available time */}
                 <View style={styles.ptStatsRow}>
                   <SymbolView
@@ -1455,7 +1479,12 @@ export default function ClassesScreen() {
                     tintColor={trainer.available ? premiumColors.redBright : mutedColor}
                     fallback={<Text style={[styles.ptSessionCount, { color: trainer.available ? premiumColors.redBright : mutedColor }]}>○</Text>}
                   />
-                  <Text style={[styles.ptSessionCount, trainer.available && { color: 'rgba(255,255,255,0.8)' }]}>
+                  <Text
+                    style={[
+                      styles.ptSessionCount,
+                      isLight && { color: theme.colors.textMuted },
+                      trainer.available && { color: isLight ? theme.colors.text : 'rgba(255,255,255,0.8)' },
+                    ]}>
                     {trainer.availableHours}
                   </Text>
                 </View>
@@ -1488,8 +1517,9 @@ export default function ClassesScreen() {
             }}
             style={[
               styles.actBox,
-              themedSurfaceStyle,
+              lightGlassStyle,
               expandedBox === 'bookings' && styles.actBoxActive,
+              isLight && expandedBox === 'bookings' && styles.actBoxActiveLight,
             ]}>
             <Image source={BOOKINGS_SIGN} style={styles.boxWatermark} resizeMode="contain" />
             <SymbolView
@@ -1505,7 +1535,7 @@ export default function ClassesScreen() {
         </View>
 
         {expandedBox === 'bookings' ? (
-          <View style={[styles.expandedPanel, themedSurfaceStyle]}>
+          <View style={[styles.expandedPanel, lightGlassStyle]}>
             <Text style={[styles.expandedTitle, surfaceTextStyle]}>Booking History</Text>
             <Text style={[styles.expandedSub, mutedTextStyle]}>Confirmed and canceled class reservations.</Text>
             <GlideSegmentedControl
@@ -1514,7 +1544,7 @@ export default function ClassesScreen() {
               onChange={setOrdersTab}
             />
             {ordersFiltered.length === 0 ? (
-              <View style={[styles.emptyCard, themedSurfaceStyle]}>
+              <View style={[styles.emptyCard, lightGlassStyle]}>
                 <Text style={[styles.emptyTitle, surfaceTextStyle]}>No {ordersTab.toLowerCase()} bookings</Text>
                 <Text style={[styles.emptyBody, mutedTextStyle]}>
                   {ordersTab === 'Confirmed'
@@ -1758,6 +1788,7 @@ const styles = StyleSheet.create({
   },
   weekStripContainer: {
     width: DATE_PAGE_W * 3,
+    paddingVertical: 7,
   },
   weekPage: {
     width: DATE_PAGE_W,
@@ -2138,7 +2169,7 @@ const styles = StyleSheet.create({
   timelineBtnTextMuted: { color: mutedColor },
 
   // Category chips
-  chipRail: { paddingHorizontal: 20, paddingBottom: 4, marginBottom: 22 },
+  chipRail: { paddingHorizontal: 20, paddingVertical: 8, marginBottom: 14 },
   chipRailInner: {
     position: 'relative',
     flexDirection: 'row',
@@ -2150,14 +2181,17 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     borderRadius: 999,
-    backgroundColor: premiumColors.red,
+    backgroundColor: 'rgba(177, 18, 38, 0.34)',
     borderWidth: 1,
-    borderColor: premiumColors.redBright,
+    borderColor: 'rgba(225, 29, 46, 0.72)',
     shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.55,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.65,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  chipLight: {
+    borderColor: 'rgba(148, 163, 184, 0.55)',
   },
   chip: {
     flexDirection: 'row',
@@ -2190,7 +2224,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(148, 163, 184, 0.26)',
   },
   chipCountText: {
-    color: mutedColor,
+    color: 'rgba(107, 114, 128, 0.96)',
     fontSize: 9,
     fontWeight: '900',
     lineHeight: 10,
@@ -2215,14 +2249,20 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: DATE_CELL_W,
     borderRadius: 12,
-    backgroundColor: premiumColors.red,
+    backgroundColor: 'rgba(177, 18, 38, 0.34)',
     borderWidth: 1,
-    borderColor: premiumColors.redBright,
+    borderColor: 'rgba(225, 29, 46, 0.72)',
     shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.55,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.65,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  dayPillLight: {
+    borderColor: 'rgba(225, 29, 46, 0.68)',
+  },
+  dayCellLight: {
+    borderColor: 'rgba(148, 163, 184, 0.55)',
   },
   dayCellShort: { color: mutedColor, fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
   dayCellNum: { color: mutedColor, fontSize: 15, fontWeight: '900', marginTop: 2 },
@@ -2295,6 +2335,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(225,29,46,0.55)',
     backgroundColor: 'rgba(177,18,38,0.12)',
   },
+  actBoxActiveLight: {
+    borderColor: 'rgba(10,11,15,0.78)',
+  },
   boxWatermark: {
     position: 'absolute',
     right: -12,
@@ -2333,8 +2376,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.03)',
   },
   voucherRowLight: {
-    backgroundColor: 'rgba(255,255,255,0.74)',
-    borderColor: 'rgba(10,11,15,0.10)',
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderColor: 'rgba(177,18,38,0.18)',
   },
   voucherRail: { width: 4, alignSelf: 'stretch' },
   voucherBody: { flex: 1, paddingVertical: 12, paddingHorizontal: 12 },
@@ -2526,6 +2569,7 @@ const styles = StyleSheet.create({
     elevation: 20,
   },
   specialCard: {
+    position: 'relative',
     height: 195,
     borderRadius: 24,
     overflow: 'hidden',
@@ -2581,13 +2625,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     letterSpacing: -0.5,
     lineHeight: 30,
-  },
-  specialDesc: {
-    color: 'rgba(255,255,255,0.62)',
-    fontSize: 11,
-    fontWeight: '600',
-    lineHeight: 16,
-    marginTop: 6,
   },
   specialCounter: {
     color: 'rgba(255,255,255,0.28)',
@@ -2690,49 +2727,16 @@ const styles = StyleSheet.create({
   ptCardTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
+    justifyContent: 'flex-end',
+    marginBottom: 10,
   },
-  ptAvailBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-  },
-  ptAvailBadgeOn: {
-    borderColor: 'rgba(34,197,94,0.4)',
-    backgroundColor: 'rgba(34,197,94,0.08)',
-  },
-  ptAvailDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: mutedColor,
-  },
-  ptAvailDotOn: {
-    backgroundColor: '#22C55E',
-    shadowColor: '#22C55E',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 6,
-  },
-  ptAvailText: {
-    color: mutedColor,
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  ptAvailTextOn: { color: '#22C55E' },
   ptAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    alignSelf: 'center',
     backgroundColor: 'rgba(177,18,38,0.18)',
     borderWidth: 1.5,
     borderColor: 'rgba(225,29,46,0.55)',
@@ -2744,7 +2748,7 @@ const styles = StyleSheet.create({
   },
   ptAvatarText: {
     color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: 30,
     fontWeight: '900',
     textShadowColor: 'rgba(225,29,46,0.6)',
     textShadowOffset: { width: 0, height: 0 },
@@ -2752,9 +2756,9 @@ const styles = StyleSheet.create({
   },
   ptAvatarRing: {
     position: 'absolute',
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 98,
+    height: 98,
+    borderRadius: 49,
     borderWidth: 1,
     borderColor: 'rgba(225,29,46,0.22)',
   },
