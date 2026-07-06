@@ -1,12 +1,14 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { SymbolView } from 'expo-symbols';
 import { Stack, useRouter } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { useAppTheme } from '@/theme/useAppTheme';
 
 // Brand accent is identical in both themes.
 const accentColor = '#E11D2E';
+const backArrowOffsetX = -5.5;
+const backArrowOffsetY = -2.5;
 
 function BackHeaderButton() {
   const router = useRouter();
@@ -25,7 +27,13 @@ function BackHeaderButton() {
         router.replace('/(tabs)');
       }}
       style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}>
-      <SymbolView name="chevron.left" size={22} tintColor={theme.colors.text} weight="bold" />
+      <SymbolView
+        name="chevron.left"
+        size={22}
+        tintColor={theme.colors.text}
+        weight="bold"
+        style={{ transform: [{ translateX: backArrowOffsetX }, { translateY: backArrowOffsetY }] }}
+      />
       <Text style={[styles.backArrow, { color: theme.colors.text }]}>‹</Text>
     </Pressable>
   );
@@ -237,5 +245,6 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
     width: 42,
     marginLeft:-13,
+    
   },
 });

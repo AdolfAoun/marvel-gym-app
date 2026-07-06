@@ -11,8 +11,9 @@ import {
   View,
 } from 'react-native';
 
+import { GlowingChips } from '@/components/GlowingChips';
 import { PremiumScreenBackground } from '@/components/PremiumScreenBackground';
-import { premiumColors, premiumGradients, premiumShadow } from '@/constants/premiumTheme';
+import { premiumColors, premiumShadow } from '@/constants/premiumTheme';
 import { voucherService } from '@/services';
 import { useAppTheme } from '@/theme/useAppTheme';
 import type { Voucher, VoucherStatus, VoucherType } from '@/types';
@@ -65,6 +66,33 @@ export default function VoucherHistoryScreen({
   const [activeTab, setActiveTab] = useState<VoucherHistoryTab>('All');
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const acceptedTypes = useMemo(() => (Array.isArray(type) ? type : [type]), [type]);
+  const isReservationHistory =
+    acceptedTypes.length === 1 && acceptedTypes[0] === 'Class Reservation';
+  const screenTone = isReservationHistory
+    ? {
+        borderColor: 'rgba(225, 29, 46, 0.4)',
+        gradientColors: [
+          'rgba(225,29,46,0.18)',
+          'rgba(177,18,38,0.08)',
+          'rgba(177,18,38,0)',
+        ] as const,
+        indicatorColor: premiumColors.red,
+        pillBackground: 'rgba(225, 29, 46, 0.14)',
+        pillBorder: 'rgba(255, 91, 106, 0.38)',
+        shadowColor: premiumColors.redBright,
+      }
+    : {
+        borderColor: 'rgba(76, 42, 158, 0.55)',
+        gradientColors: [
+          'rgba(110,79,207,0.20)',
+          'rgba(76,42,158,0.10)',
+          'rgba(76,42,158,0)',
+        ] as const,
+        indicatorColor: '#4C2A9E',
+        pillBackground: 'rgba(76, 42, 158, 0.18)',
+        pillBorder: 'rgba(155, 127, 240, 0.42)',
+        shadowColor: '#6E4FCF',
+      };
 
   const loadVouchers = useCallback(async () => {
     const memberVouchers = await voucherService.getVouchers();
@@ -88,6 +116,13 @@ export default function VoucherHistoryScreen({
   );
   const pendingCount = vouchers.filter((voucher) => voucher.status === 'Pending').length;
   const confirmedCount = vouchers.filter((voucher) => voucher.status === 'Confirmed').length;
+  const canceledCount = vouchers.filter((voucher) => voucher.status === 'Canceled').length;
+  const tabCounts: Record<VoucherHistoryTab, number> = {
+    All: vouchers.length,
+    Pending: pendingCount,
+    Confirmed: confirmedCount,
+    Canceled: canceledCount,
+  };
 
   const handleCancel = async (voucherId: string) => {
     await voucherService.cancelVoucher(voucherId);
@@ -113,24 +148,40 @@ export default function VoucherHistoryScreen({
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         <LinearGradient
-          colors={premiumGradients.redPanel}
+          colors={screenTone.gradientColors}
+          locations={[0, 0.52, 1]}
           start={{ x: 0.1, y: 0 }}
           end={{ x: 0.9, y: 1 }}
-          style={styles.heroCard}>
+          style={[
+            styles.heroCard,
+            { borderColor: screenTone.borderColor, shadowColor: screenTone.shadowColor },
+          ]}>
           <View pointerEvents="none" style={styles.heroGloss} />
           <Text style={styles.heroEyebrow}>{eyebrow}</Text>
           <Text style={styles.heroTitle}>{title}</Text>
           <Text style={styles.heroBody}>{description}</Text>
           <View style={styles.statsRow}>
-            <View style={styles.statPill}>
+            <View
+              style={[
+                styles.statPill,
+                { backgroundColor: screenTone.pillBackground, borderColor: screenTone.pillBorder },
+              ]}>
               <Text style={styles.statValue}>{pendingCount}</Text>
               <Text style={styles.statLabel}>pending</Text>
             </View>
-            <View style={styles.statPill}>
+            <View
+              style={[
+                styles.statPill,
+                { backgroundColor: screenTone.pillBackground, borderColor: screenTone.pillBorder },
+              ]}>
               <Text style={styles.statValue}>{confirmedCount}</Text>
               <Text style={styles.statLabel}>confirmed</Text>
             </View>
-            <View style={styles.statPill}>
+            <View
+              style={[
+                styles.statPill,
+                { backgroundColor: screenTone.pillBackground, borderColor: screenTone.pillBorder },
+              ]}>
               <Text style={styles.statValue}>{vouchers.length}</Text>
               <Text style={styles.statLabel}>total</Text>
             </View>
@@ -138,37 +189,22 @@ export default function VoucherHistoryScreen({
         </LinearGradient>
 
         <Text style={[styles.filterLabel, isLightMode && { color: theme.colors.text }]}>Filter requests</Text>
-        <ScrollView
-          horizontal
-          contentContainerStyle={styles.filtersRow}
-          showsHorizontalScrollIndicator={false}>
-          {historyTabs.map((tab) => {
-            const isSelected = tab === activeTab;
-
-            return (
-              <Pressable
-                key={tab}
-                accessibilityRole="button"
-                accessibilityState={{ selected: isSelected }}
-                onPress={() => setActiveTab(tab)}
-                style={({ pressed }) => [
-                  styles.filterChip,
-                  isLightMode && { backgroundColor: 'rgba(255,255,255,0.22)', borderColor: 'rgba(177,18,38,0.18)' },
-                  isSelected && styles.filterChipSelected,
-                  pressed && styles.filterChipPressed,
-                ]}>
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    isLightMode && { color: theme.colors.text },
-                    isSelected && styles.filterChipTextSelected,
-                  ]}>
-                  {tab}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        <GlowingChips
+          items={historyTabs.map((tab) => ({
+            key: tab,
+            label: tab,
+            trailingLabel: String(tabCounts[tab]),
+          }))}
+          selectedKey={activeTab}
+          onSelect={(key) => setActiveTab(key as VoucherHistoryTab)}
+          style={styles.filtersRow}
+          chipStyle={styles.filterChip}
+          unselectedChipStyle={styles.filterChipIdle}
+          labelStyle={styles.filterChipLabel}
+          trailingLabelStyle={styles.filterChipCount}
+          indicatorColor={screenTone.indicatorColor}
+          indicatorGlowColor={screenTone.shadowColor}
+        />
 
         {filteredVouchers.length === 0 ? (
           <View style={[styles.emptyCard, isLightMode && { backgroundColor: 'rgba(255,255,255,0.22)', borderColor: 'rgba(177,18,38,0.18)' }]}>
@@ -254,14 +290,15 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: 'rgba(225, 29, 46, 0.48)',
     borderRadius: 26,
+    backgroundColor: 'transparent',
     padding: 22,
     marginBottom: 22,
-    shadowColor: premiumColors.red,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.4,
-    shadowRadius: 26,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.58,
+    shadowRadius: 20,
     elevation: 10,
   },
   heroGloss: {
@@ -300,15 +337,19 @@ const styles = StyleSheet.create({
   },
   statPill: {
     flex: 1,
+    minHeight: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    padding: 10,
+    borderColor: 'rgba(255, 91, 106, 0.38)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(225, 29, 46, 0.14)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   statValue: {
     color: '#FFFFFF',
-    fontSize: 19,
+    fontSize: 15,
     fontWeight: '900',
   },
   statLabel: {
@@ -325,33 +366,39 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   filtersRow: {
-    gap: 8,
-    paddingBottom: 18,
+    gap: 6,
+    paddingBottom: 14,
   },
   filterChip: {
-    minHeight: 38,
+    height: 30,
+    minHeight: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 12,
-    backgroundColor: premiumColors.surfaceSoft,
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 0,
   },
-  filterChipSelected: {
-    borderColor: premiumColors.redBright,
-    backgroundColor: premiumColors.red,
+  filterChipIdle: {
+    opacity: 0.86,
   },
-  filterChipPressed: {
-    opacity: 0.78,
+  filterChipLabel: {
+    fontSize: 11,
+    includeFontPadding: false,
+    letterSpacing: 0,
+    lineHeight: 14,
+    textAlignVertical: 'center',
+    transform: [{ translateY: 1 }],
   },
-  filterChipText: {
-    color: premiumColors.textMuted,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  filterChipTextSelected: {
-    color: '#FFFFFF',
+  filterChipCount: {
+    minWidth: 16,
+    height: 16,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    fontSize: 9,
+    includeFontPadding: false,
+    lineHeight: 12,
+    paddingHorizontal: 5,
+    paddingVertical: 0,
+    transform: [{ translateY: 1 }],
   },
   emptyCard: {
     borderWidth: 1,

@@ -89,11 +89,11 @@ export const activeMembership: Membership = {
   memberId: currentMember.id,
   planId: 'plan-003',
   status: 'Active',
-  startDate: '2026-05-01T00:00:00.000Z',
-  endDate: '2026-07-30T23:59:59.000Z',
+  startDate: '2026-07-06T00:00:00.000Z',
+  endDate: '2026-10-04T23:59:59.000Z',
   qrCodeValue: 'MARVEL-GYM:MEMBERSHIP:membership-001',
-  createdAt: '2026-05-01T10:15:00.000Z',
-  updatedAt: '2026-05-01T10:15:00.000Z',
+  createdAt: '2026-07-06T10:15:00.000Z',
+  updatedAt: '2026-07-06T10:15:00.000Z',
 };
 
 export const gymClasses: GymClass[] = [

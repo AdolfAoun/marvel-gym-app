@@ -534,7 +534,7 @@ function TrendChart({
                   fill="rgba(160,170,185,0.85)"
                   textAnchor="middle"
                   transform={`rotate(-90 ${(expanded ? 34 : 20) / 2} ${expanded ? 96 : 73})`}>
-                  Calories
+                  Avg Calories Burned
                 </SvgText>
               </Svg>
             </View>
@@ -664,7 +664,9 @@ function TrendChart({
             </View>
           </ScrollView>
           </View>
-          <Text style={[styles.chartXAxisTitle, { color: 'rgba(160,170,185,0.85)' }]}>Time</Text>
+          <Text style={[styles.chartXAxisTitle, { color: 'rgba(160,170,185,0.85)' }]}>
+            Avg Workout Duration
+          </Text>
           <View style={styles.chartLegendRow}>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: midnightPurple }]} />
@@ -1020,7 +1022,9 @@ function FittedTrendChart({
       <View
         {...chartPanResponder.panHandlers}
         style={[styles.fittedChartPanViewport, { height: viewportHeight, width: viewportWidth }]}>
-        <Text pointerEvents="none" style={styles.fittedChartXAxisTitle}>Time</Text>
+        <Text pointerEvents="none" style={styles.fittedChartXAxisTitle}>
+          Avg Workout Duration
+        </Text>
         <Animated.View
           style={[
             styles.fittedChartPanContent,
@@ -1051,7 +1055,7 @@ function FittedTrendChart({
               rotation="-90"
               originX={16}
               originY={topInset + plotHeight * 0.6}>
-              Calories
+              Avg Calories Burned
             </SvgText>
             {calorieTicks.map((tick) => {
               const y = topInset + plotHeight - (tick / maxCalories) * plotHeight;

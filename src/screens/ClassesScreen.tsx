@@ -12,15 +12,18 @@ import type {
 } from 'react-native';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   Image,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
@@ -47,7 +50,6 @@ const FEAT_CARD_W = SCREEN_WIDTH - 40;
 const FEAT_PAGE_W = FEAT_CARD_W - 2;
 const SPA_CARD_GAP = 12;
 
-const BOOKINGS_SIGN = require('@/assets/images/marvel-logo-startup-sign-dot.png');
 const CATEGORY_IMAGES: Record<ClassCategory, string> = {
   'Fitness Classes':
     'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=900&q=80',
@@ -119,6 +121,7 @@ const PT_TRAINERS = [
     specialty: 'Strength & Conditioning',
     availableHours: '07:00 – 14:00',
     available: true,
+    phone: '+96170111222',
     tagline: 'Power through every plateau.',
   },
   {
@@ -128,6 +131,7 @@ const PT_TRAINERS = [
     specialty: 'Yoga & Mobility',
     availableHours: '09:00 – 17:00',
     available: true,
+    phone: '+96170222333',
     tagline: 'Move better. Feel better.',
   },
   {
@@ -137,6 +141,7 @@ const PT_TRAINERS = [
     specialty: 'Boxing & HIIT',
     availableHours: 'Not available today',
     available: false,
+    phone: '+96170333444',
     tagline: 'Train harder than yesterday.',
   },
 ] as const;
@@ -152,6 +157,7 @@ const SCHEDULE_FILTERS: { key: ScheduleFilter; label: string }[] = [
 ];
 
 type ChipLayout = { x: number; width: number };
+type ClassRowLayout = { height: number; y: number };
 
 const WEEKDAY_SHORTS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const WEEKDAY_FULLS = [
@@ -533,6 +539,7 @@ function WeekPageStrip({
 
 export default function ClassesScreen() {
   const theme = useAppTheme();
+  const { height: windowHeight } = useWindowDimensions();
   const isLight = theme.scheme === 'light';
   const surfaceTextStyle = isLight ? { color: theme.colors.text } : undefined;
   const instructorNameTextStyle = { color: theme.colors.text };
@@ -565,7 +572,7 @@ export default function ClassesScreen() {
     gymClass: GymClass;
   }>();
   const [isLoading, setIsLoading] = useState(true);
-  const [expandedBox, setExpandedBox] = useState<'bookings' | null>(null);
+  const [expandedBox, setExpandedBox] = useState<'vouchers' | 'bookings' | null>(null);
   const [ordersTab, setOrdersTab] = useState<'Confirmed' | 'Canceled'>('Confirmed');
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -577,8 +584,17 @@ export default function ClassesScreen() {
   const [ptSearch, setPtSearch] = useState('');
   const [ptShowFavoritesOnly, setPtShowFavoritesOnly] = useState(false);
   const [chipLayouts, setChipLayouts] = useState<Partial<Record<ScheduleFilter, ChipLayout>>>({});
+  const [pendingScrollClassId, setPendingScrollClassId] = useState<string>();
+  const [highlightedClassId, setHighlightedClassId] = useState<string>();
+  const [highlightedVoucherId, setHighlightedVoucherId] = useState<string>();
   const chipPillX = useRef(new Animated.Value(0)).current;
   const chipPillW = useRef(new Animated.Value(0)).current;
+  const contentScrollRef = useRef<ScrollView>(null);
+  const timelineYRef = useRef(0);
+  const vouchersPanelYRef = useRef(0);
+  const classLayoutRef = useRef<Record<string, ClassRowLayout>>({});
+  const classHighlightAnim = useRef(new Animated.Value(0)).current;
+  const voucherHighlightAnim = useRef(new Animated.Value(0)).current;
 
   const allWeeksData = useMemo(() => [-1, 0, 1].map(getWeekDays), []);
 
@@ -691,11 +707,89 @@ export default function ClassesScreen() {
   }, [classes, selectedDay]);
 
   const historyVouchers = classVouchers.filter((v) => v.status !== 'Pending');
+  const pendingVouchers = classVouchers.filter((v) => v.status === 'Pending');
   const ordersFiltered = historyVouchers.filter((v) => v.status === ordersTab);
 
   // Up to 5 featured items drive the "Most Popular" carousel.
   const carouselItems =
     featuredClasses.length > 0 ? featuredClasses : classes.slice(0, 5);
+
+  useEffect(() => {
+    if (!pendingScrollClassId) return undefined;
+    if (!todayClasses.some((gymClass) => gymClass.id === pendingScrollClassId)) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      const classLayout = classLayoutRef.current[pendingScrollClassId];
+      contentScrollRef.current?.scrollTo({
+        animated: true,
+        y: Math.max(
+          0,
+          timelineYRef.current +
+            (classLayout?.y ?? 0) -
+            windowHeight / 2 +
+            (classLayout?.height ?? 120) / 2,
+        ),
+      });
+      setHighlightedClassId(pendingScrollClassId);
+      setPendingScrollClassId(undefined);
+    }, 120);
+
+    return () => clearTimeout(timer);
+  }, [pendingScrollClassId, todayClasses, windowHeight]);
+
+  useEffect(() => {
+    if (!highlightedClassId) {
+      classHighlightAnim.setValue(0);
+      return undefined;
+    }
+
+    classHighlightAnim.setValue(0);
+    const animation = Animated.sequence([
+      Animated.timing(classHighlightAnim, {
+        toValue: 1,
+        duration: 260,
+        useNativeDriver: false,
+      }),
+      Animated.timing(classHighlightAnim, {
+        toValue: 0,
+        duration: 900,
+        useNativeDriver: false,
+      }),
+    ]);
+    animation.start(({ finished }) => {
+      if (finished) setHighlightedClassId(undefined);
+    });
+
+    return () => animation.stop();
+  }, [classHighlightAnim, highlightedClassId]);
+
+  useEffect(() => {
+    if (!highlightedVoucherId) {
+      voucherHighlightAnim.setValue(0);
+      return undefined;
+    }
+
+    voucherHighlightAnim.setValue(0);
+    const animation = Animated.sequence([
+      Animated.timing(voucherHighlightAnim, {
+        toValue: 1,
+        duration: 260,
+        useNativeDriver: false,
+      }),
+      Animated.timing(voucherHighlightAnim, {
+        toValue: 0,
+        duration: 900,
+        useNativeDriver: false,
+      }),
+    ]);
+    animation.start(({ finished }) => {
+      if (finished) setHighlightedVoucherId(undefined);
+    });
+
+    return () => animation.stop();
+  }, [highlightedVoucherId, voucherHighlightAnim]);
 
   const handleReserve = async (classId: string) => {
     await classService.registerForClass(classId);
@@ -709,6 +803,88 @@ export default function ClassesScreen() {
     setPendingAction(undefined);
   };
 
+  const handleCancelPendingVoucher = async (voucherId: string) => {
+    await classService.cancelClassRegistrationByVoucher(voucherId);
+    await loadData();
+  };
+
+  const handleTrainerContact = async (phone: string, channel: 'call' | 'whatsapp') => {
+    const normalizedPhone = phone.replace(/[^\d+]/g, '');
+    const url =
+      channel === 'whatsapp'
+        ? `https://wa.me/${normalizedPhone.replace('+', '')}`
+        : `tel:${normalizedPhone}`;
+
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Contact unavailable', 'This contact option could not be opened.');
+    }
+  };
+
+  const selectedClassHighlightStyle = {
+    borderColor: classHighlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.56)'],
+    }),
+    shadowColor: '#FFFFFF',
+    shadowOpacity: classHighlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.08, 0.32],
+    }),
+    shadowRadius: classHighlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [6, 13],
+    }),
+    transform: [
+      {
+        scale: classHighlightAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [1, 1.006],
+        }),
+      },
+    ],
+  };
+
+  const selectedVoucherHighlightStyle = {
+    borderColor: voucherHighlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.48)'],
+    }),
+    shadowColor: '#FFFFFF',
+    shadowOpacity: voucherHighlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.06, 0.24],
+    }),
+    shadowRadius: voucherHighlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [4, 10],
+    }),
+  };
+
+  const scrollToClass = (gymClass: GymClass) => {
+    setSelectedIso(gymClass.startTime);
+    setScheduleFilter(gymClass.category);
+    setShowFavoritesOnly(false);
+    setSearch('');
+    setSearchOpen(false);
+    setPendingScrollClassId(gymClass.id);
+  };
+
+  const scrollToClassVoucher = async (gymClass: GymClass) => {
+    const voucherId = await classService.getClassVoucherId(gymClass.id);
+    const voucher = classVouchers.find((item) => item.id === voucherId);
+    setExpandedBox(voucher?.status && voucher.status !== 'Pending' ? 'bookings' : 'vouchers');
+
+    setTimeout(() => {
+      contentScrollRef.current?.scrollTo({
+        animated: true,
+        y: Math.max(0, vouchersPanelYRef.current - 24),
+      });
+      if (voucherId) setHighlightedVoucherId(voucherId);
+    }, 120);
+  };
+
   // The carousel renders [lastClone, ...items, firstClone] so it can loop
   // seamlessly. Real item `i` lives at page index `i + 1`; `currentIndexRef`
   // tracks that PAGE index (so it starts at 1, the first real item), and
@@ -719,6 +895,8 @@ export default function ClassesScreen() {
   const specialScrollRef = useRef<ScrollView>(null);
   const autoplayIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const resumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const featuredDragResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const featuredIsDraggingRef = useRef(false);
   const currentIndexRef = useRef(1);
 
   useEffect(() => {
@@ -740,6 +918,7 @@ export default function ClassesScreen() {
     return () => {
       if (autoplayIntervalRef.current) clearInterval(autoplayIntervalRef.current);
       if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
+      if (featuredDragResetRef.current) clearTimeout(featuredDragResetRef.current);
     };
   }, [carouselItems]);
 
@@ -770,6 +949,7 @@ export default function ClassesScreen() {
     <PremiumScreenBackground redHorizonHeight={400}>
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
       <ScrollView
+        ref={contentScrollRef}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
 
@@ -801,14 +981,24 @@ export default function ClassesScreen() {
               contentOffset={{ x: featInitialOffset, y: 0 }}
               style={{ flex: 1 }}
               onScrollBeginDrag={() => {
+                featuredIsDraggingRef.current = true;
+                if (featuredDragResetRef.current) clearTimeout(featuredDragResetRef.current);
                 if (autoplayIntervalRef.current) clearInterval(autoplayIntervalRef.current);
                 if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
+              }}
+              onScrollEndDrag={() => {
+                if (featuredDragResetRef.current) clearTimeout(featuredDragResetRef.current);
+                featuredDragResetRef.current = setTimeout(() => {
+                  featuredIsDraggingRef.current = false;
+                }, 180);
               }}
               onScroll={Animated.event(
                 [{ nativeEvent: { contentOffset: { x: featuredScrollX } } }],
                 { useNativeDriver: true },
               )}
               onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+                featuredIsDraggingRef.current = false;
+                if (featuredDragResetRef.current) clearTimeout(featuredDragResetRef.current);
                 const n = carouselItems.length;
                 let page = Math.round(e.nativeEvent.contentOffset.x / FEAT_PAGE_W);
                 // Jumped onto a clone at either seam — snap (no animation) onto
@@ -832,8 +1022,7 @@ export default function ClassesScreen() {
                 }, 4000);
               }}>
               {loopItems.map((gymClass, i) => {
-                const isReserved = Boolean(gymClass.isRegistered);
-                const isFull = gymClass.status === 'Full' && !isReserved;
+                const isFull = gymClass.status === 'Full' && !gymClass.isRegistered;
                 const imgUri = gymClass.coverImageUrl || CATEGORY_IMAGES[gymClass.category];
                 const pageScale = featuredScrollX.interpolate({
                   inputRange: [(i - 1) * FEAT_PAGE_W, i * FEAT_PAGE_W, (i + 1) * FEAT_PAGE_W],
@@ -843,66 +1032,59 @@ export default function ClassesScreen() {
                 return (
                   <View key={`feat-${i}`} style={styles.featuredPage}>
                     <Animated.View style={[StyleSheet.absoluteFillObject, styles.featuredPageInner, { transform: [{ scale: pageScale }] }]}>
-                      <Image source={{ uri: imgUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-                      <LinearGradient
-                        pointerEvents="none"
-                        colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.03)', 'rgba(8,3,8,0.88)']}
-                        locations={[0, 0.32, 1]}
-                        style={StyleSheet.absoluteFillObject}
-                      />
-                      <LinearGradient
-                        pointerEvents="none"
-                        colors={['rgba(255,255,255,0.10)', 'transparent', 'rgba(255,255,255,0.05)']}
-                        start={{ x: 0, y: 0.5 }}
-                        end={{ x: 1, y: 0.5 }}
-                        style={StyleSheet.absoluteFillObject}
-                      />
-                      <View style={styles.featuredBottom}>
-                        <Text style={styles.featuredTitle}>{gymClass.title.toUpperCase()}</Text>
-                        <Text style={styles.featuredDesc} numberOfLines={1}>
-                          Coach {gymClass.instructorName}
-                        </Text>
-                        <View style={styles.statsRow}>
-                          <View style={styles.stat}>
-                            <SymbolView
-                              name="clock"
-                              size={12}
-                              tintColor="rgba(255,255,255,0.72)"
-                              fallback={<Text style={styles.statGlyph}>○</Text>}
-                            />
-                            <Text style={styles.statText}>
-                              {fmtDuration(gymClass.startTime, gymClass.endTime)}
-                            </Text>
-                          </View>
-                          <View style={styles.statDivider} />
-                          <View style={styles.stat}>
-                            <SymbolView
-                              name="person.2.fill"
-                              size={12}
-                              tintColor="rgba(255,255,255,0.72)"
-                              fallback={<Text style={styles.statGlyph}>◎</Text>}
-                            />
-                            <Text style={styles.statText}>
-                              {isFull ? 'FULL' : 'SPOTS AVAILABLE'}
-                            </Text>
+                      <Pressable
+                        onPress={() => {
+                          if (featuredIsDraggingRef.current) return;
+                          scrollToClass(gymClass);
+                        }}
+                        pressRetentionOffset={4}
+                        style={styles.featuredSlidePressable}>
+                        <Image source={{ uri: imgUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                        <LinearGradient
+                          pointerEvents="none"
+                          colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.03)', 'rgba(8,3,8,0.88)']}
+                          locations={[0, 0.32, 1]}
+                          style={StyleSheet.absoluteFillObject}
+                        />
+                        <LinearGradient
+                          pointerEvents="none"
+                          colors={['rgba(255,255,255,0.10)', 'transparent', 'rgba(255,255,255,0.05)']}
+                          start={{ x: 0, y: 0.5 }}
+                          end={{ x: 1, y: 0.5 }}
+                          style={StyleSheet.absoluteFillObject}
+                        />
+                        <View style={styles.featuredBottom}>
+                          <Text style={styles.featuredTitle}>{gymClass.title.toUpperCase()}</Text>
+                          <Text style={styles.featuredDesc} numberOfLines={1}>
+                            Coach {gymClass.instructorName}
+                          </Text>
+                          <View style={styles.statsRow}>
+                            <View style={styles.stat}>
+                              <SymbolView
+                                name="clock"
+                                size={12}
+                                tintColor="rgba(255,255,255,0.72)"
+                                fallback={<Text style={styles.statGlyph}>○</Text>}
+                              />
+                              <Text style={styles.statText}>
+                                {fmtDuration(gymClass.startTime, gymClass.endTime)}
+                              </Text>
+                            </View>
+                            <View style={styles.statDivider} />
+                            <View style={styles.stat}>
+                              <SymbolView
+                                name="person.2.fill"
+                                size={12}
+                                tintColor="rgba(255,255,255,0.72)"
+                                fallback={<Text style={styles.statGlyph}>◎</Text>}
+                              />
+                              <Text style={styles.statText}>
+                                {isFull ? 'FULL' : 'SPOTS AVAILABLE'}
+                              </Text>
+                            </View>
                           </View>
                         </View>
-                        <Pressable
-                          disabled={isFull}
-                          onPress={() =>
-                            setPendingAction({ action: isReserved ? 'cancel' : 'reserve', gymClass })
-                          }
-                          style={({ pressed }) => [
-                            styles.featuredBookBtn,
-                            isFull && styles.featuredBookBtnDisabled,
-                            pressed && !isFull && styles.btnPressed,
-                          ]}>
-                          <Text style={styles.featuredBookBtnText}>
-                            {isReserved ? 'CANCEL BOOKING' : isFull ? 'CLASS FULL' : 'BOOK NOW'}
-                          </Text>
-                          {!isFull ? <Text style={styles.featuredBookBtnArrow}> ›</Text> : null}
-                        </Pressable>
-                      </View>
+                      </Pressable>
                     </Animated.View>
                   </View>
                 );
@@ -911,6 +1093,45 @@ export default function ClassesScreen() {
             <View pointerEvents="none" style={styles.featuredGlassSpecular} />
           </View>
 
+          {carouselItems.length > 1 ? (
+            <View style={styles.featuredDotsRow}>
+              {carouselItems.map((_, index) => {
+                // Real item `index` lives at loop-space page `index + 1`
+                // (a leading clone occupies page 0). Fading each dot's
+                // opacity/scale by its distance from the current scroll
+                // position — rather than toggling which dots render —
+                // is what makes the 3-dot window glide smoothly instead
+                // of popping; at the first/last item there's no neighbor
+                // on one side, so only 2 dots ever reach visible opacity.
+                const center = (index + 1) * FEAT_PAGE_W;
+                const dotOpacity = featuredScrollX.interpolate({
+                  inputRange: [
+                    center - 2 * FEAT_PAGE_W,
+                    center - FEAT_PAGE_W,
+                    center,
+                    center + FEAT_PAGE_W,
+                    center + 2 * FEAT_PAGE_W,
+                  ],
+                  outputRange: [0, 0.4, 1, 0.4, 0],
+                  extrapolate: 'clamp',
+                });
+                const dotScale = featuredScrollX.interpolate({
+                  inputRange: [center - FEAT_PAGE_W, center, center + FEAT_PAGE_W],
+                  outputRange: [0.6, 1, 0.6],
+                  extrapolate: 'clamp',
+                });
+                return (
+                  <Animated.View
+                    key={`feat-dot-${index}`}
+                    style={[
+                      styles.featuredDot,
+                      { opacity: dotOpacity, transform: [{ scale: dotScale }] },
+                    ]}
+                  />
+                );
+              })}
+            </View>
+          ) : null}
         </View>
 
         {/* ── WELLNESS & SPA SESSIONS ───────────────────────────── */}
@@ -1245,21 +1466,29 @@ export default function ClassesScreen() {
             </Text>
           </View>
         ) : (
-          <View style={styles.timeline}>
+          <View
+            onLayout={(event: LayoutChangeEvent) => {
+              timelineYRef.current = event.nativeEvent.layout.y;
+            }}
+            style={styles.timeline}>
             <View pointerEvents="none" style={styles.timelineBarGlow} />
             <View style={styles.timelineBar} />
             {todayClasses.map((gymClass) => {
               const isReserved = Boolean(gymClass.isRegistered);
               const isFull = gymClass.status === 'Full' && !isReserved;
               const isFav = favorites.has(gymClass.id);
-              const imgUri =
-                gymClass.coverImageUrl || CATEGORY_IMAGES[gymClass.category];
               const nameParts = gymClass.instructorName.split(' ');
               const shortName =
                 nameParts[0] +
                 (nameParts[1] ? ` ${nameParts[1].slice(0, 1)}.` : '');
               return (
-                <View key={gymClass.id} style={styles.timelineRow}>
+                <View
+                  key={gymClass.id}
+                  onLayout={(event: LayoutChangeEvent) => {
+                    const { height, y } = event.nativeEvent.layout;
+                    classLayoutRef.current[gymClass.id] = { height, y };
+                  }}
+                  style={styles.timelineRow}>
                   <View style={styles.timelineTimCol}>
                     <View style={styles.timelineTimTop}>
                       <View style={styles.timelineDot} />
@@ -1271,60 +1500,13 @@ export default function ClassesScreen() {
                       {fmt24(gymClass.endTime)}
                     </Text>
                   </View>
-                  <View style={[styles.timelineCard, themedSurfaceStyle]}>
-                    <Image
-                      source={{ uri: imgUri }}
-                      style={styles.timelineThumb}
-                      resizeMode="cover"
-                    />
-                    <View style={styles.timelineBody}>
-                      <Text style={[styles.timelineTitle, surfaceTextStyle]} numberOfLines={1}>
-                        {gymClass.title.toUpperCase()}
-                      </Text>
-                      <Text style={styles.timelineCat}>{gymClass.category}</Text>
-                      <View style={styles.timelineMeta}>
-                        <SymbolView
-                          name="person.2.fill"
-                          size={11}
-                          tintColor={isFull ? premiumColors.warning : premiumColors.success}
-                          fallback={<Text style={styles.metaGlyph}>◎</Text>}
-                        />
-                        <Text
-                          style={[
-                            styles.timelineMetaText,
-                            { color: isFull ? premiumColors.warning : premiumColors.success },
-                          ]}>
-                          {isFull ? 'Full' : 'Spots available'}
-                        </Text>
-                      </View>
-                      <Pressable
-                        disabled={isFull}
-                        onPress={() =>
-                          setPendingAction({
-                            action: isReserved ? 'cancel' : 'reserve',
-                            gymClass,
-                          })
-                        }
-                        style={({ pressed }) => [
-                          styles.timelineBookNow,
-                          isReserved && styles.timelineBookNowReserved,
-                          isFull && styles.timelineBookNowDisabled,
-                          pressed && !isFull && styles.btnPressed,
-                        ]}>
-                        <Text
-                          style={[
-                            styles.timelineBookNowText,
-                            isReserved && styles.timelineBookNowTextMuted,
-                          ]}>
-                          {isReserved
-                            ? 'VIEW BOOKING'
-                            : isFull
-                              ? 'FULL'
-                              : 'BOOK NOW'}
-                        </Text>
-                      </Pressable>
-                    </View>
-                    {/* Right column: avatar + name + heart (stacked, no overlap) */}
+                  <Animated.View
+                    style={[
+                      styles.timelineCard,
+                      themedSurfaceStyle,
+                      highlightedClassId === gymClass.id && selectedClassHighlightStyle,
+                    ]}>
+                    {/* Left column: avatar + name + heart (stacked, no overlap) */}
                     <View style={styles.timelineRight}>
                       <Pressable
                         hitSlop={6}
@@ -1352,15 +1534,79 @@ export default function ClassesScreen() {
                         numberOfLines={1}>
                         {shortName}
                       </Text>
-                      <HeartButton
-                        isFav={isFav}
-                        onToggle={() => toggleFavorite(gymClass.id)}
-                        btnSize={30}
-                        iconSize={13}
-                        style={styles.timelineHeart}
-                      />
                     </View>
-                  </View>
+                    <HeartButton
+                      isFav={isFav}
+                      onToggle={() => toggleFavorite(gymClass.id)}
+                      btnSize={30}
+                      iconSize={13}
+                      style={styles.timelineHeart}
+                    />
+                    <View style={styles.timelineBody}>
+                      <Text style={[styles.timelineTitle, surfaceTextStyle]} numberOfLines={1}>
+                        {gymClass.title.toUpperCase()}
+                      </Text>
+                      <Text style={styles.timelineCat}>{gymClass.category}</Text>
+                      <View style={styles.timelineMeta}>
+                        <View style={styles.timelineMetaSpots}>
+                          <SymbolView
+                            name="person.2.fill"
+                            size={11}
+                            tintColor={isFull ? premiumColors.warning : premiumColors.success}
+                            fallback={<Text style={styles.metaGlyph}>◎</Text>}
+                          />
+                          <Text
+                            style={[
+                              styles.timelineMetaText,
+                              { color: isFull ? premiumColors.warning : premiumColors.success },
+                            ]}>
+                            {isFull ? 'Full' : 'Spots available'}
+                          </Text>
+                        </View>
+                        <View style={styles.timelineMetaDuration}>
+                          <SymbolView
+                            name="clock"
+                            size={11}
+                            tintColor={mutedColor}
+                            fallback={<Text style={styles.metaGlyph}>○</Text>}
+                          />
+                          <Text style={styles.timelineMetaText}>
+                            {fmtDuration(gymClass.startTime, gymClass.endTime)}
+                          </Text>
+                        </View>
+                      </View>
+                      <Pressable
+                        disabled={isFull}
+                        onPress={() => {
+                          if (isReserved) {
+                            scrollToClassVoucher(gymClass);
+                          } else {
+                            setPendingAction({ action: 'reserve', gymClass });
+                          }
+                        }}
+                        style={({ pressed }) => [
+                          styles.timelineBookNow,
+                          isReserved && styles.timelineBookNowReserved,
+                          isFull && styles.timelineBookNowDisabled,
+                          pressed && !isFull && styles.btnPressed,
+                        ]}>
+                        <Text
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.72}
+                          numberOfLines={1}
+                          style={[
+                            styles.timelineBookNowText,
+                            isReserved && styles.timelineBookNowTextMuted,
+                          ]}>
+                          {isReserved
+                            ? 'VIEW BOOKING'
+                            : isFull
+                              ? 'FULL'
+                              : 'BOOK NOW'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </Animated.View>
                 </View>
               );
             })}
@@ -1432,6 +1678,7 @@ export default function ClassesScreen() {
             {filteredTrainers.map((trainer) => (
               <Pressable
                 key={trainer.id}
+                disabled={!trainer.available}
                 onPress={() => setPtBookPending(trainer.id)}
                 style={({ pressed }) => [
                   styles.ptCard,
@@ -1491,7 +1738,7 @@ export default function ClassesScreen() {
                 {/* CTA */}
                 <View style={[styles.ptBookBtn, trainer.available ? styles.ptBookBtnActive : styles.ptBookBtnDisabled]}>
                   <Text style={[styles.ptBookText, !trainer.available && styles.ptBookTextMuted]}>
-                    {trainer.available ? 'Book Session' : 'Unavailable'}
+                    {trainer.available ? 'Contact Trainer' : 'Unavailable'}
                   </Text>
                 </View>
               </Pressable>
@@ -1504,10 +1751,34 @@ export default function ClassesScreen() {
           <View style={styles.accentBar} />
           <View>
             <Text style={styles.boxesEyebrow}>My activity</Text>
-            <Text style={[styles.boxesTitle, surfaceTextStyle]}>Bookings</Text>
+            <Text style={[styles.boxesTitle, surfaceTextStyle]}>Vouchers &amp; Bookings</Text>
           </View>
         </View>
         <View style={styles.boxesRow}>
+          <Pressable
+            onPress={() => {
+              if (expandedBox !== 'vouchers') {
+                void Haptics.selectionAsync().catch(() => undefined);
+              }
+              setExpandedBox(expandedBox === 'vouchers' ? null : 'vouchers');
+            }}
+            style={[
+              styles.actBox,
+              lightGlassStyle,
+              expandedBox === 'vouchers' && styles.actBoxActive,
+              isLight && expandedBox === 'vouchers' && styles.actBoxActiveLight,
+            ]}>
+            <SymbolView
+              name="ticket.fill"
+              size={24}
+              tintColor={premiumColors.redBright}
+              fallback={<Text style={styles.boxGlyph}>▤</Text>}
+            />
+            <Text style={[styles.actBoxCount, surfaceTextStyle]}>{pendingVouchers.length}</Text>
+            <Text style={[styles.actBoxLabel, surfaceTextStyle]}>Vouchers</Text>
+            <Text style={[styles.actBoxSub, mutedTextStyle]}>Pending</Text>
+          </Pressable>
+
           <Pressable
             onPress={() => {
               if (expandedBox !== 'bookings') {
@@ -1521,7 +1792,6 @@ export default function ClassesScreen() {
               expandedBox === 'bookings' && styles.actBoxActive,
               isLight && expandedBox === 'bookings' && styles.actBoxActiveLight,
             ]}>
-            <Image source={BOOKINGS_SIGN} style={styles.boxWatermark} resizeMode="contain" />
             <SymbolView
               name="list.bullet.clipboard"
               size={24}
@@ -1534,8 +1804,63 @@ export default function ClassesScreen() {
           </Pressable>
         </View>
 
+        {expandedBox === 'vouchers' ? (
+          <View
+            onLayout={(event: LayoutChangeEvent) => {
+              vouchersPanelYRef.current = event.nativeEvent.layout.y;
+            }}
+            style={[styles.expandedPanel, lightGlassStyle]}>
+            <Text style={[styles.expandedTitle, surfaceTextStyle]}>My Vouchers</Text>
+            <Text style={[styles.expandedSub, mutedTextStyle]}>
+              Awaiting staff confirmation. Cancel anytime before approval.
+            </Text>
+            {pendingVouchers.length === 0 ? (
+              <View style={[styles.emptyCard, lightGlassStyle]}>
+                <Text style={[styles.emptyTitle, surfaceTextStyle]}>No pending vouchers</Text>
+                <Text style={[styles.emptyBody, mutedTextStyle]}>
+                  Book a class to create a pending voucher.
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.voucherList}>
+                {pendingVouchers.map((voucher) => (
+                  <Animated.View
+                    key={voucher.id}
+                    style={[
+                      styles.voucherRow,
+                      isLight && styles.voucherRowLight,
+                      highlightedVoucherId === voucher.id && selectedVoucherHighlightStyle,
+                    ]}>
+                    <View style={[styles.voucherRail, { backgroundColor: statusColor(voucher.status) }]} />
+                    <View style={styles.voucherBody}>
+                      <Text style={[styles.voucherTitle, surfaceTextStyle]} numberOfLines={2}>
+                        {voucher.description}
+                      </Text>
+                      <Text style={[styles.voucherMeta, mutedTextStyle]}>
+                        {fmtVoucherDate(voucher.date)}
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={() => handleCancelPendingVoucher(voucher.id)}
+                      style={({ pressed }) => [
+                        styles.voucherCancel,
+                        pressed && styles.btnPressed,
+                      ]}>
+                      <Text style={styles.voucherCancelText}>Cancel</Text>
+                    </Pressable>
+                  </Animated.View>
+                ))}
+              </View>
+            )}
+          </View>
+        ) : null}
+
         {expandedBox === 'bookings' ? (
-          <View style={[styles.expandedPanel, lightGlassStyle]}>
+          <View
+            onLayout={(event: LayoutChangeEvent) => {
+              vouchersPanelYRef.current = event.nativeEvent.layout.y;
+            }}
+            style={[styles.expandedPanel, lightGlassStyle]}>
             <Text style={[styles.expandedTitle, surfaceTextStyle]}>Booking History</Text>
             <Text style={[styles.expandedSub, mutedTextStyle]}>Confirmed and canceled class reservations.</Text>
             <GlideSegmentedControl
@@ -1555,7 +1880,13 @@ export default function ClassesScreen() {
             ) : (
               <View style={styles.voucherList}>
                 {ordersFiltered.map((v) => (
-                  <View key={v.id} style={[styles.voucherRow, isLight && styles.voucherRowLight]}>
+                  <Animated.View
+                    key={v.id}
+                    style={[
+                      styles.voucherRow,
+                      isLight && styles.voucherRowLight,
+                      highlightedVoucherId === v.id && selectedVoucherHighlightStyle,
+                    ]}>
                     <View style={[styles.voucherRail, { backgroundColor: statusColor(v.status) }]} />
                     <View style={styles.voucherBody}>
                       <Text style={[styles.voucherTitle, surfaceTextStyle]}>{v.description}</Text>
@@ -1566,7 +1897,7 @@ export default function ClassesScreen() {
                         {v.status}
                       </Text>
                     </View>
-                  </View>
+                  </Animated.View>
                 ))}
               </View>
             )}
@@ -1574,37 +1905,46 @@ export default function ClassesScreen() {
         ) : null}
       </ScrollView>
 
-      {/* ── PT BOOKING MODAL ──────────────────────────────────────── */}
+      {/* ── PT CONTACT MODAL ──────────────────────────────────────── */}
       <Modal transparent visible={Boolean(ptBookPending)} animationType="fade">
         <View style={styles.modalOverlay}>
           <Pressable style={styles.modalBackdrop} onPress={() => setPtBookPending(undefined)} />
           <View style={[styles.modalCard, themedSurfaceStyle]}>
-            {ptBookPending ? (
+            {ptBookPending ? (() => {
+              const trainer = PT_TRAINERS.find((t) => t.id === ptBookPending);
+              if (!trainer) return null;
+
+              return (
               <>
-                <Text style={styles.modalKicker}>Personal Training</Text>
-                <Text style={[styles.modalTitle, surfaceTextStyle]}>
-                  {PT_TRAINERS.find((t) => t.id === ptBookPending)?.name}
-                </Text>
-                <Text style={[styles.modalMeta, mutedTextStyle]}>
-                  {PT_TRAINERS.find((t) => t.id === ptBookPending)?.specialty}
-                </Text>
+                <Text style={styles.modalKicker}>Contact Trainer</Text>
+                <Text style={[styles.modalTitle, surfaceTextStyle]}>{trainer.name}</Text>
+                <Text style={[styles.modalMeta, mutedTextStyle]}>{trainer.specialty}</Text>
                 <Text style={styles.modalNote}>
-                  PT session requests are reviewed within 24 hours. Your trainer will confirm a time slot directly with you.
+                  Choose how you want to reach this trainer.
                 </Text>
-                <View style={styles.modalActions}>
+                <View style={styles.ptContactActions}>
                   <Pressable
-                    onPress={() => setPtBookPending(undefined)}
-                    style={({ pressed }) => [styles.modalSecBtn, pressed && styles.btnPressed]}>
-                    <Text style={styles.modalSecText}>Back</Text>
+                    onPress={() => handleTrainerContact(trainer.phone, 'whatsapp')}
+                    style={({ pressed }) => [styles.ptContactPrimaryWrap, pressed && styles.btnPressed]}>
+                    <LinearGradient
+                      colors={['#FF2638', '#B11226', '#2A0308']}
+                      locations={[0, 0.58, 1]}
+                      start={{ x: 0.08, y: 0 }}
+                      end={{ x: 0.92, y: 1 }}
+                      style={styles.ptContactPrimaryButton}>
+                      <View pointerEvents="none" style={styles.ptContactGloss} />
+                      <Text style={styles.ptContactPrimaryText}>WhatsApp</Text>
+                    </LinearGradient>
                   </Pressable>
                   <Pressable
-                    onPress={() => setPtBookPending(undefined)}
-                    style={({ pressed }) => [styles.modalPrimBtn, pressed && styles.btnPressed]}>
-                    <Text style={styles.modalPrimText}>Request Session</Text>
+                    onPress={() => handleTrainerContact(trainer.phone, 'call')}
+                    style={({ pressed }) => [styles.ptContactGhostButton, pressed && styles.btnPressed]}>
+                    <Text style={styles.ptContactGhostText}>Call</Text>
                   </Pressable>
                 </View>
               </>
-            ) : null}
+              );
+            })() : null}
           </View>
         </View>
       </Modal>
@@ -1849,6 +2189,19 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.28)',
     fontWeight: '700',
   },
+  featuredDotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+  },
+  featuredDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: premiumColors.redBright,
+  },
   featuredGlassSpecular: {
     position: 'absolute',
     top: 0,
@@ -1894,6 +2247,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.22)',
     ...premiumShadow,
+  },
+  featuredSlidePressable: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
   },
   featuredTopRow: {
     flexDirection: 'row',
@@ -1947,24 +2304,6 @@ const styles = StyleSheet.create({
   statText: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '800' },
   statDivider: { width: 1, height: 14, backgroundColor: 'rgba(255,255,255,0.25)' },
   statGlyph: { color: 'rgba(255,255,255,0.7)', fontSize: 10 },
-  featuredBookBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    borderRadius: 10,
-    backgroundColor: premiumColors.red,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    ...premiumGlow,
-  },
-  featuredBookBtnDisabled: {
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  featuredBookBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
-  featuredBookBtnArrow: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
   btnPressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
 
   specialDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: 'rgba(255,255,255,0.22)' },
@@ -2051,28 +2390,35 @@ const styles = StyleSheet.create({
     ...premiumShadow,
   },
   timelineThumb: { width: 64, height: 64, borderRadius: 32 },
-  timelineBody: { flex: 1, paddingRight: 24 },
+  timelineBody: { flex: 1, paddingRight: 8 },
   timelineTitle: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
   timelineCat: { color: premiumColors.redBright, fontSize: 11, fontWeight: '800', marginTop: 3 },
-  timelineMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 },
+  timelineMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 5,
+  },
+  timelineMetaSpots: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  timelineMetaDuration: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   timelineMetaText: { color: mutedColor, fontSize: 11, fontWeight: '700' },
   metaGlyph: { color: mutedColor, fontSize: 10 },
   timelineRight: {
-    width: 58,
+    width: 68,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'stretch',
   },
-  instructorAvatar: { width: 42, height: 42, borderRadius: 21 },
+  instructorAvatar: { width: 60, height: 60, borderRadius: 30 },
   instructorAvatarFallback: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  instructorAvatarText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  instructorAvatarText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
   instructorName: {
     color: '#000000',
     fontSize: 11,
@@ -2109,39 +2455,45 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   timelineHeart: {
-    marginTop: 6,
-    right: 2,
+    position: 'absolute',
+    top: 8,
+    right: 8,
     zIndex: 2,
   },
   timelineBookNow: {
     alignSelf: 'stretch',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 34,
-    marginTop: 9,
-    borderRadius: 12,
-    backgroundColor: premiumColors.red,
+    minHeight: 26,
+    marginTop: 8,
+    borderWidth: 1.2,
+    borderColor: 'rgba(225,29,46,0.55)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(7,2,5,0.45)',
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    ...premiumGlow,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    elevation: 4,
   },
   timelineBookNowReserved: {
     backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.22)',
     shadowOpacity: 0,
     elevation: 0,
   },
   timelineBookNowDisabled: {
     backgroundColor: 'rgba(255,255,255,0.07)',
+    borderColor: 'rgba(255,255,255,0.14)',
     shadowOpacity: 0,
     elevation: 0,
   },
   timelineBookNowText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
   },
   timelineBookNowTextMuted: { color: mutedColor },
   timelineBtn: {
@@ -2321,7 +2673,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: premiumColors.glassBorder,
     borderRadius: 22,
-    backgroundColor: premiumColors.surface,
+    backgroundColor: 'transparent',
     paddingVertical: 22,
     paddingHorizontal: 10,
     gap: 4,
@@ -2383,6 +2735,20 @@ const styles = StyleSheet.create({
   voucherBody: { flex: 1, paddingVertical: 12, paddingHorizontal: 12 },
   voucherTitle: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', lineHeight: 18 },
   voucherMeta: { color: mutedColor, fontSize: 11, fontWeight: '700', marginTop: 3 },
+  voucherCancel: {
+    borderRadius: 999,
+    backgroundColor: 'rgba(177,18,38,0.20)',
+    borderWidth: 1,
+    borderColor: 'rgba(225,29,46,0.55)',
+    marginRight: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  voucherCancelText: {
+    color: premiumColors.redBright,
+    fontSize: 11,
+    fontWeight: '900',
+  },
   statusChip: {
     borderWidth: 1,
     borderRadius: 999,
@@ -2487,6 +2853,64 @@ const styles = StyleSheet.create({
     paddingLeft: 10,
   },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 20 },
+  ptContactActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  ptContactPrimaryWrap: {
+    flex: 1,
+    borderRadius: 999,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.30,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  ptContactPrimaryButton: {
+    minHeight: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,91,106,0.72)',
+    borderRadius: 999,
+  },
+  ptContactGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '42%',
+    backgroundColor: 'rgba(255,255,255,0.075)',
+  },
+  ptContactPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  ptContactGhostButton: {
+    flex: 1,
+    minHeight: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.4,
+    borderColor: 'rgba(255,35,55,0.78)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(7,2,5,0.45)',
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 4,
+  },
+  ptContactGhostText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
   modalSecBtn: {
     flex: 1,
     minHeight: 50,

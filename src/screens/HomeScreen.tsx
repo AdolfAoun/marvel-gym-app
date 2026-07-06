@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  type ColorValue,
   Image,
   Modal,
   PanResponder,
@@ -147,6 +148,39 @@ function getCountdownColor(progress: number, status?: MembershipStatus) {
   const hue = Math.round(clamped * 140);
 
   return `hsl(${hue}, 72%, 45%)`;
+}
+
+// The surrounding card is a fixed ocean/aqua accent regardless of countdown
+// progress — only the number and bar inside carry the green->red urgency.
+function getCountdownAccentTheme(
+  status: MembershipStatus | undefined,
+  isDepleted: boolean,
+): {
+  borderColor: ColorValue;
+  gradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]];
+  shadowColor: ColorValue;
+} {
+  if (isDepleted || status === 'Expired' || status === 'Suspended') {
+    return {
+      borderColor: 'rgba(107, 114, 128, 0.48)',
+      gradientColors: [
+        'rgba(107, 114, 128, 0.18)',
+        'rgba(75, 85, 99, 0.08)',
+        'rgba(75, 85, 99, 0)',
+      ],
+      shadowColor: '#6B7280',
+    };
+  }
+
+  return {
+    borderColor: 'rgba(56, 189, 248, 0.42)',
+    gradientColors: [
+      'rgba(56, 189, 248, 0.18)',
+      'rgba(14, 165, 233, 0.08)',
+      'rgba(14, 165, 233, 0)',
+    ],
+    shadowColor: '#0EA5E9',
+  };
 }
 
 function getStatusTone(status?: MembershipStatus) {
@@ -542,15 +576,23 @@ export default function HomeScreen() {
     useCallback(() => {
       let isActive = true;
 
-      const refreshLatestClassUpdate = async () => {
-        const classUpdate = await classService.getLatestClassUpdate();
+      const refreshHomeActivity = async () => {
+        const [classUpdate, currentVouchers] = await Promise.all([
+          classService.getLatestClassUpdate(),
+          voucherService.getVouchers(),
+        ]);
 
-        if (isActive && classUpdate) {
+        if (!isActive) {
+          return;
+        }
+
+        setVouchers(currentVouchers);
+        if (classUpdate) {
           setNotification(classUpdate);
         }
       };
 
-      refreshLatestClassUpdate();
+      refreshHomeActivity();
 
       return () => {
         isActive = false;
@@ -590,8 +632,13 @@ export default function HomeScreen() {
     membership,
     plan?.durationInDays,
   );
-  const countdownColor = getCountdownColor(membershipProgress, status);
-  const statusTone = getStatusTone(status);
+  const isMembershipDepleted = daysRemaining <= 0;
+  const countdownColor = isMembershipDepleted
+    ? '#6B7280'
+    : getCountdownColor(membershipProgress, status);
+  const countdownAccent = getCountdownAccentTheme(status, isMembershipDepleted);
+  const statusTone = isMembershipDepleted ? '#6B7280' : getStatusTone(status);
+  const daysStatusLabel = isMembershipDepleted ? 'Inactive' : status ?? 'Pending';
   const isFrozen = status === 'Frozen';
   const canShowQr = status === 'Active';
   const expiryDate = formatDate(membership?.endDate);
@@ -777,14 +824,6 @@ export default function HomeScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
-          <LinearGradient
-            pointerEvents="none"
-            colors={[theme.ink(0.12), theme.ink(0.055), 'rgba(177, 18, 38, 0.1)']}
-            start={{ x: 0.08, y: 0 }}
-            end={{ x: 0.92, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-          <View pointerEvents="none" style={styles.heroGloss} />
           <View style={styles.heroTopRow}>
             <View style={styles.heroTextBlock}>
               <Text style={styles.kicker}>
@@ -941,27 +980,34 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.ringStage}>
-          <View style={styles.daysGlassCard}>
+          <View
+            style={[
+              styles.daysGlassCard,
+              {
+                borderColor: countdownAccent.borderColor,
+                shadowColor: countdownAccent.shadowColor,
+              },
+              isMembershipDepleted && !isLightMode && { shadowOpacity: 0.2 },
+            ]}>
             <LinearGradient
               pointerEvents="none"
-              colors={
-                isLightMode
-                  ? ['rgba(225,29,46,0.18)', 'rgba(177,18,38,0.07)', 'rgba(255,255,255,0.04)']
-                  : ['rgba(177,18,38,0.08)', 'rgba(255,255,255,0.02)']
-              }
-              locations={isLightMode ? [0, 0.42, 1] : undefined}
-              style={StyleSheet.absoluteFill}
+              colors={countdownAccent.gradientColors}
+              locations={[0, 0.52, 1]}
+              style={styles.daysCardGloss}
             />
+            {isMembershipDepleted ? (
+              <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.daysInactiveScrim]} />
+            ) : null}
             <View style={styles.daysTopRow}>
               <View>
-                <Text style={[styles.daysNumber, { color: isLightMode ? theme.colors.text : countdownColor }]}>
+                <Text style={[styles.daysNumber, { color: countdownColor }]}>
                   {daysRemaining}
                 </Text>
                 <Text style={[styles.daysLabel, isLightMode && { color: theme.colors.text }]}>Days Remaining</Text>
               </View>
               <View style={styles.daysStatusPill}>
                 <View style={[styles.statusDot, { backgroundColor: statusTone }]} />
-                <Text style={[styles.daysStatusText, isLightMode && { color: theme.colors.text }]}>{status ?? 'Pending'}</Text>
+                <Text style={[styles.daysStatusText, isLightMode && { color: theme.colors.text }]}>{daysStatusLabel}</Text>
               </View>
             </View>
             <View style={styles.membershipTrack}>
@@ -970,6 +1016,7 @@ export default function HomeScreen() {
                   styles.membershipTrackFill,
                   {
                     backgroundColor: countdownColor,
+                    opacity: isMembershipDepleted ? 0.45 : 1,
                     width: `${Math.round(membershipProgress * 100)}%`,
                   },
                 ]}
@@ -1005,13 +1052,14 @@ export default function HomeScreen() {
               }}
               style={({ pressed }) => [
                 styles.actionChip,
-                styles.actionChipRenew,
                 isLightMode && styles.actionChipLightGrey,
+                styles.actionChipRenew,
                 pressed && styles.buttonPressed,
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={[theme.ink(0.08), theme.ink(0)]}
+                colors={['rgba(225,29,46,0.18)', 'rgba(177,18,38,0.08)', 'rgba(177,18,38,0)']}
+                locations={[0, 0.52, 1]}
                 style={styles.actionChipGloss}
               />
               <View style={[styles.actionIconWrap, styles.actionIconWrapRenew]}>
@@ -1028,13 +1076,14 @@ export default function HomeScreen() {
               }}
               style={({ pressed }) => [
                 styles.actionChip,
-                styles.actionChipFreeze,
                 isLightMode && styles.actionChipLightGrey,
+                styles.actionChipFreeze,
                 pressed && styles.buttonPressed,
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={[theme.ink(0.08), theme.ink(0)]}
+                colors={['rgba(96,165,250,0.18)', 'rgba(59,130,246,0.08)', 'rgba(59,130,246,0)']}
+                locations={[0, 0.52, 1]}
                 style={styles.actionChipGloss}
               />
               <View style={[styles.actionIconWrap, styles.actionIconWrapFreeze]}>
@@ -1049,17 +1098,18 @@ export default function HomeScreen() {
               onPress={handleShowQr}
               style={({ pressed }) => [
                 styles.actionChip,
-                styles.actionChipRenew,
                 isLightMode && styles.actionChipLightGrey,
+                styles.actionChipQr,
                 !canShowQr && styles.actionCardDisabled,
                 pressed && styles.buttonPressed,
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={[theme.ink(0.08), theme.ink(0)]}
+                colors={['rgba(155,127,240,0.18)', 'rgba(76,42,158,0.09)', 'rgba(76,42,158,0)']}
+                locations={[0, 0.52, 1]}
                 style={styles.actionChipGloss}
               />
-              <View style={[styles.actionIconWrap, styles.actionIconWrapRenew]}>
+              <View style={[styles.actionIconWrap, styles.actionIconWrapQr]}>
                 <Text style={styles.actionIcon}>⊞</Text>
               </View>
               <Text style={styles.actionTitle}>Open QR</Text>
@@ -1117,11 +1167,12 @@ export default function HomeScreen() {
               onPress={() => router.push('/machine-guide')}
               style={({ pressed }) => [
                 styles.featureCard,
+                styles.featureCardMachineGuideGlow,
                 pressed && styles.featurePressed,
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={[theme.colors.red, '#3A0B14', '#160609']}
+                colors={['rgba(225,29,46,0.30)', 'rgba(58,11,20,0.18)', 'rgba(22,6,9,0.08)']}
                 start={{ x: 0.1, y: 0 }}
                 end={{ x: 0.9, y: 1 }}
                 style={StyleSheet.absoluteFill}
@@ -1167,11 +1218,12 @@ export default function HomeScreen() {
               onPress={() => router.push('/ai-plan' as Href)}
               style={({ pressed }) => [
                 styles.featureCard,
+                styles.featureCardAiPlanGlow,
                 pressed && styles.featurePressed,
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={['#1A0A2E', '#110720', '#0A0414']}
+                colors={['rgba(46,16,101,0.32)', 'rgba(17,7,32,0.20)', 'rgba(10,4,20,0.10)']}
                 start={{ x: 0.1, y: 0 }}
                 end={{ x: 0.9, y: 1 }}
                 style={StyleSheet.absoluteFill}
@@ -1219,11 +1271,12 @@ export default function HomeScreen() {
               onPress={() => router.push('/how-to-use' as Href)}
               style={({ pressed }) => [
                 styles.featureCard,
+                styles.featureCardHowToUseGlow,
                 pressed && styles.featurePressed,
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={['#1C1F29', '#14161D', '#0C0D12']}
+                colors={['rgba(28,31,41,0.34)', 'rgba(20,22,29,0.22)', 'rgba(12,13,18,0.10)']}
                 start={{ x: 0.1, y: 0 }}
                 end={{ x: 0.9, y: 1 }}
                 style={StyleSheet.absoluteFill}
@@ -1267,6 +1320,15 @@ export default function HomeScreen() {
         </View>
 
         <View style={[styles.activityPanel, isLightMode && styles.activityPanelLight]}>
+          {!isLightMode ? (
+            <LinearGradient
+              pointerEvents="none"
+              colors={['rgba(46,16,101,0.11)', 'rgba(225,29,46,0.07)', 'rgba(10,4,20,0.045)']}
+              start={{ x: 0.1, y: 0 }}
+              end={{ x: 0.9, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+          ) : null}
           <View style={styles.daySelector}>
             <GlowingChips
               items={activitySchedule.map((item) => ({
@@ -1276,7 +1338,7 @@ export default function HomeScreen() {
               selectedKey={selectedActivityDay?.id ?? ''}
               onSelect={setSelectedActivityDayId}
               indicatorColor="#2E1065"
-              indicatorGlowColor="#4C2A9E"
+              indicatorGlowColor="rgba(76,42,158,0.58)"
             />
           </View>
 
@@ -1343,11 +1405,11 @@ export default function HomeScreen() {
                     fallback={<Text style={styles.requestLinkIconFallback}>T</Text>}
                   />
                 </View>
-                <View style={styles.requestLinkCountPill}>
+                <View style={[styles.requestLinkCountPill, styles.requestLinkCountPillPayments]}>
                   <Text style={styles.requestLinkCountText}>{paymentVouchers.length}</Text>
                 </View>
               </View>
-              <Text style={[styles.requestLinkTitle, isLightMode && { color: theme.colors.text }]}>Vouchers</Text>
+              <Text style={[styles.requestLinkTitle, isLightMode && { color: theme.colors.text }]}>My Vouchers</Text>
               <Text style={[styles.requestLinkBody, isLightMode && { color: theme.colors.textMuted }]}>
                 Renewals, freezes, and shop requests paid at the counter.
               </Text>
@@ -1367,7 +1429,7 @@ export default function HomeScreen() {
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={[theme.ink(0.08), theme.ink(0), 'rgba(0,0,0,0.08)']}
+                colors={['rgba(225,29,46,0.18)', 'rgba(76,10,20,0.10)', 'rgba(0,0,0,0.36)']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFillObject}
@@ -1381,7 +1443,7 @@ export default function HomeScreen() {
                     fallback={<Text style={styles.requestLinkIconFallback}>R</Text>}
                   />
                 </View>
-                <View style={styles.requestLinkCountPill}>
+                <View style={[styles.requestLinkCountPill, styles.requestLinkCountPillReservations]}>
                   <Text style={styles.requestLinkCountText}>{reservationVouchers.length}</Text>
                 </View>
               </View>
@@ -1644,25 +1706,18 @@ function useStyles(theme: AppTheme) {
     borderWidth: 1,
     borderColor: theme.ink(0.14),
     borderRadius: 26,
+    backgroundColor: 'transparent',
     width: '100%',
     padding: 20,
     marginBottom: 22,
-    shadowColor: '#E11D2E',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.12,
-    shadowRadius: 28,
+    shadowColor: theme.scheme === 'light' ? '#0A0B0F' : '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
     elevation: 6,
   },
   guestHeroFade: {
     ...StyleSheet.absoluteFillObject,
-  },
-  heroGloss: {
-    position: 'absolute',
-    top: 0,
-    left: 18,
-    right: 18,
-    height: 1,
-    backgroundColor: theme.ink(0.22),
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -1712,9 +1767,9 @@ function useStyles(theme: AppTheme) {
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: theme.ink(0.28),
+    borderColor: theme.ink(0.14),
     borderRadius: 32,
-    backgroundColor: theme.ink(0.06),
+    backgroundColor: theme.ink(0.08),
     overflow: 'hidden',
   },
   avatarImage: {
@@ -1937,16 +1992,26 @@ function useStyles(theme: AppTheme) {
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: theme.scheme === 'light' ? 'rgba(177,18,38,0.18)' : 'rgba(255,255,255,0.12)',
+    borderColor: theme.ink(0.18),
     borderRadius: 26,
-    backgroundColor: theme.scheme === 'light' ? 'rgba(255,255,255,0.22)' : 'rgba(18,20,28,0.82)',
+    backgroundColor: theme.scheme === 'light' ? 'rgba(255,255,255,0.22)' : 'transparent',
     width: '100%',
     padding: 18,
-    shadowColor: theme.scheme === 'light' ? '#E11D2E' : '#000000',
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: theme.scheme === 'light' ? 0.12 : 0.52,
-    shadowRadius: 32,
+    shadowColor: theme.colors.textMuted,
+    shadowOffset: { width: 0, height: theme.scheme === 'light' ? 18 : 0 },
+    shadowOpacity: theme.scheme === 'light' ? 0.12 : 0.58,
+    shadowRadius: theme.scheme === 'light' ? 32 : 20,
     elevation: 12,
+  },
+  daysCardGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '52%',
+  },
+  daysInactiveScrim: {
+    backgroundColor: theme.scheme === 'light' ? 'rgba(120,120,128,0.22)' : 'rgba(60,64,72,0.42)',
   },
   daysCrystalFacet: {
     position: 'absolute',
@@ -2101,16 +2166,16 @@ function useStyles(theme: AppTheme) {
   activityPanel: {
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: theme.ink(0.12),
+    borderColor: theme.scheme === 'light' ? theme.ink(0.12) : 'rgba(155, 127, 240, 0.18)',
     borderRadius: 26,
-    backgroundColor: 'rgba(18, 20, 28, 0.68)',
+    backgroundColor: theme.scheme === 'light' ? 'rgba(18, 20, 28, 0.68)' : 'transparent',
     padding: 15,
     marginBottom: 22,
-    shadowColor: theme.colors.redBright,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.16,
-    shadowRadius: 22,
-    elevation: 6,
+    shadowColor: theme.scheme === 'light' ? theme.colors.redBright : '#8B5CF6',
+    shadowOffset: { width: 0, height: theme.scheme === 'light' ? 16 : 0 },
+    shadowOpacity: theme.scheme === 'light' ? 0.16 : 0.26,
+    shadowRadius: theme.scheme === 'light' ? 22 : 14,
+    elevation: theme.scheme === 'light' ? 6 : 6,
   },
   activityPanelLight: {
     borderColor: theme.colors.border,
@@ -2161,22 +2226,31 @@ function useStyles(theme: AppTheme) {
     elevation: 7,
   },
   actionChipRenew: {
-    borderColor: 'rgba(225, 29, 46, 0.4)',
-    backgroundColor: 'rgba(177, 18, 38, 0.28)',
+    borderColor: 'rgba(225, 29, 46, 0.48)',
+    backgroundColor: 'transparent',
     shadowColor: theme.colors.redBright,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 14,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.58,
+    shadowRadius: 20,
+    elevation: 10,
   },
   actionChipFreeze: {
-    borderColor: 'rgba(96, 165, 250, 0.28)',
-    backgroundColor: 'rgba(30, 58, 92, 0.22)',
-    shadowColor: '#3B82F6',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.22,
-    shadowRadius: 14,
-    elevation: 4,
+    borderColor: 'rgba(96, 165, 250, 0.48)',
+    backgroundColor: 'transparent',
+    shadowColor: '#60A5FA',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.58,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  actionChipQr: {
+    borderColor: 'rgba(155, 127, 240, 0.48)',
+    backgroundColor: 'transparent',
+    shadowColor: '#6E4FCF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.58,
+    shadowRadius: 20,
+    elevation: 10,
   },
   actionChipLightGrey: {
     borderColor: 'rgba(10,11,15,0.14)',
@@ -2197,10 +2271,19 @@ function useStyles(theme: AppTheme) {
     backgroundColor: accentColor,
   },
   actionIconWrapRenew: {
-    backgroundColor: theme.colors.redBright,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 91, 106, 0.5)',
+    backgroundColor: 'rgba(225, 29, 46, 0.34)',
   },
   actionIconWrapFreeze: {
-    backgroundColor: 'rgba(59, 130, 246, 0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(147, 197, 253, 0.5)',
+    backgroundColor: 'rgba(59, 130, 246, 0.34)',
+  },
+  actionIconWrapQr: {
+    borderWidth: 1,
+    borderColor: 'rgba(192, 132, 252, 0.5)',
+    backgroundColor: 'rgba(76, 42, 158, 0.34)',
   },
   actionIcon: {
     color: '#FFFFFF',
@@ -2263,6 +2346,33 @@ function useStyles(theme: AppTheme) {
   featurePressed: {
     opacity: 0.9,
     transform: [{ scale: 0.985 }],
+  },
+  featureCardAiPlanGlow: {
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(155, 127, 240, 0.4)',
+    shadowColor: '#6E4FCF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.65,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  featureCardMachineGuideGlow: {
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(225, 29, 46, 0.4)',
+    shadowColor: '#E11D2E',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.65,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  featureCardHowToUseGlow: {
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 18,
+    elevation: 9,
   },
   featureWatermark: {
     position: 'absolute',
@@ -2479,23 +2589,34 @@ function useStyles(theme: AppTheme) {
   },
   requestLinkCardPayments: {
     borderColor: 'rgba(76, 42, 158, 0.55)',
-    backgroundColor: 'rgba(20, 10, 52, 0.90)',
+    backgroundColor: 'transparent',
+    shadowColor: '#6E4FCF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.65,
+    shadowRadius: 20,
+    elevation: 10,
   },
   requestLinkCardReservations: {
-    borderColor: 'rgba(225, 29, 46, 0.2)',
+    borderColor: 'rgba(225, 29, 46, 0.42)',
     backgroundColor: 'transparent',
+    shadowColor: '#E11D2E',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 20,
+    elevation: 10,
   },
   requestLinkCardGlass: {
-    borderColor: 'rgba(10,11,15,0.78)',
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    shadowColor: '#E11D2E',
-    shadowOpacity: 0.12,
+    backgroundColor: 'transparent',
   },
   requestLinkCardPaymentsLight: {
-    backgroundColor: 'rgba(76,42,158,0.16)',
+    borderColor: 'rgba(76, 42, 158, 0.55)',
+    shadowColor: '#6E4FCF',
+    shadowOpacity: 0.5,
   },
   requestLinkCardReservationsLight: {
-    backgroundColor: 'rgba(177,18,38,0.14)',
+    borderColor: 'rgba(177, 18, 38, 0.36)',
+    shadowColor: '#E11D2E',
+    shadowOpacity: 0.38,
   },
   requestLinkTopRow: {
     flexDirection: 'row',
@@ -2517,7 +2638,7 @@ function useStyles(theme: AppTheme) {
   },
   requestLinkIconWrapReservations: {
     borderColor: 'rgba(225, 29, 46, 0.38)',
-    backgroundColor: 'rgba(225, 29, 46, 0.16)',
+    backgroundColor: 'rgba(28, 6, 10, 0.64)',
   },
   requestLinkIconFallback: {
     color: '#FFFFFF',
@@ -2525,18 +2646,32 @@ function useStyles(theme: AppTheme) {
     fontWeight: '900',
   },
   requestLinkCountPill: {
-    minWidth: 30,
-    height: 30,
+    minWidth: 38,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.ink(0.16),
     borderRadius: 999,
-    backgroundColor: theme.ink(0.1),
-    paddingHorizontal: 8,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    paddingHorizontal: 12,
+  },
+  requestLinkCountPillPayments: {
+    borderColor: 'rgba(155, 127, 240, 0.42)',
+    backgroundColor: 'rgba(76, 42, 158, 0.18)',
+  },
+  requestLinkCountPillReservations: {
+    borderColor: 'rgba(255, 91, 106, 0.38)',
+    backgroundColor: 'rgba(225, 29, 46, 0.14)',
   },
   requestLinkCountText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
+    includeFontPadding: false,
+    lineHeight: 14,
+    textAlign: 'center',
+    textAlignVertical: 'center',
   },
   requestLinkTitle: {
     color: '#FFFFFF',

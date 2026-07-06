@@ -43,6 +43,7 @@ type GlowingChipsProps = {
   chipStyle?: StyleProp<ViewStyle>;
   unselectedChipStyle?: StyleProp<ViewStyle>;
   labelStyle?: StyleProp<TextStyle>;
+  trailingLabelStyle?: StyleProp<TextStyle>;
   /** Fill color of the gliding selection pill. Defaults to the red accent. */
   indicatorColor?: string;
   /** Border/glow color of the selection pill. Defaults to the bright red accent. */
@@ -64,6 +65,7 @@ export function GlowingChips({
   chipStyle,
   unselectedChipStyle,
   labelStyle,
+  trailingLabelStyle,
   indicatorColor = premiumColors.red,
   indicatorGlowColor = premiumColors.redBright,
 }: GlowingChipsProps) {
@@ -104,7 +106,7 @@ export function GlowingChips({
         toValue: layout.x,
         duration: 140,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(indicatorWidth, {
         toValue: layout.width,
@@ -216,7 +218,12 @@ export function GlowingChips({
                 {item.label}
               </Text>
               {item.trailingLabel ? (
-                <Text style={[styles.chipCount, isSelected && styles.chipCountSelected]}>
+                <Text
+                  style={[
+                    styles.chipCount,
+                    isSelected && styles.chipCountSelected,
+                    trailingLabelStyle,
+                  ]}>
                   {item.trailingLabel}
                 </Text>
               ) : null}

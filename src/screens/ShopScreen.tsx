@@ -16,6 +16,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import type { LayoutChangeEvent, ViewStyle } from 'react-native';
@@ -42,10 +43,6 @@ const accentColor = premiumColors.red;
 const mutedColor = premiumColors.textMuted;
 const shopHeartPurple = '#A855F7';
 
-// Faint Marvel logo signs used as glow-box watermarks.
-const ORDERS_SIGN = require('@/assets/images/marvel-logo-startup-sign-dot.png');
-const VOUCHERS_SIGN = require('@/assets/images/marvel-logo-startup-sign-x.png');
-
 type OrderTab = 'Confirmed' | 'Canceled';
 
 // Member-facing shop categories. Each groups one or more underlying
@@ -59,6 +56,8 @@ type CategoryMeta = {
   fallback: string;
   sources: ProductCategory[];
 };
+
+type ProductCardLayout = { height: number; y: number };
 
 const categoryMeta: CategoryMeta[] = [
   { key: 'Supplements', symbol: 'pills.fill', fallback: 'Su', sources: ['Supplements'] },
@@ -110,6 +109,16 @@ function getVoucherStatusColor(status: VoucherStatus) {
   if (status === 'Confirmed') return premiumColors.success;
   if (status === 'Canceled') return premiumColors.textMuted;
   return premiumColors.warning;
+}
+
+function getReservationKind(product: Product) {
+  if (product.category === 'Beverages') return 'Drink';
+  if (product.category === 'Nutrition') return 'Snack';
+  if (product.category === 'Supplements') return 'Supplement';
+  if (product.category === 'Equipment') return 'Equipment';
+  if (product.category === 'Accessories') return 'Accessory';
+  if (product.category === 'Apparel') return 'Apparel';
+  return 'Item';
 }
 
 function RatingStars({ rating }: { rating: number }) {
@@ -332,6 +341,7 @@ function GlideSegmentedControl<T extends string>({
 
 export default function ShopScreen() {
   const theme = useAppTheme();
+  const { height: windowHeight } = useWindowDimensions();
   const isLight = theme.scheme === 'light';
   const surfaceTextStyle = isLight ? { color: theme.colors.text } : undefined;
   const priceTextStyle = { color: theme.colors.text };
@@ -371,7 +381,13 @@ export default function ShopScreen() {
   const [toastText, setToastText] = useState('');
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [expandedBox, setExpandedBox] = useState<'vouchers' | 'orders' | null>(null);
+  const [pendingScrollProductId, setPendingScrollProductId] = useState<string>();
+  const [highlightedProductId, setHighlightedProductId] = useState<string>();
 
+  const contentScrollRef = useRef<ScrollView>(null);
+  const productGridYRef = useRef(0);
+  const productLayoutRef = useRef<Record<string, ProductCardLayout>>({});
+  const productHighlightAnim = useRef(new Animated.Value(0)).current;
   const shopFadeAnim = useRef(new Animated.Value(1)).current;
   const shopIndexRef = useRef(0);
 
@@ -466,6 +482,57 @@ export default function ShopScreen() {
     return () => clearInterval(timer);
   }, [featuredProducts.length, transitionToShopSlide]);
 
+  useEffect(() => {
+    if (!pendingScrollProductId) return undefined;
+    if (!visibleProducts.some((product) => product.id === pendingScrollProductId)) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      const productLayout = productLayoutRef.current[pendingScrollProductId];
+      contentScrollRef.current?.scrollTo({
+        animated: true,
+        y: Math.max(
+          0,
+          productGridYRef.current +
+            (productLayout?.y ?? 0) -
+            windowHeight / 2 +
+            (productLayout?.height ?? 260) / 2,
+        ),
+      });
+      setHighlightedProductId(pendingScrollProductId);
+      setPendingScrollProductId(undefined);
+    }, 120);
+
+    return () => clearTimeout(timer);
+  }, [pendingScrollProductId, visibleProducts, windowHeight]);
+
+  useEffect(() => {
+    if (!highlightedProductId) {
+      productHighlightAnim.setValue(0);
+      return undefined;
+    }
+
+    productHighlightAnim.setValue(0);
+    const animation = Animated.sequence([
+      Animated.timing(productHighlightAnim, {
+        toValue: 1,
+        duration: 260,
+        useNativeDriver: false,
+      }),
+      Animated.timing(productHighlightAnim, {
+        toValue: 0,
+        duration: 900,
+        useNativeDriver: false,
+      }),
+    ]);
+    animation.start(({ finished }) => {
+      if (finished) setHighlightedProductId(undefined);
+    });
+
+    return () => animation.stop();
+  }, [highlightedProductId, productHighlightAnim]);
+
   const categoryCounts = useMemo(() => {
     const counts = new Map<ShopCategory, number>();
     products.forEach((product) => {
@@ -506,7 +573,10 @@ export default function ShopScreen() {
         voucherQuantity > 1
           ? `${voucherQuantity}x ${pendingVoucherProduct.name}`
           : pendingVoucherProduct.name;
-      await voucherService.createShopVoucher(label, totalAmount);
+      await voucherService.createShopVoucher(
+        label,
+        totalAmount,
+      );
       await loadData();
       setPendingVoucherProduct(undefined);
       setVoucherQuantity(1);
@@ -519,6 +589,39 @@ export default function ShopScreen() {
   const handleCancelPendingVoucher = async (voucherId: string) => {
     await voucherService.cancelVoucher(voucherId);
     await loadData();
+  };
+
+  const selectedProductHighlightStyle = {
+    borderColor: productHighlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.56)'],
+    }),
+    shadowColor: '#FFFFFF',
+    shadowOpacity: productHighlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.08, 0.32],
+    }),
+    shadowRadius: productHighlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [6, 13],
+    }),
+    transform: [
+      {
+        scale: productHighlightAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [1, 1.006],
+        }),
+      },
+    ],
+  };
+
+  const scrollToProduct = (product: Product) => {
+    const shopCategory = shopCategoryOf(product);
+    if (shopCategory) setSelectedCategory(shopCategory);
+    setShowFavoritesOnly(false);
+    setSearch('');
+    setSearchOpen(false);
+    setPendingScrollProductId(product.id);
   };
 
   if (isLoading) {
@@ -537,6 +640,7 @@ export default function ShopScreen() {
     <PremiumScreenBackground redHorizonHeight={400}>
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
       <ScrollView
+        ref={contentScrollRef}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         {/* Header — matches Classes (big italic title + tagline) */}
@@ -635,10 +739,7 @@ export default function ShopScreen() {
                       ) : null}
                     </View>
                     <Pressable
-                      onPress={() => {
-                        setPendingVoucherProduct(product);
-                        setVoucherQuantity(1);
-                      }}
+                      onPress={() => scrollToProduct(product)}
                       style={({ pressed }) => [
                         styles.featuredBookBtn,
                         pressed && styles.buttonPressed,
@@ -827,7 +928,11 @@ export default function ShopScreen() {
             </Text>
           </View>
         ) : (
-          <View style={styles.productGrid}>
+          <View
+            onLayout={(event: LayoutChangeEvent) => {
+              productGridYRef.current = event.nativeEvent.layout.y;
+            }}
+            style={styles.productGrid}>
             {visibleProducts.map((product) => {
               const imageUri = getDisplayProductImageUri(product);
               const isFavorite = favorites.has(product.id);
@@ -840,7 +945,17 @@ export default function ShopScreen() {
                     )
                   : undefined;
               return (
-                <View key={product.id} style={[styles.productCard, themedSurfaceStyle]}>
+                <Animated.View
+                  key={product.id}
+                  onLayout={(event: LayoutChangeEvent) => {
+                    const { height, y } = event.nativeEvent.layout;
+                    productLayoutRef.current[product.id] = { height, y };
+                  }}
+                  style={[
+                    styles.productCard,
+                    themedSurfaceStyle,
+                    highlightedProductId === product.id && selectedProductHighlightStyle,
+                  ]}>
                   <View style={styles.productImageWrap}>
                     {imageUri ? (
                       <Image
@@ -920,7 +1035,7 @@ export default function ShopScreen() {
                       <Text style={styles.voucherButtonText}>Order</Text>
                     </Pressable>
                   </View>
-                </View>
+                </Animated.View>
               );
             })}
           </View>
@@ -949,11 +1064,6 @@ export default function ShopScreen() {
               expandedBox === 'vouchers' && styles.actBoxActive,
               isLight && expandedBox === 'vouchers' && styles.actBoxActiveLight,
             ]}>
-            <Image
-              source={VOUCHERS_SIGN}
-              style={styles.actBoxWatermark}
-              resizeMode="contain"
-            />
             <SymbolView
               name="ticket.fill"
               size={24}
@@ -976,11 +1086,6 @@ export default function ShopScreen() {
               expandedBox === 'orders' && styles.actBoxActive,
               isLight && expandedBox === 'orders' && styles.actBoxActiveLight,
             ]}>
-            <Image
-              source={ORDERS_SIGN}
-              style={styles.actBoxWatermark}
-              resizeMode="contain"
-            />
             <SymbolView
               name="bag.fill"
               size={24}
@@ -1114,29 +1219,40 @@ export default function ShopScreen() {
           <View style={[styles.modalCard, themedSurfaceStyle]}>
             {pendingVoucherProduct ? (
               <>
-                <Text style={styles.modalKicker}>Place Order</Text>
+                <Text style={styles.modalKicker}>
+                  Reserve {getReservationKind(pendingVoucherProduct)}
+                </Text>
                 <Text style={[styles.modalTitle, surfaceTextStyle]}>{pendingVoucherProduct.name}</Text>
                 <Text style={[styles.modalBody, mutedTextStyle]}>
                   A pending order is created and paid in cash at the counter.
                 </Text>
 
-                <View style={styles.stepperRow}>
+                <View style={styles.quantityAdjuster}>
                   <Pressable
-                    onPress={() => setVoucherQuantity((v) => Math.max(1, v - 1))}
-                    style={styles.stepperButton}>
-                    <Text style={styles.stepperButtonText}>-</Text>
+                    onPress={() => setVoucherQuantity((value) => Math.max(1, value - 1))}
+                    style={({ pressed }) => [
+                      styles.quantityButton,
+                      pressed && styles.buttonPressed,
+                    ]}>
+                    <Text style={styles.quantityButtonText}>-</Text>
                   </Pressable>
-                  <View style={styles.stepperValueCard}>
-                    <Text style={styles.stepperValue}>{voucherQuantity}</Text>
-                    <Text style={styles.stepperLabel}>
-                      qty · {formatPrice(pendingVoucherProduct.price * voucherQuantity)}
-                    </Text>
+                  <View style={styles.quantityValuePill}>
+                    <Text style={styles.quantityValue}>{voucherQuantity}</Text>
                   </View>
                   <Pressable
-                    onPress={() => setVoucherQuantity((v) => Math.min(20, v + 1))}
-                    style={styles.stepperButton}>
-                    <Text style={styles.stepperButtonText}>+</Text>
+                    onPress={() => setVoucherQuantity((value) => Math.min(20, value + 1))}
+                    style={({ pressed }) => [
+                      styles.quantityButton,
+                      pressed && styles.buttonPressed,
+                    ]}>
+                    <Text style={styles.quantityButtonText}>+</Text>
                   </Pressable>
+                </View>
+
+                <View style={styles.orderAmountRow}>
+                  <Text style={[styles.orderAmountText, mutedTextStyle]}>
+                    {formatPrice(pendingVoucherProduct.price * voucherQuantity)}
+                  </Text>
                 </View>
 
                 <View style={styles.modalActionRow}>
@@ -1369,18 +1485,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 16,
-    borderRadius: 18,
+    borderRadius: 16,
     backgroundColor: premiumColors.red,
-    paddingVertical: 15,
+    paddingVertical: 12,
     ...premiumGlow,
   },
   featuredBookBtnText: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '900',
     letterSpacing: 0.6,
   },
-  featuredBookBtnArrow: { color: '#FFFFFF', fontSize: 20, fontWeight: '900' },
+  featuredBookBtnArrow: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
   pagination: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -1832,15 +1948,15 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginTop: 8,
   },
-  stepperRow: {
+  quantityAdjuster: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     marginTop: 18,
   },
-  stepperButton: {
-    width: 50,
-    height: 50,
+  quantityButton: {
+    width: 46,
+    height: 46,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -1848,30 +1964,34 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
-  stepperButtonText: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  stepperValueCard: {
-    flex: 1,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 16,
-    backgroundColor: premiumColors.surfaceSoft,
-    paddingVertical: 10,
-  },
-  stepperValue: {
+  quantityButtonText: {
     color: '#FFFFFF',
     fontSize: 22,
     fontWeight: '900',
   },
-  stepperLabel: {
-    color: mutedColor,
-    fontSize: 12,
+  quantityValuePill: {
+    flex: 1,
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    borderRadius: 16,
+    backgroundColor: premiumColors.surfaceSoft,
+  },
+  quantityValue: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  orderAmountRow: {
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  orderAmountText: {
+    color: premiumColors.textMuted,
+    fontSize: 14,
     fontWeight: '800',
-    marginTop: 2,
   },
   modalActionRow: {
     flexDirection: 'row',
@@ -1936,7 +2056,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: premiumColors.glassBorder,
     borderRadius: 22,
-    backgroundColor: premiumColors.surface,
+    backgroundColor: 'transparent',
     paddingVertical: 22,
     paddingHorizontal: 10,
     gap: 4,

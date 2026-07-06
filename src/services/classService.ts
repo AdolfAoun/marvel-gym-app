@@ -375,6 +375,25 @@ export const cancelClassRegistration = async (
   return updatedClass;
 };
 
+export const getClassVoucherId = async (
+  classId: string,
+): Promise<string | undefined> => classVoucherMap.get(classId);
+
+export const cancelClassRegistrationByVoucher = async (
+  voucherId: string,
+): Promise<GymClass | undefined> => {
+  const classId = [...classVoucherMap.entries()].find(
+    ([, mappedVoucherId]) => mappedVoucherId === voucherId,
+  )?.[0];
+
+  if (classId) {
+    return cancelClassRegistration(classId);
+  }
+
+  await cancelVoucherById(voucherId);
+  return undefined;
+};
+
 export const getLatestClassUpdate = async (): Promise<
   AppNotification | undefined
 > => {
@@ -389,5 +408,7 @@ export const classService = {
   deleteAdminClass,
   registerForClass,
   cancelClassRegistration,
+  getClassVoucherId,
+  cancelClassRegistrationByVoucher,
   getLatestClassUpdate,
 };
