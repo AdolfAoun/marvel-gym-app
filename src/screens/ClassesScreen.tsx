@@ -15,6 +15,7 @@ import {
   Alert,
   Animated,
   Dimensions,
+  Easing,
   Image,
   Linking,
   Modal,
@@ -520,11 +521,27 @@ function WeekPageStrip({
               void Haptics.selectionAsync().catch(() => undefined);
               onSelect(day.iso);
             }}
-            style={[styles.dayCell, isLight && styles.dayCellLight]}>
-            <Text style={[styles.dayCellShort, selected && styles.dayCellTextActive]}>
+            style={[
+              styles.dayCell,
+              isLight && styles.dayCellLight,
+              selected && styles.dayCellSelected,
+            ]}>
+            <Text
+              style={[
+                styles.dayCellShort,
+                isLight && styles.dayCellTextLight,
+                selected && styles.dayCellTextActive,
+                selected && isLight && styles.dayCellTextActiveLight,
+              ]}>
               {day.short}
             </Text>
-            <Text style={[styles.dayCellNum, selected && styles.dayCellTextActive]}>
+            <Text
+              style={[
+                styles.dayCellNum,
+                isLight && styles.dayCellTextLight,
+                selected && styles.dayCellTextActive,
+                selected && isLight && styles.dayCellTextActiveLight,
+              ]}>
               {day.num}
             </Text>
             {day.isToday ? (
@@ -563,8 +580,10 @@ export default function ClassesScreen() {
     d.setHours(0, 0, 0, 0);
     return d.toISOString();
   });
+  const [visualSelectedIso, setVisualSelectedIso] = useState(selectedIso);
   const [weekOffset, setWeekOffset] = useState(0);
   const weekScrollRef = useRef<ScrollView>(null);
+  const selectedIsoCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [scheduleFilter, setScheduleFilter] = useState<ScheduleFilter>('ALL');
   const [pendingAction, setPendingAction] = useState<{
@@ -591,6 +610,8 @@ export default function ClassesScreen() {
   const chipPillW = useRef(new Animated.Value(0)).current;
   const contentScrollRef = useRef<ScrollView>(null);
   const timelineYRef = useRef(0);
+  const searchRowYRef = useRef(0);
+  const searchRowHRef = useRef(0);
   const vouchersPanelYRef = useRef(0);
   const classLayoutRef = useRef<Record<string, ClassRowLayout>>({});
   const classHighlightAnim = useRef(new Animated.Value(0)).current;
@@ -599,9 +620,21 @@ export default function ClassesScreen() {
   const allWeeksData = useMemo(() => [-1, 0, 1].map(getWeekDays), []);
 
   const selectedOffset = offsetFromToday(selectedIso);
+  const visualSelectedOffset = offsetFromToday(visualSelectedIso);
   const selectedDay = getWeekdayName(selectedIso);
   const normalizedSearch = search.trim().toLowerCase();
   const normalizedPtSearch = ptSearch.trim().toLowerCase();
+
+  const selectDate = useCallback((iso: string) => {
+    setVisualSelectedIso(iso);
+    if (selectedIsoCommitTimerRef.current) {
+      clearTimeout(selectedIsoCommitTimerRef.current);
+    }
+    selectedIsoCommitTimerRef.current = setTimeout(() => {
+      setSelectedIso(iso);
+      selectedIsoCommitTimerRef.current = null;
+    }, 340);
+  }, []);
 
   const filteredTrainers = PT_TRAINERS.filter((t) => {
     if (ptShowFavoritesOnly && !favorites.has(t.id)) return false;
@@ -614,6 +647,15 @@ export default function ClassesScreen() {
     const pageIdx = weekOffset + 1;
     weekScrollRef.current?.scrollTo({ x: pageIdx * DATE_PAGE_W, animated: true });
   }, [weekOffset]);
+
+  useEffect(
+    () => () => {
+      if (selectedIsoCommitTimerRef.current) {
+        clearTimeout(selectedIsoCommitTimerRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     const layout = chipLayouts[scheduleFilter];
@@ -745,16 +787,25 @@ export default function ClassesScreen() {
       return undefined;
     }
 
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
     classHighlightAnim.setValue(0);
     const animation = Animated.sequence([
       Animated.timing(classHighlightAnim, {
         toValue: 1,
-        duration: 260,
+        duration: 240,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+      Animated.timing(classHighlightAnim, {
+        toValue: 0.12,
+        duration: 520,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: false,
       }),
       Animated.timing(classHighlightAnim, {
         toValue: 0,
-        duration: 900,
+        duration: 340,
+        easing: Easing.out(Easing.quad),
         useNativeDriver: false,
       }),
     ]);
@@ -771,16 +822,25 @@ export default function ClassesScreen() {
       return undefined;
     }
 
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
     voucherHighlightAnim.setValue(0);
     const animation = Animated.sequence([
       Animated.timing(voucherHighlightAnim, {
         toValue: 1,
-        duration: 260,
+        duration: 240,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+      Animated.timing(voucherHighlightAnim, {
+        toValue: 0.12,
+        duration: 520,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: false,
       }),
       Animated.timing(voucherHighlightAnim, {
         toValue: 0,
-        duration: 900,
+        duration: 340,
+        easing: Easing.out(Easing.quad),
         useNativeDriver: false,
       }),
     ]);
@@ -822,25 +882,36 @@ export default function ClassesScreen() {
     }
   };
 
+  // Same bright-red selection glow in both themes (red reads clearly on the
+  // dark surface too), just a touch stronger in light mode where the card is
+  // pale.
   const selectedClassHighlightStyle = {
     borderColor: classHighlightAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: ['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.56)'],
+      outputRange: ['rgba(225,29,46,0.30)', 'rgba(225,29,46,0.95)'],
     }),
-    shadowColor: '#FFFFFF',
+    borderWidth: classHighlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [1, 2],
+    }),
+    backgroundColor: classHighlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['rgba(225,29,46,0)', isLight ? 'rgba(225,29,46,0.12)' : 'rgba(225,29,46,0.16)'],
+    }),
+    shadowColor: '#E11D2E',
     shadowOpacity: classHighlightAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: [0.08, 0.32],
+      outputRange: isLight ? [0.12, 0.5] : [0.12, 0.6],
     }),
     shadowRadius: classHighlightAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: [6, 13],
+      outputRange: [8, 20],
     }),
     transform: [
       {
         scale: classHighlightAnim.interpolate({
           inputRange: [0, 1],
-          outputRange: [1, 1.006],
+          outputRange: [1, isLight ? 1.025 : 1.02],
         }),
       },
     ],
@@ -849,20 +920,57 @@ export default function ClassesScreen() {
   const selectedVoucherHighlightStyle = {
     borderColor: voucherHighlightAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: ['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.48)'],
+      outputRange: ['rgba(225,29,46,0.28)', 'rgba(225,29,46,0.9)'],
     }),
-    shadowColor: '#FFFFFF',
+    borderWidth: voucherHighlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [1, 2],
+    }),
+    backgroundColor: voucherHighlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['rgba(225,29,46,0)', isLight ? 'rgba(225,29,46,0.11)' : 'rgba(225,29,46,0.15)'],
+    }),
+    shadowColor: '#E11D2E',
     shadowOpacity: voucherHighlightAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: [0.06, 0.24],
+      outputRange: isLight ? [0.1, 0.45] : [0.1, 0.55],
     }),
     shadowRadius: voucherHighlightAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: [4, 10],
+      outputRange: [7, 18],
     }),
+    transform: [
+      {
+        scale: voucherHighlightAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [1, 1.02],
+        }),
+      },
+    ],
+  };
+
+  // Opens the search field and scrolls it toward the vertical middle of the
+  // screen so it sits above the keyboard and stays readable while typing.
+  const openSearchAndRecenter = () => {
+    void Haptics.selectionAsync().catch(() => undefined);
+    setSearchOpen(true);
+    setTimeout(() => {
+      contentScrollRef.current?.scrollTo({
+        animated: true,
+        y: Math.max(
+          0,
+          searchRowYRef.current - windowHeight / 2 + searchRowHRef.current / 2,
+        ),
+      });
+    }, 60);
   };
 
   const scrollToClass = (gymClass: GymClass) => {
+    if (selectedIsoCommitTimerRef.current) {
+      clearTimeout(selectedIsoCommitTimerRef.current);
+      selectedIsoCommitTimerRef.current = null;
+    }
+    setVisualSelectedIso(gymClass.startTime);
     setSelectedIso(gymClass.startTime);
     setScheduleFilter(gymClass.category);
     setShowFavoritesOnly(false);
@@ -966,7 +1074,9 @@ export default function ClassesScreen() {
 
         {/* ── FEATURED — fixed widget, swipe inside to change ──────── */}
         <View style={styles.featuredOuterLabel}>
-          <Text style={[styles.featuredOuterLabelText, surfaceTextStyle]}>MOST POPULAR</Text>
+          <View style={styles.featuredOuterPill}>
+            <Text style={styles.featuredOuterLabelText}>MOST POPULAR</Text>
+          </View>
         </View>
 
         <View style={styles.featuredWidget}>
@@ -1092,46 +1202,6 @@ export default function ClassesScreen() {
             </Animated.ScrollView>
             <View pointerEvents="none" style={styles.featuredGlassSpecular} />
           </View>
-
-          {carouselItems.length > 1 ? (
-            <View style={styles.featuredDotsRow}>
-              {carouselItems.map((_, index) => {
-                // Real item `index` lives at loop-space page `index + 1`
-                // (a leading clone occupies page 0). Fading each dot's
-                // opacity/scale by its distance from the current scroll
-                // position — rather than toggling which dots render —
-                // is what makes the 3-dot window glide smoothly instead
-                // of popping; at the first/last item there's no neighbor
-                // on one side, so only 2 dots ever reach visible opacity.
-                const center = (index + 1) * FEAT_PAGE_W;
-                const dotOpacity = featuredScrollX.interpolate({
-                  inputRange: [
-                    center - 2 * FEAT_PAGE_W,
-                    center - FEAT_PAGE_W,
-                    center,
-                    center + FEAT_PAGE_W,
-                    center + 2 * FEAT_PAGE_W,
-                  ],
-                  outputRange: [0, 0.4, 1, 0.4, 0],
-                  extrapolate: 'clamp',
-                });
-                const dotScale = featuredScrollX.interpolate({
-                  inputRange: [center - FEAT_PAGE_W, center, center + FEAT_PAGE_W],
-                  outputRange: [0.6, 1, 0.6],
-                  extrapolate: 'clamp',
-                });
-                return (
-                  <Animated.View
-                    key={`feat-dot-${index}`}
-                    style={[
-                      styles.featuredDot,
-                      { opacity: dotOpacity, transform: [{ scale: dotScale }] },
-                    ]}
-                  />
-                );
-              })}
-            </View>
-          ) : null}
         </View>
 
         {/* ── WELLNESS & SPA SESSIONS ───────────────────────────── */}
@@ -1191,7 +1261,18 @@ export default function ClassesScreen() {
                 </View>
                 {/* CTA */}
                 <Pressable
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+                  }}
                   style={({ pressed }) => [styles.specialBookBtn, pressed && styles.btnPressed]}>
+                  <LinearGradient
+                    pointerEvents="none"
+                    colors={['#FF2638', '#B11226', '#2A0308']}
+                    locations={[0, 0.58, 1]}
+                    start={{ x: 0.08, y: 0 }}
+                    end={{ x: 0.92, y: 1 }}
+                    style={StyleSheet.absoluteFillObject}
+                  />
                   <Text style={styles.specialBookText}>Book Session</Text>
                   <Text style={styles.specialBookArrow}> ›</Text>
                 </Pressable>
@@ -1204,6 +1285,17 @@ export default function ClassesScreen() {
         <View style={styles.specialDots}>
           {SPECIAL_SESSIONS.map((_, i) => {
             const pageOffset = i * (SPA_CARD_W + SPA_CARD_GAP);
+            const dotOpacity = specialScrollX.interpolate({
+              inputRange: [
+                pageOffset - 2 * (SPA_CARD_W + SPA_CARD_GAP),
+                pageOffset - (SPA_CARD_W + SPA_CARD_GAP),
+                pageOffset,
+                pageOffset + (SPA_CARD_W + SPA_CARD_GAP),
+                pageOffset + 2 * (SPA_CARD_W + SPA_CARD_GAP),
+              ],
+              outputRange: [0, 0.4, 1, 0.4, 0],
+              extrapolate: 'clamp',
+            });
             const dotColor = specialScrollX.interpolate({
               inputRange: [
                 pageOffset - (SPA_CARD_W + SPA_CARD_GAP),
@@ -1211,10 +1303,19 @@ export default function ClassesScreen() {
                 pageOffset + (SPA_CARD_W + SPA_CARD_GAP),
               ],
               outputRange: [
-                'rgba(255,255,255,0.22)',
+                isLight ? 'rgba(166,174,189,0.72)' : mutedColor,
                 premiumColors.redBright,
-                'rgba(255,255,255,0.22)',
+                isLight ? 'rgba(166,174,189,0.72)' : mutedColor,
               ],
+              extrapolate: 'clamp',
+            });
+            const dotScale = specialScrollX.interpolate({
+              inputRange: [
+                pageOffset - (SPA_CARD_W + SPA_CARD_GAP),
+                pageOffset,
+                pageOffset + (SPA_CARD_W + SPA_CARD_GAP),
+              ],
+              outputRange: [0.82, 1.22, 0.82],
               extrapolate: 'clamp',
             });
 
@@ -1233,6 +1334,8 @@ export default function ClassesScreen() {
                     styles.specialDot,
                     {
                       backgroundColor: dotColor,
+                      opacity: dotOpacity,
+                      transform: [{ scale: dotScale }],
                     },
                   ]}
                 />
@@ -1292,9 +1395,9 @@ export default function ClassesScreen() {
                 key={wIdx}
                 week={week}
                 weekIdx={wIdx}
-                selectedOffset={selectedOffset}
+                selectedOffset={visualSelectedOffset}
                 isLight={isLight}
-                onSelect={setSelectedIso}
+                onSelect={selectDate}
               />
             ))}
           </ScrollView>
@@ -1324,13 +1427,18 @@ export default function ClassesScreen() {
         </View>
 
         {/* ── SELECTED-DAY HEADER + SEARCH / FAVORITES ────────── */}
-        <View style={styles.todayRow}>
+        <View
+          style={styles.todayRow}
+          onLayout={(event) => {
+            searchRowYRef.current = event.nativeEvent.layout.y;
+            searchRowHRef.current = event.nativeEvent.layout.height;
+          }}>
           <View style={styles.todayLabelBlock}>
             <Text style={[styles.todayLabel, surfaceTextStyle]} numberOfLines={1}>
-              {relativeDayLabel(selectedOffset).toUpperCase()}
+              {relativeDayLabel(visualSelectedOffset).toUpperCase()}
             </Text>
             <Text style={[styles.todayDate, mutedTextStyle]} numberOfLines={1}>
-              {fmtFullDate(selectedIso)}
+              {fmtFullDate(visualSelectedIso)}
             </Text>
           </View>
           <View style={styles.sectionIcons}>
@@ -1377,8 +1485,8 @@ export default function ClassesScreen() {
               </View>
             ) : (
               <Pressable
-                onPress={() => setSearchOpen(true)}
-                style={styles.iconBtnSmall}>
+                onPress={openSearchAndRecenter}
+                style={[styles.iconBtnSmall, isLight && styles.iconBtnSmallLight]}>
                 <SymbolView
                   name="magnifyingglass"
                   size={18}
@@ -1422,7 +1530,10 @@ export default function ClassesScreen() {
                     return { ...current, [f.key]: { x, width } };
                   });
                 }}
-                onPress={() => setScheduleFilter(f.key)}
+                onPress={() => {
+                  void Haptics.selectionAsync().catch(() => undefined);
+                  setScheduleFilter(f.key);
+                }}
                 style={[
                   styles.chip,
                   isLight && styles.chipLight,
@@ -1578,6 +1689,7 @@ export default function ClassesScreen() {
                       <Pressable
                         disabled={isFull}
                         onPress={() => {
+                          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
                           if (isReserved) {
                             scrollToClassVoucher(gymClass);
                           } else {
@@ -1590,6 +1702,16 @@ export default function ClassesScreen() {
                           isFull && styles.timelineBookNowDisabled,
                           pressed && !isFull && styles.btnPressed,
                         ]}>
+                        {!isReserved && !isFull ? (
+                          <LinearGradient
+                            pointerEvents="none"
+                            colors={['#FF2638', '#B11226', '#2A0308']}
+                            locations={[0, 0.58, 1]}
+                            start={{ x: 0.08, y: 0 }}
+                            end={{ x: 0.92, y: 1 }}
+                            style={StyleSheet.absoluteFillObject}
+                          />
+                        ) : null}
                         <Text
                           adjustsFontSizeToFit
                           minimumFontScale={0.72}
@@ -1602,7 +1724,7 @@ export default function ClassesScreen() {
                             ? 'VIEW BOOKING'
                             : isFull
                               ? 'FULL'
-                              : 'BOOK NOW'}
+                              : 'Book Session'}
                         </Text>
                       </Pressable>
                     </View>
@@ -1659,7 +1781,12 @@ export default function ClassesScreen() {
                   </Pressable>
                 </View>
               ) : (
-                <Pressable onPress={() => setPtSearchOpen(true)} style={styles.iconBtnSmall}>
+                <Pressable
+                  onPress={() => {
+                    void Haptics.selectionAsync().catch(() => undefined);
+                    setPtSearchOpen(true);
+                  }}
+                  style={[styles.iconBtnSmall, isLight && styles.iconBtnSmallLight]}>
                   <SymbolView
                     name="magnifyingglass"
                     size={18}
@@ -1737,6 +1864,16 @@ export default function ClassesScreen() {
                 </View>
                 {/* CTA */}
                 <View style={[styles.ptBookBtn, trainer.available ? styles.ptBookBtnActive : styles.ptBookBtnDisabled]}>
+                  {trainer.available ? (
+                    <LinearGradient
+                      pointerEvents="none"
+                      colors={['#FF2638', '#B11226', '#2A0308']}
+                      locations={[0, 0.58, 1]}
+                      start={{ x: 0.08, y: 0 }}
+                      end={{ x: 0.92, y: 1 }}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                  ) : null}
                   <Text style={[styles.ptBookText, !trainer.available && styles.ptBookTextMuted]}>
                     {trainer.available ? 'Contact Trainer' : 'Unavailable'}
                   </Text>
@@ -2000,23 +2137,35 @@ export default function ClassesScreen() {
                 ) : null}
                 <View style={styles.modalActions}>
                   <Pressable
-                    onPress={() => setPendingAction(undefined)}
+                    onPress={() => {
+                      void Haptics.selectionAsync().catch(() => undefined);
+                      setPendingAction(undefined);
+                    }}
                     style={({ pressed }) => [styles.modalSecBtn, pressed && styles.btnPressed]}>
-                    <Text style={styles.modalSecText}>Back</Text>
+                    <Text style={styles.modalSecText}>Cancel</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => {
                       if (!pendingAction) return;
+                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
                       if (pendingAction.action === 'cancel') {
                         handleCancel(pendingAction.gymClass.id);
                       } else {
                         handleReserve(pendingAction.gymClass.id);
                       }
                     }}
-                    style={({ pressed }) => [styles.modalPrimBtn, pressed && styles.btnPressed]}>
-                    <Text style={styles.modalPrimText}>
-                      {pendingAction.action === 'reserve' ? 'Confirm' : 'Cancel booking'}
-                    </Text>
+                    style={({ pressed }) => [styles.modalPrimBtnWrap, pressed && styles.btnPressed]}>
+                    <LinearGradient
+                      colors={['#FF2638', '#B11226', '#2A0308']}
+                      locations={[0, 0.58, 1]}
+                      start={{ x: 0.08, y: 0 }}
+                      end={{ x: 0.92, y: 1 }}
+                      style={styles.modalPrimBtn}>
+                      <View pointerEvents="none" style={styles.modalPrimBtnGloss} />
+                      <Text style={styles.modalPrimText}>
+                        {pendingAction.action === 'reserve' ? 'Confirm' : 'Cancel booking'}
+                      </Text>
+                    </LinearGradient>
                   </Pressable>
                 </View>
               </>
@@ -2070,6 +2219,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.18)',
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.07)',
+  },
+  iconBtnSmallLight: {
+    borderColor: 'rgba(100,116,139,0.55)',
+    backgroundColor: 'rgba(100,116,139,0.10)',
   },
   iconBtnActive: {
     borderColor: 'rgba(225,29,46,0.55)',
@@ -2142,12 +2295,12 @@ const styles = StyleSheet.create({
     borderRadius: DATE_NAV_BUTTON_W / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(8,5,5,0.72)',
+    backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
   },
   weekEdgeBtnLight: {
-    backgroundColor: 'rgba(255,255,255,0.72)',
+    backgroundColor: 'transparent',
     borderColor: 'rgba(10,11,15,0.12)',
   },
   weekEdgeBtnLeft: {},
@@ -2173,11 +2326,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 10,
   },
+  featuredOuterPill: {
+    borderWidth: 1,
+    borderColor: 'rgba(225,29,46,0.45)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(225,29,46,0.09)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
   featuredOuterLabelText: {
-    color: '#FFFFFF',
-    fontSize: 13,
+    color: premiumColors.redBright,
+    fontSize: 9,
     fontWeight: '900',
-    letterSpacing: 2.5,
+    letterSpacing: 1,
   },
   featuredOuterCounter: {
     color: '#FFFFFF',
@@ -2188,19 +2349,6 @@ const styles = StyleSheet.create({
   featuredOuterCounterFaint: {
     color: 'rgba(255,255,255,0.28)',
     fontWeight: '700',
-  },
-  featuredDotsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 12,
-  },
-  featuredDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: premiumColors.redBright,
   },
   featuredGlassSpecular: {
     position: 'absolute',
@@ -2245,7 +2393,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
+    borderColor: 'rgba(255,255,255,0.52)',
     ...premiumShadow,
   },
   featuredSlidePressable: {
@@ -2306,7 +2454,12 @@ const styles = StyleSheet.create({
   statGlyph: { color: 'rgba(255,255,255,0.7)', fontSize: 10 },
   btnPressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
 
-  specialDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: 'rgba(255,255,255,0.22)' },
+  specialDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(166,174,189,0.72)',
+  },
 
   // Today header
   todayRow: {
@@ -2375,7 +2528,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   timelineStartTime: { color: premiumColors.red, fontSize: 15, fontWeight: '900', textAlign: 'center', width: 58 },
-  timelineEndTime: { color: mutedColor, fontSize: 15, fontWeight: '800', textAlign: 'center', width: 58 },
+  timelineEndTime: { color: '#4B5563', fontSize: 15, fontWeight: '800', textAlign: 'center', width: 58 },
   timelineCard: {
     flex: 1,
     flexDirection: 'row',
@@ -2464,12 +2617,13 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
     minHeight: 26,
     marginTop: 8,
     borderWidth: 1.2,
-    borderColor: 'rgba(225,29,46,0.55)',
+    borderColor: 'rgba(255,91,106,0.72)',
     borderRadius: 999,
-    backgroundColor: 'rgba(7,2,5,0.45)',
+    backgroundColor: 'transparent',
     paddingHorizontal: 12,
     shadowColor: premiumColors.redBright,
     shadowOffset: { width: 0, height: 6 },
@@ -2594,6 +2748,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.04)',
   },
   dayCellActive: {},
+  dayCellSelected: {
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+  },
   dayPill: {
     position: 'absolute',
     left: 0,
@@ -2601,24 +2759,23 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: DATE_CELL_W,
     borderRadius: 12,
-    backgroundColor: 'rgba(177, 18, 38, 0.34)',
-    borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.72)',
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.65,
-    shadowRadius: 12,
-    elevation: 6,
+    backgroundColor: 'rgba(225, 29, 46, 0.24)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(225, 29, 46, 0.92)',
   },
   dayPillLight: {
-    borderColor: 'rgba(225, 29, 46, 0.68)',
+    backgroundColor: 'rgba(225, 29, 46, 0.22)',
+    borderColor: 'rgba(225, 29, 46, 0.92)',
   },
   dayCellLight: {
     borderColor: 'rgba(148, 163, 184, 0.55)',
+    backgroundColor: 'rgba(255,255,255,0.42)',
   },
   dayCellShort: { color: mutedColor, fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
   dayCellNum: { color: mutedColor, fontSize: 15, fontWeight: '900', marginTop: 2 },
   dayCellTextActive: { color: '#FFFFFF' },
+  dayCellTextLight: { color: 'rgba(91, 98, 112, 0.96)' },
+  dayCellTextActiveLight: { color: '#FFFFFF' },
   todayDot: {
     width: 4,
     height: 4,
@@ -2631,8 +2788,8 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
   },
   todayDotActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#FFFFFF',
+    backgroundColor: premiumColors.redBright,
+    shadowColor: premiumColors.redBright,
   },
 
   // Boxes heading
@@ -2913,23 +3070,40 @@ const styles = StyleSheet.create({
   },
   modalSecBtn: {
     flex: 1,
-    minHeight: 50,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 16,
-    backgroundColor: premiumColors.surfaceSoft,
+    borderWidth: 1.4,
+    borderColor: 'rgba(225,29,46,0.55)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(7,2,5,0.45)',
   },
-  modalSecText: { color: mutedColor, fontSize: 14, fontWeight: '900' },
-  modalPrimBtn: {
+  modalSecText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  modalPrimBtnWrap: {
     flex: 1.4,
-    minHeight: 50,
+    borderRadius: 999,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  modalPrimBtn: {
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
-    backgroundColor: premiumColors.red,
-    ...premiumGlow,
+    overflow: 'hidden',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,91,106,0.72)',
+    borderRadius: 999,
+  },
+  modalPrimBtnGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '42%',
+    backgroundColor: 'rgba(255,255,255,0.075)',
   },
   modalPrimText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
 
@@ -2998,7 +3172,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(225,29,46,0.55)',
+    borderColor: 'rgba(255,255,255,0.52)',
     padding: 16,
     justifyContent: 'space-between',
     shadowColor: premiumColors.redBright,
@@ -3061,16 +3235,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: premiumColors.redBright,
-    borderRadius: 14,
-    backgroundColor: premiumColors.red,
+    position: 'relative',
+    overflow: 'hidden',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,91,106,0.72)',
+    borderRadius: 999,
+    backgroundColor: 'transparent',
     paddingVertical: 9,
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 5,
+    ...premiumGlow,
   },
   specialBookText: {
     color: '#FFFFFF',
@@ -3079,14 +3251,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   specialBookArrow: {
-    color: premiumColors.redBright,
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '900',
   },
   specialDots: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 6,
+    gap: 5,
     marginBottom: 20,
   },
 
@@ -3231,18 +3403,15 @@ const styles = StyleSheet.create({
   ptBookBtn: {
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
     minHeight: 40,
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 999,
+    borderWidth: 1.2,
   },
   ptBookBtnActive: {
-    backgroundColor: premiumColors.red,
-    borderColor: premiumColors.redBright,
-    shadowColor: premiumColors.redBright,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 5,
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(255,91,106,0.72)',
+    ...premiumGlow,
   },
   ptBookBtnDisabled: {
     backgroundColor: 'rgba(255,255,255,0.04)',

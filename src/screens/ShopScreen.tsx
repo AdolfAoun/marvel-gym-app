@@ -386,6 +386,8 @@ export default function ShopScreen() {
 
   const contentScrollRef = useRef<ScrollView>(null);
   const productGridYRef = useRef(0);
+  const searchRowYRef = useRef(0);
+  const searchRowHRef = useRef(0);
   const productLayoutRef = useRef<Record<string, ProductCardLayout>>({});
   const productHighlightAnim = useRef(new Animated.Value(0)).current;
   const shopFadeAnim = useRef(new Animated.Value(1)).current;
@@ -513,16 +515,25 @@ export default function ShopScreen() {
       return undefined;
     }
 
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
     productHighlightAnim.setValue(0);
     const animation = Animated.sequence([
       Animated.timing(productHighlightAnim, {
         toValue: 1,
-        duration: 260,
+        duration: 240,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+      Animated.timing(productHighlightAnim, {
+        toValue: 0.12,
+        duration: 520,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: false,
       }),
       Animated.timing(productHighlightAnim, {
         toValue: 0,
-        duration: 900,
+        duration: 340,
+        easing: Easing.out(Easing.quad),
         useNativeDriver: false,
       }),
     ]);
@@ -580,6 +591,7 @@ export default function ShopScreen() {
       await loadData();
       setPendingVoucherProduct(undefined);
       setVoucherQuantity(1);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
       showToast('Voucher created successfully');
     } finally {
       setIsCreatingVoucher(false);
@@ -591,28 +603,55 @@ export default function ShopScreen() {
     await loadData();
   };
 
+  // Same bright-red selection glow in both themes (red reads clearly on the
+  // dark surface too), just a touch stronger in light mode where the card is
+  // pale.
   const selectedProductHighlightStyle = {
     borderColor: productHighlightAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: ['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.56)'],
+      outputRange: ['rgba(225,29,46,0.30)', 'rgba(225,29,46,0.95)'],
     }),
-    shadowColor: '#FFFFFF',
+    borderWidth: productHighlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [1, 2],
+    }),
+    backgroundColor: productHighlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['rgba(225,29,46,0)', isLight ? 'rgba(225,29,46,0.12)' : 'rgba(225,29,46,0.16)'],
+    }),
+    shadowColor: '#E11D2E',
     shadowOpacity: productHighlightAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: [0.08, 0.32],
+      outputRange: isLight ? [0.12, 0.5] : [0.12, 0.6],
     }),
     shadowRadius: productHighlightAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: [6, 13],
+      outputRange: [8, 20],
     }),
     transform: [
       {
         scale: productHighlightAnim.interpolate({
           inputRange: [0, 1],
-          outputRange: [1, 1.006],
+          outputRange: [1, isLight ? 1.025 : 1.02],
         }),
       },
     ],
+  };
+
+  // Opens the search field and scrolls it toward the vertical middle of the
+  // screen so it sits above the keyboard and stays readable while typing.
+  const openSearchAndRecenter = () => {
+    void Haptics.selectionAsync().catch(() => undefined);
+    setSearchOpen(true);
+    setTimeout(() => {
+      contentScrollRef.current?.scrollTo({
+        animated: true,
+        y: Math.max(
+          0,
+          searchRowYRef.current - windowHeight / 2 + searchRowHRef.current / 2,
+        ),
+      });
+    }, 60);
   };
 
   const scrollToProduct = (product: Product) => {
@@ -739,12 +778,23 @@ export default function ShopScreen() {
                       ) : null}
                     </View>
                     <Pressable
-                      onPress={() => scrollToProduct(product)}
+                      onPress={() => {
+                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+                        scrollToProduct(product);
+                      }}
                       style={({ pressed }) => [
                         styles.featuredBookBtn,
                         pressed && styles.buttonPressed,
                       ]}>
-                      <Text style={styles.featuredBookBtnText}>SHOP NOW</Text>
+                      <LinearGradient
+                        pointerEvents="none"
+                        colors={['#FF2638', '#B11226', '#2A0308']}
+                        locations={[0, 0.58, 1]}
+                        start={{ x: 0.08, y: 0 }}
+                        end={{ x: 0.92, y: 1 }}
+                        style={StyleSheet.absoluteFillObject}
+                      />
+                      <Text style={styles.featuredBookBtnText}>Shop Now</Text>
                       <Text style={styles.featuredBookBtnArrow}> ›</Text>
                     </Pressable>
                   </View>
@@ -799,7 +849,10 @@ export default function ShopScreen() {
                     return { ...current, [meta.key]: { x, width } };
                   });
                 }}
-                onPress={() => setSelectedCategory(meta.key)}
+                onPress={() => {
+                  void Haptics.selectionAsync().catch(() => undefined);
+                  setSelectedCategory(meta.key);
+                }}
                 style={({ pressed }) => [
                   styles.categoryTile,
                   isLight && styles.categoryTileLight,
@@ -846,7 +899,12 @@ export default function ShopScreen() {
         </ScrollView>
 
         {/* Products */}
-        <View style={styles.sectionHeading}>
+        <View
+          style={styles.sectionHeading}
+          onLayout={(event) => {
+            searchRowYRef.current = event.nativeEvent.layout.y;
+            searchRowHRef.current = event.nativeEvent.layout.height;
+          }}>
           <View style={styles.accentBar} />
           <View style={styles.sectionHeadingText}>
             <Text style={styles.sectionEyebrow}>{selectedCategory}</Text>
@@ -898,11 +956,8 @@ export default function ShopScreen() {
               </View>
             ) : (
               <Pressable
-                onPress={() => {
-                  void Haptics.selectionAsync().catch(() => undefined);
-                  setSearchOpen(true);
-                }}
-                style={styles.iconBtnSmall}>
+                onPress={openSearchAndRecenter}
+                style={[styles.iconBtnSmall, isLight && styles.iconBtnSmallLight]}>
                 <SymbolView
                   name="magnifyingglass"
                   size={17}
@@ -1015,6 +1070,7 @@ export default function ShopScreen() {
                     </View>
                     <Pressable
                       onPress={() => {
+                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
                         setPendingVoucherProduct(product);
                         setVoucherQuantity(1);
                       }}
@@ -1022,6 +1078,14 @@ export default function ShopScreen() {
                         styles.voucherButton,
                         pressed && styles.buttonPressed,
                       ]}>
+                      <LinearGradient
+                        pointerEvents="none"
+                        colors={['#FF2638', '#B11226', '#2A0308']}
+                        locations={[0, 0.58, 1]}
+                        start={{ x: 0.08, y: 0 }}
+                        end={{ x: 0.92, y: 1 }}
+                        style={StyleSheet.absoluteFillObject}
+                      />
                       <SymbolView
                         name="bag.fill"
                         size={15}
@@ -1077,9 +1141,12 @@ export default function ShopScreen() {
 
           {/* ORDERS (right): confirmed + canceled history log */}
           <Pressable
-            onPress={() =>
-              setExpandedBox(expandedBox === 'orders' ? null : 'orders')
-            }
+            onPress={() => {
+              if (expandedBox !== 'orders') {
+                void Haptics.selectionAsync().catch(() => undefined);
+              }
+              setExpandedBox(expandedBox === 'orders' ? null : 'orders');
+            }}
             style={[
               styles.actBox,
               lightGlassStyle,
@@ -1229,23 +1296,31 @@ export default function ShopScreen() {
 
                 <View style={styles.quantityAdjuster}>
                   <Pressable
-                    onPress={() => setVoucherQuantity((value) => Math.max(1, value - 1))}
+                    onPress={() => {
+                      void Haptics.selectionAsync().catch(() => undefined);
+                      setVoucherQuantity((value) => Math.max(1, value - 1));
+                    }}
                     style={({ pressed }) => [
                       styles.quantityButton,
+                      isLight && styles.quantityButtonLight,
                       pressed && styles.buttonPressed,
                     ]}>
-                    <Text style={styles.quantityButtonText}>-</Text>
+                    <Text style={[styles.quantityButtonText, isLight && styles.quantityButtonTextLight]}>-</Text>
                   </Pressable>
-                  <View style={styles.quantityValuePill}>
-                    <Text style={styles.quantityValue}>{voucherQuantity}</Text>
+                  <View style={[styles.quantityValuePill, isLight && styles.quantityValuePillLight]}>
+                    <Text style={[styles.quantityValue, isLight && styles.quantityValueLight]}>{voucherQuantity}</Text>
                   </View>
                   <Pressable
-                    onPress={() => setVoucherQuantity((value) => Math.min(20, value + 1))}
+                    onPress={() => {
+                      void Haptics.selectionAsync().catch(() => undefined);
+                      setVoucherQuantity((value) => Math.min(20, value + 1));
+                    }}
                     style={({ pressed }) => [
                       styles.quantityButton,
+                      isLight && styles.quantityButtonLight,
                       pressed && styles.buttonPressed,
                     ]}>
-                    <Text style={styles.quantityButtonText}>+</Text>
+                    <Text style={[styles.quantityButtonText, isLight && styles.quantityButtonTextLight]}>+</Text>
                   </Pressable>
                 </View>
 
@@ -1272,7 +1347,16 @@ export default function ShopScreen() {
                       styles.modalPrimaryButton,
                       pressed && styles.buttonPressed,
                     ]}>
-                    <Text style={styles.modalPrimaryText}>Place order</Text>
+                    <LinearGradient
+                      pointerEvents="none"
+                      colors={['#FF2638', '#B11226', '#2A0308']}
+                      locations={[0, 0.58, 1]}
+                      start={{ x: 0.08, y: 0 }}
+                      end={{ x: 0.92, y: 1 }}
+                      style={styles.modalPrimaryFill}>
+                      <View pointerEvents="none" style={styles.modalPrimaryGloss} />
+                      <Text style={styles.modalPrimaryText}>Place Order</Text>
+                    </LinearGradient>
                   </Pressable>
                 </View>
               </>
@@ -1344,6 +1428,10 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     backgroundColor: 'rgba(148, 163, 184, 0.18)',
   },
+  iconBtnSmallLight: {
+    borderColor: 'rgba(100,116,139,0.55)',
+    backgroundColor: 'rgba(100,116,139,0.10)',
+  },
   iconBtnActive: {
     borderColor: 'rgba(225,29,46,0.55)',
     backgroundColor: 'rgba(177,18,38,0.2)',
@@ -1410,7 +1498,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
+    borderColor: 'rgba(255,255,255,0.52)',
     ...premiumShadow,
   },
   featuredFallback: {
@@ -1484,8 +1572,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
     marginTop: 16,
-    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,91,106,0.72)',
+    borderRadius: 999,
     backgroundColor: premiumColors.red,
     paddingVertical: 12,
     ...premiumGlow,
@@ -1775,11 +1867,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
     gap: 6,
+    overflow: 'hidden',
     minHeight: 40,
-    borderWidth: 1,
-    borderColor: premiumColors.redBright,
-    borderRadius: 12,
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,91,106,0.72)',
+    borderRadius: 999,
     backgroundColor: premiumColors.red,
     marginTop: 12,
     ...premiumGlow,
@@ -1880,16 +1974,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   voucherCancel: {
-    borderWidth: 1,
-    borderColor: 'rgba(225, 29, 46, 0.3)',
-    borderRadius: 12,
-    backgroundColor: 'rgba(177, 18, 38, 0.1)',
+    borderWidth: 1.4,
+    borderColor: 'rgba(225,29,46,0.55)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(7,2,5,0.45)',
     paddingHorizontal: 14,
     paddingVertical: 9,
     marginRight: 12,
   },
   voucherCancelText: {
-    color: premiumColors.redBright,
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '900',
   },
@@ -1964,10 +2058,17 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
+  quantityButtonLight: {
+    borderColor: 'rgba(107,114,128,0.55)',
+    backgroundColor: 'rgba(255,255,255,0.94)',
+  },
   quantityButtonText: {
     color: '#FFFFFF',
     fontSize: 22,
     fontWeight: '900',
+  },
+  quantityButtonTextLight: {
+    color: '#4B5563',
   },
   quantityValuePill: {
     flex: 1,
@@ -1979,10 +2080,17 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: premiumColors.surfaceSoft,
   },
+  quantityValuePillLight: {
+    borderColor: 'rgba(107,114,128,0.55)',
+    backgroundColor: 'rgba(255,255,255,0.94)',
+  },
   quantityValue: {
     color: '#FFFFFF',
     fontSize: 20,
     fontWeight: '900',
+  },
+  quantityValueLight: {
+    color: '#4B5563',
   },
   orderAmountRow: {
     alignItems: 'center',
@@ -2000,27 +2108,44 @@ const styles = StyleSheet.create({
   },
   modalSecondaryButton: {
     flex: 1,
-    minHeight: 50,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: premiumColors.border,
-    borderRadius: 16,
-    backgroundColor: premiumColors.surfaceSoft,
+    borderWidth: 1.4,
+    borderColor: 'rgba(225,29,46,0.55)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(7,2,5,0.45)',
   },
   modalSecondaryText: {
-    color: premiumColors.textMuted,
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '900',
   },
   modalPrimaryButton: {
     flex: 1.4,
-    minHeight: 50,
+    borderRadius: 999,
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  modalPrimaryFill: {
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
-    backgroundColor: premiumColors.red,
-    ...premiumGlow,
+    overflow: 'hidden',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,91,106,0.72)',
+    borderRadius: 999,
+  },
+  modalPrimaryGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '42%',
+    backgroundColor: 'rgba(255,255,255,0.075)',
   },
   modalPrimaryText: {
     color: '#FFFFFF',

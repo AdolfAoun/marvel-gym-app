@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  type GestureResponderEvent,
   Image,
   Linking,
   Modal,
@@ -190,6 +191,20 @@ export default function MachineGuideScreen() {
   sideIndexRef.current = sideIndex;
   const toggleDragStartX = useRef(0);
 
+  // Hold-to-swap: press and hold the figure for a beat and it "locks" into
+  // swipe mode (with a selection tick, like changing months in Journey), so a
+  // then-sideways drag flips the figure and the page scroll can't steal it.
+  const swipeLockRef     = useRef(false);
+  const holdTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartRef    = useRef({ x: 0, y: 0 });
+
+  const clearHold = () => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+  };
+
   const animateToIndex = (index: number) => {
     const to = -index * bodyPageW;
     committedX.current = to;
@@ -256,6 +271,87 @@ export default function MachineGuideScreen() {
     }),
   ).current;
 
+  // Swipe left/right directly on the mannequin to flip front ⇄ back. Only
+  // claims the gesture once it's clearly horizontal, so tapping a muscle still
+  // selects it and vertical drags still scroll the page. A short partial swipe
+  // (~18% of the width) or a quick flick is enough — no full-width drag needed.
+  const shouldClaimSwipe = (gesture: { dx: number; dy: number }) => {
+    // Once the hold lock is armed, claim any drag — even a vertical one — so
+    // the page can't run away with the gesture. Otherwise fall back to the
+    // lenient horizontal test (diagonals welcome).
+    if (swipeLockRef.current) return Math.abs(gesture.dx) > 2 || Math.abs(gesture.dy) > 2;
+    return Math.abs(gesture.dx) > 5 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 0.55;
+  };
+
+  const bodySwipeResponder = useRef(
+    PanResponder.create({
+      // Capture-phase claim beats the parent ScrollView when locked or clearly
+      // horizontal; taps (no movement) still fall through to muscle selection.
+      onMoveShouldSetPanResponderCapture: (_event, gesture) => shouldClaimSwipe(gesture),
+      onMoveShouldSetPanResponder: (_event, gesture) => shouldClaimSwipe(gesture),
+      onPanResponderGrant: () => clearHold(),
+      onPanResponderMove: (_event, gesture) => {
+        const nextX = Math.max(-bodyPageW, Math.min(0, committedX.current + gesture.dx));
+        translateX.setValue(nextX);
+      },
+      onPanResponderRelease: (_event, gesture) => {
+        const current = sideIndexRef.current;
+        // When locked in, an even lighter drag flips it; otherwise ~10%.
+        const threshold = bodyPageW * (swipeLockRef.current ? 0.05 : 0.1);
+        swipeLockRef.current = false;
+        clearHold();
+        let target = current;
+        if ((gesture.dx <= -threshold || gesture.vx <= -0.2) && current === 0) {
+          target = 1;
+        } else if ((gesture.dx >= threshold || gesture.vx >= 0.2) && current === 1) {
+          target = 0;
+        }
+
+        if (target !== current) {
+          setBodySide(target === 0 ? 'front' : 'back');
+          void Haptics.selectionAsync().catch(() => undefined);
+          return;
+        }
+
+        // Not enough to flip — settle back onto the current page.
+        animateToIndex(current);
+      },
+      onPanResponderTerminate: () => {
+        swipeLockRef.current = false;
+        clearHold();
+        animateToIndex(sideIndexRef.current);
+      },
+    }),
+  ).current;
+
+  // Raw touch handlers on the pager wrapper run alongside the pan responder and
+  // drive the hold timer independently of who wins the gesture, so a plain tap
+  // (finger lifts before the timer) never arms the lock.
+  const handleBodyTouchStart = (event: GestureResponderEvent) => {
+    const { pageX, pageY } = event.nativeEvent;
+    touchStartRef.current = { x: pageX, y: pageY };
+    clearHold();
+    holdTimerRef.current = setTimeout(() => {
+      swipeLockRef.current = true;
+      void Haptics.selectionAsync().catch(() => undefined);
+    }, 220);
+  };
+
+  const handleBodyTouchMove = (event: GestureResponderEvent) => {
+    if (swipeLockRef.current) return;
+    const { pageX, pageY } = event.nativeEvent;
+    const dx = Math.abs(pageX - touchStartRef.current.x);
+    const dy = Math.abs(pageY - touchStartRef.current.y);
+    // Moved off before the hold armed — treat as a normal tap/scroll and
+    // cancel the pending lock so the ScrollView keeps vertical drags.
+    if (dx > 12 || dy > 12) clearHold();
+  };
+
+  const handleBodyTouchEnd = () => {
+    swipeLockRef.current = false;
+    clearHold();
+  };
+
   // ── Data loading ──────────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
@@ -268,6 +364,9 @@ export default function MachineGuideScreen() {
     };
     load();
   }, []);
+
+  // Drop any pending hold timer when the screen goes away.
+  useEffect(() => clearHold, []);
 
   const availableGroups = useMemo(
     () => muscleOrder.filter((g) => guides.some((m) => m.muscleGroup === g)),
@@ -448,9 +547,14 @@ export default function MachineGuideScreen() {
             </Text>
           </View>
 
-          {/* Anatomical body — button-controlled front ⇄ back glide */}
+          {/* Anatomical body — swipe or toggle to glide front ⇄ back */}
           <View
-            style={{ width: bodyPageW, alignSelf: 'center', overflow: 'hidden' }}>
+            style={{ width: bodyPageW, alignSelf: 'center', overflow: 'hidden' }}
+            onTouchStart={handleBodyTouchStart}
+            onTouchMove={handleBodyTouchMove}
+            onTouchEnd={handleBodyTouchEnd}
+            onTouchCancel={handleBodyTouchEnd}
+            {...bodySwipeResponder.panHandlers}>
             <Animated.View
               style={{
                 flexDirection: 'row',

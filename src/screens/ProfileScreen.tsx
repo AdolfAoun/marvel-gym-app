@@ -41,13 +41,71 @@ type ProfileForm = {
 
 type EditableField = keyof ProfileForm;
 
-function formatDateInput(value: string) {
-  const digits = value.replace(/\D/g, '').slice(0, 8);
-  const day = digits.slice(0, 2);
-  const month = digits.slice(2, 4);
-  const year = digits.slice(4, 8);
+// Masks a DD/MM/YYYY date. Slashes are inserted proactively the moment a
+// section fills (so the user types digits only and never the "/"), but not
+// while deleting — otherwise backspacing a slash would immediately re-add it.
+function formatDateInput(next: string, prev: string) {
+  const deleting = next.length < prev.length;
+  const digits = next.replace(/\D/g, '').slice(0, 8);
 
-  return [day, month, year].filter(Boolean).join('/');
+  let out = digits.slice(0, 2);
+  if (digits.length > 2 || (digits.length === 2 && !deleting)) out += '/';
+  out += digits.slice(2, 4);
+  if (digits.length > 4 || (digits.length === 4 && !deleting)) out += '/';
+  out += digits.slice(4, 8);
+
+  return out;
+}
+
+// Returns a short error message for the given field, or '' if valid.
+function getFieldError(field: EditableField, value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+
+  if (field === 'firstName') {
+    return /\d/.test(trimmed) ? 'Name can’t contain numbers.' : '';
+  }
+
+  if (field === 'location') {
+    return /\d/.test(trimmed) ? 'Place can’t contain numbers.' : '';
+  }
+
+  if (field === 'email') {
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailPattern.test(trimmed.toLowerCase()) ? '' : 'Enter a valid email.';
+  }
+
+  if (field === 'dateOfBirth') {
+    const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(trimmed);
+    if (!match) return 'Use DD/MM/YYYY.';
+
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    const year = Number(match[3]);
+    const date = new Date(year, month - 1, day);
+
+    if (
+      date.getFullYear() !== year ||
+      date.getMonth() !== month - 1 ||
+      date.getDate() !== day
+    ) {
+      return 'Enter a real date.';
+    }
+
+    const today = new Date();
+    if (date.getTime() > today.getTime()) return 'Date can’t be in the future.';
+
+    let age = today.getFullYear() - year;
+    const hadBirthday =
+      today.getMonth() > month - 1 ||
+      (today.getMonth() === month - 1 && today.getDate() >= day);
+    if (!hadBirthday) age -= 1;
+
+    if (age > 100) return 'Age can’t exceed 100 years.';
+    if (age < 3) return 'Must be at least 3 years old.';
+  }
+
+  return '';
 }
 
 function toDisplayDate(value?: string) {
@@ -109,6 +167,7 @@ export default function ProfileScreen() {
   const [member, setMember] = useState<Member>();
   const [initialForm, setInitialForm] = useState<ProfileForm>();
   const [form, setForm] = useState<ProfileForm>();
+  const [userEditedFields, setUserEditedFields] = useState<Set<EditableField>>(new Set());
   const [editingField, setEditingField] = useState<EditableField>();
   const [isSaving, setIsSaving] = useState(false);
   const [isSignOutVisible, setIsSignOutVisible] = useState(false);
@@ -130,6 +189,7 @@ export default function ProfileScreen() {
       setMember(currentMember);
       setInitialForm(nextForm);
       setForm(nextForm);
+      setUserEditedFields(new Set());
       setInitialProfileImageUri(currentMember.profileImageUri ?? '');
       setDraftProfileImageUri(currentMember.profileImageUri ?? '');
       setStudentVerification(nextVerification);
@@ -146,11 +206,13 @@ export default function ProfileScreen() {
   };
 
   const handleEditField = (field: EditableField) => {
+    void Haptics.selectionAsync().catch(() => undefined);
     setEditingField(field);
     setFormError('');
   };
 
   const handleCancelField = (field: EditableField) => {
+    void Haptics.selectionAsync().catch(() => undefined);
     if (initialForm) {
       setForm((current) =>
         current ? { ...current, [field]: initialForm[field] } : current,
@@ -181,17 +243,14 @@ export default function ProfileScreen() {
     }
 
     const cleanEmail = form.email.trim().toLowerCase();
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const parsedDateOfBirth = parseDateOfBirth(form.dateOfBirth);
 
-    if (editingField === 'email' && cleanEmail && !emailPattern.test(cleanEmail)) {
-      setFormError('Enter a valid email address.');
-      return;
-    }
-
-    if (editingField === 'dateOfBirth' && form.dateOfBirth.trim() && !parsedDateOfBirth) {
-      setFormError('Enter date of birth as DD/MM/YYYY.');
-      return;
+    if (editingField) {
+      const fieldError = getFieldError(editingField, form[editingField]);
+      if (fieldError) {
+        setFormError(fieldError);
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -209,9 +268,13 @@ export default function ProfileScreen() {
       setMember(updatedMember);
       setInitialForm(nextForm);
       setForm(nextForm);
+      if (editingField) {
+        setUserEditedFields((current) => new Set(current).add(editingField));
+      }
       setInitialProfileImageUri(updatedMember.profileImageUri ?? '');
       setDraftProfileImageUri(updatedMember.profileImageUri ?? '');
       setEditingField(undefined);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     } finally {
       setIsSaving(false);
     }
@@ -373,6 +436,13 @@ export default function ProfileScreen() {
     profileImageUri: draftProfileImageUri,
   });
   const studentStatus = studentVerification?.status ?? 'Not Submitted';
+  const getEditableFieldTextStyle = (field: EditableField) => {
+    if (!isLight) return undefined;
+    if (editingField === field) return styles.inputEditingLight;
+    if (userEditedFields.has(field)) return styles.inputSavedLight;
+    return styles.inputPreviewLight;
+  };
+
   const renderFieldActions = (field: EditableField) => {
     const isFieldEditing = editingField === field;
 
@@ -385,6 +455,7 @@ export default function ProfileScreen() {
             style={({ pressed }) => [
               styles.fieldActionButton,
               styles.fieldCancelButton,
+              isLight && styles.fieldActionButtonLight,
               pressed && styles.buttonPressed,
             ]}>
             <SymbolView name="xmark.circle.fill" size={18} tintColor="#C4C9D1" weight="regular" />
@@ -395,6 +466,8 @@ export default function ProfileScreen() {
             onPress={handleDone}
             style={({ pressed }) => [
               styles.fieldActionButton,
+              isLight && styles.fieldActionButtonLight,
+              isLight && styles.fieldConfirmButtonLight,
               doneDisabled && styles.fieldActionButtonDisabled,
               pressed && !doneDisabled && styles.buttonPressed,
             ]}>
@@ -404,7 +477,15 @@ export default function ProfileScreen() {
               <SymbolView
                 name="checkmark"
                 size={16}
-                tintColor={doneDisabled ? premiumColors.textFaint : '#FFFFFF'}
+                tintColor={
+                  doneDisabled
+                    ? isLight
+                      ? '#9CA3AF'
+                      : premiumColors.textFaint
+                    : isLight
+                      ? '#111827'
+                      : '#FFFFFF'
+                }
                 weight="bold"
               />
             )}
@@ -420,6 +501,7 @@ export default function ProfileScreen() {
         style={({ pressed }) => [
           styles.fieldActionButton,
           styles.fieldEditButton,
+          isLight && styles.fieldActionButtonLight,
           isLight && styles.fieldEditButtonLight,
           pressed && styles.buttonPressed,
         ]}>
@@ -483,8 +565,16 @@ export default function ProfileScreen() {
                 placeholder="First name"
                 placeholderTextColor="#667282"
                 selectionColor={accentColor}
-                style={[styles.input, editingField !== 'firstName' && styles.inputReadOnly, isLight && editingField !== 'firstName' && styles.inputReadOnlyLight]}
+                style={[
+                  styles.input,
+                  editingField !== 'firstName' && styles.inputReadOnly,
+                  isLight && editingField !== 'firstName' && styles.inputReadOnlyLight,
+                  getEditableFieldTextStyle('firstName'),
+                ]}
               />
+              {editingField === 'firstName' && formError ? (
+                <Text style={styles.errorText}>{formError}</Text>
+              ) : null}
             </View>
 
             <View style={styles.fieldGroup}>
@@ -510,15 +600,25 @@ export default function ProfileScreen() {
             <TextInput
               value={form.dateOfBirth}
               onChangeText={(dateOfBirth) =>
-                updateForm({ dateOfBirth: formatDateInput(dateOfBirth) })
+                updateForm({
+                  dateOfBirth: formatDateInput(dateOfBirth, form.dateOfBirth),
+                })
               }
               editable={editingField === 'dateOfBirth'}
               keyboardType="number-pad"
               placeholder="DD/MM/YYYY"
               placeholderTextColor="#667282"
               selectionColor={accentColor}
-              style={[styles.input, editingField !== 'dateOfBirth' && styles.inputReadOnly, isLight && editingField !== 'dateOfBirth' && styles.inputReadOnlyLight]}
+              style={[
+                styles.input,
+                editingField !== 'dateOfBirth' && styles.inputReadOnly,
+                isLight && editingField !== 'dateOfBirth' && styles.inputReadOnlyLight,
+                getEditableFieldTextStyle('dateOfBirth'),
+              ]}
             />
+            {editingField === 'dateOfBirth' && formError ? (
+              <Text style={styles.errorText}>{formError}</Text>
+            ) : null}
           </View>
 
           <View style={styles.inputGroup}>
@@ -536,8 +636,16 @@ export default function ProfileScreen() {
               placeholder="member@marvelgym.com"
               placeholderTextColor="#667282"
               selectionColor={accentColor}
-              style={[styles.input, editingField !== 'email' && styles.inputReadOnly, isLight && editingField !== 'email' && styles.inputReadOnlyLight]}
+              style={[
+                styles.input,
+                editingField !== 'email' && styles.inputReadOnly,
+                isLight && editingField !== 'email' && styles.inputReadOnlyLight,
+                getEditableFieldTextStyle('email'),
+              ]}
             />
+            {editingField === 'email' && formError ? (
+              <Text style={styles.errorText}>{formError}</Text>
+            ) : null}
           </View>
 
           <View style={styles.inputGroup}>
@@ -552,11 +660,17 @@ export default function ProfileScreen() {
               placeholder="City, country"
               placeholderTextColor="#667282"
               selectionColor={accentColor}
-              style={[styles.input, editingField !== 'location' && styles.inputReadOnly, isLight && editingField !== 'location' && styles.inputReadOnlyLight]}
+              style={[
+                styles.input,
+                editingField !== 'location' && styles.inputReadOnly,
+                isLight && editingField !== 'location' && styles.inputReadOnlyLight,
+                getEditableFieldTextStyle('location'),
+              ]}
             />
+            {editingField === 'location' && formError ? (
+              <Text style={styles.errorText}>{formError}</Text>
+            ) : null}
           </View>
-
-          {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
         </View>
 
         <View style={[styles.card, isLight && styles.cardLight]}>
@@ -584,11 +698,6 @@ export default function ProfileScreen() {
                   ? 'Student ID could not be verified. Please upload a clearer proof.'
                   : 'Upload your student ID to benefit from our student discount.'}
           </Text>
-          {studentVerification?.proofLabel ? (
-            <Text style={[styles.studentProofText, isLight && styles.textStrongLight]}>
-              Proof: {studentVerification.proofLabel}
-            </Text>
-          ) : null}
           {studentVerificationMessage ? (
             <Text style={styles.studentMessageText}>{studentVerificationMessage}</Text>
           ) : null}
@@ -623,15 +732,15 @@ export default function ProfileScreen() {
       </ScrollView>
 
       <Modal transparent visible={isSignOutVisible} animationType="fade">
-        <View style={styles.centerModalOverlay}>
+        <View style={[styles.centerModalOverlay, isLight && styles.centerModalOverlayLight]}>
           <Pressable
-            style={styles.modalBackdrop}
+            style={[styles.modalBackdrop, isLight && styles.modalBackdropLight]}
             onPress={() => setIsSignOutVisible(false)}
           />
-          <View style={styles.confirmCard}>
-            <Text style={styles.sheetKicker}>Profile</Text>
-            <Text style={styles.sheetTitle}>Sign out?</Text>
-            <Text style={styles.sheetBody}>
+          <View style={[styles.confirmCard, isLight && styles.confirmCardLight]}>
+            <Text style={[styles.sheetKicker, isLight && styles.sheetKickerLight]}>Profile</Text>
+            <Text style={[styles.sheetTitle, isLight && styles.textStrongLight]}>Sign out?</Text>
+            <Text style={[styles.sheetBody, isLight && styles.sheetBodyLight]}>
               Are you sure you want to sign out?
             </Text>
             <View style={styles.confirmRow}>
@@ -639,9 +748,12 @@ export default function ProfileScreen() {
                 onPress={() => setIsSignOutVisible(false)}
                 style={({ pressed }) => [
                   styles.confirmSecondary,
+                  isLight && styles.confirmSecondaryLight,
                   pressed && styles.buttonPressed,
                 ]}>
-                <Text style={styles.confirmSecondaryText}>Cancel</Text>
+                <Text style={[styles.confirmSecondaryText, isLight && styles.confirmSecondaryTextLight]}>
+                  Cancel
+                </Text>
               </Pressable>
               <Pressable
                 onPress={handleSignOut}
@@ -748,7 +860,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: 'rgba(124, 92, 230, 0.78)',
     borderRadius: 999,
     backgroundColor: 'rgba(255, 255, 255, 0.16)',
     marginTop: 12,
@@ -905,11 +1017,19 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
+  fieldActionButtonLight: {
+    borderWidth: 1,
+    borderColor: 'rgba(107,114,128,0.42)',
+    backgroundColor: 'rgba(255,255,255,0.94)',
+  },
   fieldEditButton: {
     backgroundColor: 'rgba(148, 154, 166, 0.34)',
   },
   fieldEditButtonLight: {
     backgroundColor: 'rgba(100, 110, 130, 0.55)',
+  },
+  fieldConfirmButtonLight: {
+    borderColor: 'rgba(107,114,128,0.55)',
   },
   fieldCancelButton: {
     backgroundColor: 'transparent',
@@ -961,13 +1081,23 @@ const styles = StyleSheet.create({
     color: premiumColors.textMuted,
   },
   inputReadOnlyLight: {
-    color: '#14161D',
+    color: '#6B7280',
+  },
+  inputPreviewLight: {
+    color: '#6B7280',
+  },
+  inputEditingLight: {
+    color: '#374151',
+  },
+  inputSavedLight: {
+    color: '#000000',
   },
   errorText: {
-    color: '#F2B8BF',
+    color: '#EF4444',
     fontSize: 12,
     fontWeight: '800',
     lineHeight: 17,
+    marginTop: 6,
   },
   signOutButton: {
     minHeight: 52,
@@ -997,8 +1127,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.58)',
     padding: 20,
   },
+  centerModalOverlayLight: {
+    backgroundColor: 'transparent',
+  },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
+  },
+  modalBackdropLight: {
+    backgroundColor: 'rgba(248,250,252,0.44)',
   },
   confirmCard: {
     width: '100%',
@@ -1010,12 +1146,25 @@ const styles = StyleSheet.create({
     padding: 22,
     ...premiumShadow,
   },
+  confirmCardLight: {
+    borderColor: '#FFFFFF',
+    borderRadius: 26,
+    backgroundColor: 'rgba(232,234,238,0.90)',
+    shadowColor: premiumColors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.10,
+    shadowRadius: 20,
+    elevation: 10,
+  },
   sheetKicker: {
     color: premiumColors.redBright,
     fontSize: 12,
     fontWeight: '900',
     marginBottom: 6,
     textTransform: 'uppercase',
+  },
+  sheetKickerLight: {
+    color: '#6B7280',
   },
   sheetTitle: {
     color: premiumColors.text,
@@ -1029,6 +1178,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 20,
     marginTop: 8,
+  },
+  sheetBodyLight: {
+    color: '#4B5563',
   },
   confirmRow: {
     flexDirection: 'row',
@@ -1045,10 +1197,17 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: 'rgba(7,2,5,0.45)',
   },
+  confirmSecondaryLight: {
+    borderColor: 'rgba(107,114,128,0.30)',
+    backgroundColor: 'rgba(255,255,255,0.78)',
+  },
   confirmSecondaryText: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '900',
+  },
+  confirmSecondaryTextLight: {
+    color: '#111827',
   },
   confirmPrimaryWrap: {
     flex: 1,

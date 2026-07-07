@@ -111,6 +111,20 @@ export function PremiumScreenBackground({
       />
       <View pointerEvents="none" style={styles.vignette} />
       {children}
+      {/* Top fade: as content scrolls up under the status bar it dissolves
+          into the backdrop (like a soft shadow at the top edge) and
+          re-emerges when scrolled back down. Sits above the scrolling
+          content but is short enough to clear each screen's resting header. */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={
+          isDark
+            ? ['#0A0B0F', '#0A0B0F', 'rgba(10,11,15,0)']
+            : ['#F5F6F8', '#F5F6F8', 'rgba(245,246,248,0)']
+        }
+        locations={[0, 0.45, 1]}
+        style={styles.topFade}
+      />
     </View>
   );
 }
@@ -130,6 +144,13 @@ function useStyles(theme: AppTheme) {
           left: 0,
           right: 0,
           height: 420,
+        },
+        topFade: {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 58,
         },
         signLayer: {
           ...StyleSheet.absoluteFillObject,

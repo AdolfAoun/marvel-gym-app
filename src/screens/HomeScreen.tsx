@@ -459,46 +459,11 @@ export default function HomeScreen() {
   const [feedback, setFeedback] = useState('Ready when you are.');
   const [toastMessage, setToastMessage] = useState('');
   const modalProgress = useRef(new Animated.Value(0)).current;
-  const sheetPanY = useRef(new Animated.Value(0)).current;
   const qrPanY = useRef(new Animated.Value(0)).current;
   const toastProgress = useRef(new Animated.Value(0)).current;
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
-  const sheetPanResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) =>
-        gestureState.dy > 4 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
-      onMoveShouldSetPanResponderCapture: (_, gestureState) =>
-        gestureState.dy > 8 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
-      onPanResponderMove: (_, gestureState) => {
-        sheetPanY.setValue(Math.max(0, gestureState.dy));
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > 44 || gestureState.vy > 0.45) {
-          closeMembershipModal();
-          return;
-        }
-
-        Animated.spring(sheetPanY, {
-          toValue: 0,
-          useNativeDriver: true,
-          friction: 8,
-          tension: 90,
-        }).start();
-      },
-      onPanResponderTerminate: () => {
-        Animated.spring(sheetPanY, {
-          toValue: 0,
-          useNativeDriver: true,
-          friction: 8,
-          tension: 90,
-        }).start();
-      },
-      onPanResponderTerminationRequest: () => true,
-      onShouldBlockNativeResponder: () => false,
-    }),
-  ).current;
   const qrPanResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) =>
@@ -606,7 +571,6 @@ export default function HomeScreen() {
     }
 
     modalProgress.setValue(0);
-    sheetPanY.setValue(0);
     Animated.spring(modalProgress, {
       toValue: 1,
       useNativeDriver: true,
@@ -670,13 +634,11 @@ export default function HomeScreen() {
   };
 
   const closeMembershipModal = () => {
-    sheetPanY.stopAnimation();
     Animated.timing(modalProgress, {
       toValue: 0,
       duration: 160,
       useNativeDriver: true,
     }).start(() => {
-      sheetPanY.setValue(0);
       setMembershipModal(undefined);
     });
   };
@@ -747,6 +709,7 @@ export default function HomeScreen() {
       setFeedback(
         `${voucher.id} created. Complete the counter confirmation at the gym.`,
       );
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
       showToast('Voucher created');
       closeMembershipModal();
     } finally {
@@ -775,6 +738,7 @@ export default function HomeScreen() {
       setFeedback(
         `${voucher.id} created. Complete the counter confirmation at the gym.`,
       );
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
       showToast('Voucher created');
       closeMembershipModal();
     } finally {
@@ -823,7 +787,15 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.heroCard}>
+        <View style={[styles.heroCard, isLightMode && member?.firstName === 'Guest' && styles.heroCardGuestLight]}>
+          {isLightMode && member?.firstName === 'Guest' ? (
+            <LinearGradient
+              pointerEvents="none"
+              colors={['rgba(225,29,46,0.24)', 'rgba(177,18,38,0.12)', 'rgba(177,18,38,0)']}
+              locations={[0, 0.52, 1]}
+              style={styles.guestHeroFade}
+            />
+          ) : null}
           <View style={styles.heroTopRow}>
             <View style={styles.heroTextBlock}>
               <Text style={styles.kicker}>
@@ -868,7 +840,7 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.whatsNewWidget}>
-          <View style={styles.whatsNewCard}>
+          <View style={[styles.whatsNewCard, isLightMode && styles.whatsNewCardLight]}>
             <Animated.ScrollView
               ref={whatsNewScrollRef}
               horizontal
@@ -959,7 +931,6 @@ export default function HomeScreen() {
                 );
               })}
             </Animated.ScrollView>
-            <View pointerEvents="none" style={styles.whatsNewSpecular} />
           </View>
         </View>
 
@@ -1047,6 +1018,7 @@ export default function HomeScreen() {
           <View style={styles.actionGridInner}>
             <Pressable
               onPress={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
                 setSelectedRenewMonths(1);
                 setMembershipModal('renew');
               }}
@@ -1054,11 +1026,16 @@ export default function HomeScreen() {
                 styles.actionChip,
                 isLightMode && styles.actionChipLightGrey,
                 styles.actionChipRenew,
+                isLightMode && styles.actionChipRenewLight,
                 pressed && styles.buttonPressed,
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={['rgba(225,29,46,0.18)', 'rgba(177,18,38,0.08)', 'rgba(177,18,38,0)']}
+                colors={
+                  isLightMode
+                    ? ['rgba(225,29,46,0.24)', 'rgba(177,18,38,0.12)', 'rgba(177,18,38,0)']
+                    : ['rgba(225,29,46,0.18)', 'rgba(177,18,38,0.08)', 'rgba(177,18,38,0)']
+                }
                 locations={[0, 0.52, 1]}
                 style={styles.actionChipGloss}
               />
@@ -1071,6 +1048,7 @@ export default function HomeScreen() {
 
             <Pressable
               onPress={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
                 setSelectedFreezeWeeks(1);
                 setMembershipModal('freeze');
               }}
@@ -1078,11 +1056,16 @@ export default function HomeScreen() {
                 styles.actionChip,
                 isLightMode && styles.actionChipLightGrey,
                 styles.actionChipFreeze,
+                isLightMode && styles.actionChipFreezeLight,
                 pressed && styles.buttonPressed,
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={['rgba(96,165,250,0.18)', 'rgba(59,130,246,0.08)', 'rgba(59,130,246,0)']}
+                colors={
+                  isLightMode
+                    ? ['rgba(96,165,250,0.24)', 'rgba(59,130,246,0.12)', 'rgba(59,130,246,0)']
+                    : ['rgba(96,165,250,0.18)', 'rgba(59,130,246,0.08)', 'rgba(59,130,246,0)']
+                }
                 locations={[0, 0.52, 1]}
                 style={styles.actionChipGloss}
               />
@@ -1105,7 +1088,11 @@ export default function HomeScreen() {
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={['rgba(155,127,240,0.18)', 'rgba(76,42,158,0.09)', 'rgba(76,42,158,0)']}
+                colors={
+                  isLightMode
+                    ? ['rgba(155,127,240,0.24)', 'rgba(76,42,158,0.13)', 'rgba(76,42,158,0)']
+                    : ['rgba(155,127,240,0.18)', 'rgba(76,42,158,0.09)', 'rgba(76,42,158,0)']
+                }
                 locations={[0, 0.52, 1]}
                 style={styles.actionChipGloss}
               />
@@ -1172,7 +1159,11 @@ export default function HomeScreen() {
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={['rgba(225,29,46,0.30)', 'rgba(58,11,20,0.18)', 'rgba(22,6,9,0.08)']}
+                colors={
+                  isLightMode
+                    ? ['rgba(225,29,46,0.46)', 'rgba(58,11,20,0.30)', 'rgba(22,6,9,0.15)']
+                    : ['rgba(225,29,46,0.40)', 'rgba(58,11,20,0.26)', 'rgba(22,6,9,0.13)']
+                }
                 start={{ x: 0.1, y: 0 }}
                 end={{ x: 0.9, y: 1 }}
                 style={StyleSheet.absoluteFill}
@@ -1193,8 +1184,12 @@ export default function HomeScreen() {
                   />
                 </View>
               </View>
-              <Text style={styles.featureKicker}>Machine Guide</Text>
-              <Text style={styles.featureTitle}>Find the right equipment</Text>
+              <Text style={[styles.featureKicker, isLightMode && styles.featureTextMachineGuideLight]}>
+                Machine Guide
+              </Text>
+              <Text style={styles.featureTitle}>
+                Find the right equipment
+              </Text>
               <Text style={styles.featureBody}>
                 Pick a muscle group and get setup cues.
               </Text>
@@ -1223,7 +1218,11 @@ export default function HomeScreen() {
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={['rgba(46,16,101,0.32)', 'rgba(17,7,32,0.20)', 'rgba(10,4,20,0.10)']}
+                colors={
+                  isLightMode
+                    ? ['rgba(46,16,101,0.48)', 'rgba(17,7,32,0.32)', 'rgba(10,4,20,0.17)']
+                    : ['rgba(46,16,101,0.42)', 'rgba(17,7,32,0.28)', 'rgba(10,4,20,0.15)']
+                }
                 start={{ x: 0.1, y: 0 }}
                 end={{ x: 0.9, y: 1 }}
                 style={StyleSheet.absoluteFill}
@@ -1276,7 +1275,11 @@ export default function HomeScreen() {
               ]}>
               <LinearGradient
                 pointerEvents="none"
-                colors={['rgba(28,31,41,0.34)', 'rgba(20,22,29,0.22)', 'rgba(12,13,18,0.10)']}
+                colors={
+                  isLightMode
+                    ? ['rgba(28,31,41,0.50)', 'rgba(20,22,29,0.34)', 'rgba(12,13,18,0.18)']
+                    : ['rgba(28,31,41,0.44)', 'rgba(20,22,29,0.30)', 'rgba(12,13,18,0.16)']
+                }
                 start={{ x: 0.1, y: 0 }}
                 end={{ x: 0.9, y: 1 }}
                 style={StyleSheet.absoluteFill}
@@ -1297,7 +1300,7 @@ export default function HomeScreen() {
                   />
                 </View>
               </View>
-              <Text style={[styles.featureKicker, styles.featureKickerAi]}>
+              <Text style={[styles.featureKicker, styles.featureKickerAi, isLightMode && styles.featureKickerAiLight]}>
                 AI Gym Help
               </Text>
               <Text style={styles.featureTitle}>How to use the app</Text>
@@ -1337,8 +1340,8 @@ export default function HomeScreen() {
               }))}
               selectedKey={selectedActivityDay?.id ?? ''}
               onSelect={setSelectedActivityDayId}
-              indicatorColor="#2E1065"
-              indicatorGlowColor="rgba(76,42,158,0.58)"
+              indicatorColor={isLightMode ? '#A78BFA' : '#2E1065'}
+              indicatorGlowColor={isLightMode ? 'rgba(167,139,250,0.42)' : 'rgba(76,42,158,0.58)'}
             />
           </View>
 
@@ -1465,15 +1468,19 @@ export default function HomeScreen() {
             <Text style={styles.sectionHeadingTitle}>Updates</Text>
           </View>
         </View>
-        <View style={styles.infoCard}>
+        <View style={[styles.infoCard, isLightMode && styles.infoCardLight]}>
           <LinearGradient
             pointerEvents="none"
-            colors={[theme.ink(0.07), 'rgba(225,29,46,0.05)', theme.ink(0)]}
+            colors={
+              isLightMode
+                ? ['rgba(255,255,255,0.18)', 'rgba(225,29,46,0.035)', 'rgba(255,255,255,0)']
+                : [theme.ink(0.07), 'rgba(225,29,46,0.05)', theme.ink(0)]
+            }
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
           />
-          <Text style={styles.infoEmpty}>No recent updates</Text>
+          <Text style={[styles.infoEmpty, isLightMode && styles.infoEmptyLight]}>No recent updates</Text>
         </View>
       </ScrollView>
 
@@ -1492,23 +1499,15 @@ export default function HomeScreen() {
       ) : null}
 
       <Modal transparent visible={Boolean(membershipModal)} animationType="none">
-        <Animated.View style={[styles.modalOverlay, { opacity: modalProgress }]}>
+        <Animated.View style={[styles.centerModalOverlay, { opacity: modalProgress }]}>
           <Pressable style={styles.modalBackdrop} onPress={closeMembershipModal} />
           <Animated.View
             style={[
-              styles.modalCard,
+              styles.membershipModalCard,
               {
-                transform: [{ translateY: sheetPanY }, { scale: modalScale }],
+                transform: [{ scale: modalScale }],
               },
             ]}>
-            <View
-              pointerEvents="box-only"
-              style={styles.modalTopDragHitbox}
-              {...sheetPanResponder.panHandlers}
-            />
-            <View style={styles.modalDragZone}>
-              <View style={styles.modalHandle} />
-            </View>
             <View style={styles.modalHeaderRow}>
               <View style={[styles.modalIconWrap, { borderColor: sheetAccentBorder, backgroundColor: sheetAccentSoft }]}>
                 <SymbolView
@@ -1716,6 +1715,15 @@ function useStyles(theme: AppTheme) {
     shadowRadius: 18,
     elevation: 6,
   },
+  heroCardGuestLight: {
+    borderColor: '#FFFFFF',
+    backgroundColor: 'rgba(232,234,238,0.68)',
+    shadowColor: theme.colors.redBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.10,
+    shadowRadius: 20,
+    elevation: 10,
+  },
   guestHeroFade: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -1851,6 +1859,9 @@ function useStyles(theme: AppTheme) {
     borderColor: theme.ink(0.22),
     ...theme.shadow,
   },
+  whatsNewCardLight: {
+    borderColor: '#FFFFFF',
+  },
   whatsNewPage: {
     height: 220,
   },
@@ -1858,14 +1869,6 @@ function useStyles(theme: AppTheme) {
     justifyContent: 'space-between',
     borderRadius: 26,
     overflow: 'hidden',
-  },
-  whatsNewSpecular: {
-    position: 'absolute',
-    top: 0,
-    left: 18,
-    right: 18,
-    height: 1,
-    backgroundColor: theme.ink(0.55),
   },
   whatsNewTopRow: {
     flexDirection: 'row',
@@ -1994,7 +1997,7 @@ function useStyles(theme: AppTheme) {
     borderWidth: 1,
     borderColor: theme.ink(0.18),
     borderRadius: 26,
-    backgroundColor: theme.scheme === 'light' ? 'rgba(255,255,255,0.22)' : 'transparent',
+    backgroundColor: theme.scheme === 'light' ? 'rgba(255,255,255,0.72)' : 'transparent',
     width: '100%',
     padding: 18,
     shadowColor: theme.colors.textMuted,
@@ -2234,6 +2237,9 @@ function useStyles(theme: AppTheme) {
     shadowRadius: 20,
     elevation: 10,
   },
+  actionChipRenewLight: {
+    borderColor: '#FFFFFF',
+  },
   actionChipFreeze: {
     borderColor: 'rgba(96, 165, 250, 0.48)',
     backgroundColor: 'transparent',
@@ -2242,6 +2248,9 @@ function useStyles(theme: AppTheme) {
     shadowOpacity: 0.58,
     shadowRadius: 20,
     elevation: 10,
+  },
+  actionChipFreezeLight: {
+    borderColor: '#FFFFFF',
   },
   actionChipQr: {
     borderColor: 'rgba(155, 127, 240, 0.48)',
@@ -2483,6 +2492,12 @@ function useStyles(theme: AppTheme) {
     lineHeight: 17,
     marginTop: 6,
   },
+  featureTextMachineGuideLight: {
+    color: '#9CA3AF',
+  },
+  featureKickerAiLight: {
+    color: '#F4626C',
+  },
   activityCard: {
     position: 'relative',
     overflow: 'hidden',
@@ -2609,12 +2624,12 @@ function useStyles(theme: AppTheme) {
     backgroundColor: 'transparent',
   },
   requestLinkCardPaymentsLight: {
-    borderColor: 'rgba(76, 42, 158, 0.55)',
+    borderColor: '#FFFFFF',
     shadowColor: '#6E4FCF',
     shadowOpacity: 0.5,
   },
   requestLinkCardReservationsLight: {
-    borderColor: 'rgba(177, 18, 38, 0.36)',
+    borderColor: '#FFFFFF',
     shadowColor: '#E11D2E',
     shadowOpacity: 0.38,
   },
@@ -2833,9 +2848,13 @@ function useStyles(theme: AppTheme) {
     borderWidth: 1,
     borderColor: theme.ink(0.12),
     borderRadius: 24,
-    backgroundColor: 'rgba(18, 20, 28, 0.74)',
+    backgroundColor: theme.scheme === 'light' ? 'rgba(255,255,255,0.78)' : 'rgba(18, 20, 28, 0.74)',
     padding: 18,
     ...theme.shadow,
+  },
+  infoCardLight: {
+    borderColor: 'rgba(10,11,15,0.10)',
+    backgroundColor: 'rgba(244,245,248,0.78)',
   },
   infoTitle: {
     color: theme.colors.text,
@@ -2853,6 +2872,9 @@ function useStyles(theme: AppTheme) {
     color: theme.colors.textMuted,
     fontSize: 14,
     fontWeight: '700',
+  },
+  infoEmptyLight: {
+    color: '#6B7280',
   },
   buttonPressed: {
     opacity: 0.76,
@@ -2877,11 +2899,6 @@ function useStyles(theme: AppTheme) {
     fontSize: 13,
     fontWeight: '900',
   },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(24, 26, 32, 0.42)',
-  },
   centerModalOverlay: {
     flex: 1,
     alignItems: 'center',
@@ -2891,22 +2908,6 @@ function useStyles(theme: AppTheme) {
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-  },
-  modalCard: {
-    position: 'relative',
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    borderWidth: 1,
-    borderColor: theme.ink(0.12),
-    backgroundColor: theme.colors.surface,
-    paddingHorizontal: 22,
-    paddingTop: 14,
-    paddingBottom: 30,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: -16 },
-    shadowOpacity: 0.2,
-    shadowRadius: 28,
-    elevation: 14,
   },
   qrCard: {
     position: 'relative',
@@ -2919,6 +2920,24 @@ function useStyles(theme: AppTheme) {
     borderRadius: 28,
     backgroundColor: theme.colors.surface,
     padding: 22,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.22,
+    shadowRadius: 28,
+    elevation: 14,
+  },
+  membershipModalCard: {
+    position: 'relative',
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 420,
+    borderWidth: 1,
+    borderColor: theme.ink(0.12),
+    borderRadius: 28,
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 22,
+    paddingTop: 20,
+    paddingBottom: 24,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.22,
@@ -2949,28 +2968,6 @@ function useStyles(theme: AppTheme) {
     borderRadius: 999,
     backgroundColor: theme.ink(0.28),
     marginBottom: 16,
-  },
-  modalHandle: {
-    width: 54,
-    height: 6,
-    alignSelf: 'center',
-    borderRadius: 999,
-    backgroundColor: theme.ink(0.28),
-  },
-  modalDragZone: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: -22,
-    minHeight: 32,
-    marginBottom: 10,
-  },
-  modalTopDragHitbox: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 68,
-    zIndex: 2,
   },
   modalKicker: {
     fontSize: 12,
